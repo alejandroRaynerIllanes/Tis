@@ -4,6 +4,7 @@ import { Tag, ChefHat, Plus, Edit2, Trash2, CloudUpload, X, AlertTriangle } from
 import { useAppContext } from '../../context/AppContext';
 import { uploadService } from '../../services/upload.service';
 import { categoriesService } from '../../services/categories.service';
+import { platosService } from '../../services/platos.service';
 interface MenuManagementProps {
   categories: any[];
   setCategories: (cats: any[]) => void;
@@ -20,6 +21,35 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
     title: '', category: '', description: '', price: '',
     image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmb29kfGVufDF8fHx8MTc3MzM3OTc2OHww&ixlib=rb-4.1.0&q=80&w=1080'
   });
+
+  // Cargar platos reales de MongoDB
+ // Cargar platos reales de MongoDB
+  const cargarPlatos = async () => {
+    try {
+      const data = await platosService.getAll();
+      console.log("🍔 Datos crudos desde el backend:", data); // <-- ESTO NOS DIRÁ LA VERDAD
+
+      const platosFormateados = data.map((p: any) => ({
+        id: p._id,
+        name: p.nombre,
+        category: p.categoria, // Si el backend manda un objeto en vez de un ID, aquí se rompe
+        price: p.precio,
+        // Seguro de vida: Si no hay imagen, pon la de por defecto
+        image: p.imagenUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmb29kfGVufDF8fHx8MTc3MzM3OTc2OHww&ixlib=rb-4.1.0&q=80&w=1080',
+        description: p.descripcion,
+        status: (p.disponible ? 'Disponible' : 'Agotado') as 'Disponible' | 'Agotado'
+      }));
+      
+      console.log("✨ Platos formateados para React:", platosFormateados);
+      setDishes(platosFormateados);
+    } catch (error) {
+      console.error("❌ Error CRÍTICO al cargar los platos:", error);
+    }
+  };
+
+  useEffect(() => {
+    cargarPlatos();
+  }, []);
 
   const categoryRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const presetCategoryRef = useRef<string>('');
@@ -84,16 +114,55 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
     setIsModalOpen(true);
   };
 
-  const handleSaveDish = (e: React.FormEvent) => {
+ const handleSaveDish = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.title || !formData.price || !formData.category) return;
-    if (editingId) {
-      setDishes(dishes.map(d => d.id === editingId ? { ...d, name: formData.title, category: formData.category, price: Number(formData.price), image: formData.image, description: formData.description } : d));
-    } else {
-      const newDish = { id: Date.now().toString(), name: formData.title, category: formData.category, price: Number(formData.price), image: formData.image, description: formData.description, status: 'Disponible' as const };
-      setDishes([...dishes, newDish]);
+    console.log("1. Botón guardar presionado. Datos actuales:", formData);
+
+    // 1. Validamos con alertas para que NO sea silencioso
+    if (!formData.title || !formData.price || !formData.category) {
+      alert("⚠️ Por favor llena el nombre, el precio y selecciona una categoría.");
+      return;
     }
-    setIsModalOpen(false);
+
+    // Tu backend EXIGE una descripción según el modelo de Mongoose
+    if (!formData.description || formData.description.trim() === "") {
+      alert("⚠️ La descripción es obligatoria para poder guardar en la base de datos.");
+      return;
+    }
+
+    try {
+      console.log("2. Todo correcto. Armando paquete para el backend...");
+      const datosParaBackend = {
+        nombre: formData.title,
+        descripcion: formData.description,
+        precio: Number(formData.price),
+        imagenUrl: formData.image,
+        categoria: formData.category, // Debe ser el _id de Mongo de la categoría
+        disponible: true
+      };
+      console.log("3. Paquete listo para enviar:", datosParaBackend);
+
+      if (editingId) {
+        console.log("4. Editando plato existente...");
+        await platosService.update(editingId, datosParaBackend);
+      } else {
+        console.log("4. Creando nuevo plato...");
+        const respuesta = await platosService.create(datosParaBackend);
+        console.log("5. Respuesta del servidor:", respuesta);
+      }
+
+      console.log("6. Éxito. Recargando interfaz...");
+      await cargarPlatos();
+      setIsModalOpen(false);
+      
+      // Feedback visual de éxito
+      alert("✅ ¡Plato guardado con éxito en la Base de Datos!");
+
+    } catch (error) {
+      // Si el backend rechaza la petición (ej. error 500 o 400), caerá aquí
+      console.error("❌ Error CRÍTICO al guardar el plato:", error);
+      alert("❌ Hubo un error al guardar. Presiona F12 y revisa la pestaña 'Console' para ver el detalle.");
+    }
   };
 
   const handleSaveCategory = async (e: React.FormEvent) => {

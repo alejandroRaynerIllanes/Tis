@@ -1,7 +1,7 @@
 
-  # Diseñar pantalla de login
+  # Proyecto Restaurante
 
-  This is a code bundle for Diseñar pantalla de login. The original project is available at https://www.figma.com/design/fbdMKQWyRYgMpS2pq3yDey/Dise%C3%B1ar-pantalla-de-login.
+  This is a code bundle for Proyecto Restaurante. The original project is available at https://www.figma.com/design/fbdMKQWyRYgMpS2pq3yDey/Proyecto-Restaurante.
 
   ## Running the code
 

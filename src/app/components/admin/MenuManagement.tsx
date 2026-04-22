@@ -337,7 +337,25 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
             <h2 className="text-2xl font-bold text-[#4B2E2D] mb-3">¿Eliminar del Menú?</h2>
             <div className="flex gap-4 w-full mt-4">
               <button onClick={() => setItemToDelete(null)} className="flex-1 py-3 px-4 font-bold text-[#4B2E2D] bg-transparent border-2 border-[#4B2E2D] rounded-xl transition-all">Cancelar</button>
-              <button onClick={() => { setDishes(dishes.filter(d => d.id !== itemToDelete)); setItemToDelete(null); }} className="flex-1 py-3 px-4 bg-[#D0543A] text-white font-bold rounded-xl transition-all border-2 border-[#D0543A]">Sí, Eliminar</button>
+              <button 
+  onClick={async () => { 
+    if (!itemToDelete) return;
+    try {
+      // 1. Le decimos al Backend que elimine el plato en MongoDB
+      await platosService.remove(itemToDelete);
+      
+      // 2. Si el backend responde con éxito, lo borramos de la pantalla
+      setDishes(dishes.filter(d => d.id !== itemToDelete));
+      setItemToDelete(null);
+    } catch (error) {
+      console.error("Error al eliminar el plato:", error);
+      alert("Hubo un problema al intentar eliminar el plato de la base de datos.");
+    }
+  }} 
+  className="flex-1 py-3 px-4 bg-[#D0543A] text-white font-bold rounded-xl transition-all border-2 border-[#D0543A] hover:bg-[#b5462f] active:scale-95"
+>
+  Sí, Eliminar
+</button>
             </div>
           </div>
         </div>

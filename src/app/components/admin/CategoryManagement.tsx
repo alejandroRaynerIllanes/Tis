@@ -5,9 +5,14 @@ import { useAppContext } from '../../context/AppContext';
 import { categoriesService } from '../../services/categories.service';
 import { toast } from 'sonner';
 
+export interface UICategory {
+  id: string;
+  label: string;
+}
+
 interface CategoryManagementProps {
-  categories: any[];
-  setCategories: (cats: any[]) => void;
+  categories: UICategory[];
+  setCategories: (cats: UICategory[]) => void;
 }
 
 export function CategoryManagement({ categories, setCategories }: CategoryManagementProps) {
@@ -24,7 +29,7 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
     setIsCategoryModalOpen(true);
   };
 
-  const handleOpenEditCategoryModal = (category: any) => {
+  const handleOpenEditCategoryModal = (category: UICategory) => {
     setCategoryEditingId(category.id);
     setCategoryFormData({ label: category.label });
     setIsCategoryModalOpen(true);

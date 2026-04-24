@@ -6,9 +6,35 @@ import { uploadService } from '../../services/upload.service';
 import { categoriesService } from '../../services/categories.service';
 import { platosService } from '../../services/platos.service';
 import { toast } from 'sonner';
+
+export interface UICategory {
+  id: string;
+  label: string;
+}
+
+export interface UIDish {
+  id: string;
+  name: string;
+  category: string;
+  price: number;
+  image: string;
+  description: string;
+  status: 'Disponible' | 'Agotado';
+}
+
+interface BackendDish {
+  _id: string;
+  nombre: string;
+  categoria: any; // Puede ser el string (ID) o el objeto populado
+  precio: number;
+  imagenUrl?: string;
+  descripcion?: string;
+  disponible: boolean;
+}
+
 interface MenuManagementProps {
-  categories: any[];
-  setCategories: (cats: any[]) => void;
+  categories: UICategory[];
+  setCategories: (cats: UICategory[]) => void;
 }
 
 export function MenuManagement({ categories, setCategories }: MenuManagementProps) {
@@ -30,7 +56,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
       const data = await platosService.getAll();
       console.log("🍔 Datos crudos desde el backend:", data); // <-- ESTO NOS DIRÁ LA VERDAD
 
-      const platosFormateados = data.map((p: any) => ({
+      const platosFormateados: UIDish[] = data.map((p: BackendDish) => ({
         id: p._id,
         name: p.nombre,
         // FIX: El backend popula la categoría, así que extraemos el _id del objeto.
@@ -107,7 +133,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
     }
   }, [isModalOpen]);
 
-  const handleOpenEditModal = (dish: any) => {
+  const handleOpenEditModal = (dish: UIDish) => {
     setEditingId(dish.id);
     setIsPresetCategory(false);
     presetCategoryRef.current = '';

@@ -22,6 +22,7 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
   const [categoryFormData, setCategoryFormData] = useState({ label: '' });
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // 🚀 PASO 1: Listado dinámico (Consumir las categorías desde el backend al abrir)
   useEffect(() => {
@@ -85,13 +86,17 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
 
   // 🚀 CONECTADO AL BACKEND (Eliminar)
   const handleDeleteCategory = async (categoryId: string) => {
+    setIsDeleting(true);
     try {
       await categoriesService.remove(categoryId);
       setCategories(categories.filter(cat => cat.id !== categoryId));
       setCategoryToDelete(null);
+      toast.success("Categoría eliminada con éxito.");
     } catch (error) {
       console.error("Error al eliminar categoría:", error);
       toast.error("No se pudo eliminar la categoría.", { description: "Verifica que no tenga platos asignados." });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -145,8 +150,14 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
             <AlertTriangle size={32} className="text-[#D0543A] mb-4" />
             <h2 className="text-2xl font-bold text-[#4B2E2D] mb-3">¿Eliminar Categoría?</h2>
             <div className="flex gap-4 w-full mt-4">
-              <button onClick={() => setCategoryToDelete(null)} className="flex-1 py-3 px-4 font-bold text-[#4B2E2D] border-2 border-[#4B2E2D] rounded-xl">Cancelar</button>
-              <button onClick={() => handleDeleteCategory(categoryToDelete)} className="flex-1 py-3 px-4 bg-[#D0543A] text-white font-bold rounded-xl">Sí, Eliminar</button>
+              <button onClick={() => setCategoryToDelete(null)} disabled={isDeleting} className="flex-1 py-3 px-4 font-bold text-[#4B2E2D] border-2 border-[#4B2E2D] rounded-xl disabled:opacity-50">Cancelar</button>
+              <button 
+                onClick={() => handleDeleteCategory(categoryToDelete)} 
+                disabled={isDeleting}
+                className={`flex-1 py-3 px-4 text-white font-bold rounded-xl transition-all ${isDeleting ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#D0543A] hover:bg-[#b5462f]'}`}
+              >
+                {isDeleting ? 'Eliminando...' : 'Sí, Eliminar'}
+              </button>
             </div>
           </div>
         </div>

@@ -1,5 +1,5 @@
 // src/app/components/admin/CategoryManagement.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, X, AlertTriangle } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import { categoriesService } from '../../services/categories.service';
@@ -22,6 +22,20 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
   const [categoryFormData, setCategoryFormData] = useState({ label: '' });
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // 🚀 PASO 1: Listado dinámico (Consumir las categorías desde el backend al abrir)
+  useEffect(() => {
+    const cargarCategorias = async () => {
+      try {
+        const data = await categoriesService.getAll();
+        setCategories(data.map((cat: any) => ({ id: cat._id, label: cat.nombre })));
+      } catch (error) {
+        console.error("Error al cargar categorías:", error);
+        toast.error("Error al cargar las categorías desde el servidor.");
+      }
+    };
+    cargarCategorias();
+  }, []);
 
   const handleOpenAddCategoryModal = () => {
     setCategoryEditingId(null);

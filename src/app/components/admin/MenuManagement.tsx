@@ -18,7 +18,7 @@ export interface UIDish {
   category: string;
   price: number;
   image: string;
-  description: string;
+  description?: string;
   status: 'Disponible' | 'Agotado';
 }
 

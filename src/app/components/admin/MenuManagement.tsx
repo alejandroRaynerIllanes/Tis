@@ -5,6 +5,7 @@ import { useAppContext } from '../../context/AppContext';
 import { uploadService } from '../../services/upload.service';
 import { categoriesService } from '../../services/categories.service';
 import { platosService } from '../../services/platos.service';
+import { toast } from 'sonner';
 interface MenuManagementProps {
   categories: any[];
   setCategories: (cats: any[]) => void;
@@ -64,7 +65,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      alert("El archivo pesa más de 5MB.");
+      toast.error("El archivo pesa más de 5MB.");
       return;
     }
 
@@ -74,7 +75,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
       setFormData(prev => ({ ...prev, image: response.url }));
     } catch (error) {
       console.error("Error al subir la imagen:", error);
-      alert("Hubo un problema al subir la foto.");
+      toast.error("Hubo un problema al subir la foto.");
     } finally {
       setIsUploading(false);
     }
@@ -120,13 +121,13 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
 
     // 1. Validamos con alertas para que NO sea silencioso
     if (!formData.title || !formData.price || !formData.category) {
-      alert("⚠️ Por favor llena el nombre, el precio y selecciona una categoría.");
+      toast.warning("Por favor llena el nombre, el precio y selecciona una categoría.");
       return;
     }
 
     // Tu backend EXIGE una descripción según el modelo de Mongoose
     if (!formData.description || formData.description.trim() === "") {
-      alert("⚠️ La descripción es obligatoria para poder guardar en la base de datos.");
+      toast.warning("La descripción es obligatoria para poder guardar en la base de datos.");
       return;
     }
 
@@ -156,12 +157,12 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
       setIsModalOpen(false);
       
       // Feedback visual de éxito
-      alert("✅ ¡Plato guardado con éxito en la Base de Datos!");
+      toast.success("¡Plato guardado con éxito en la Base de Datos!");
 
     } catch (error) {
       // Si el backend rechaza la petición (ej. error 500 o 400), caerá aquí
       console.error("❌ Error CRÍTICO al guardar el plato:", error);
-      alert("❌ Hubo un error al guardar. Presiona F12 y revisa la pestaña 'Console' para ver el detalle.");
+      toast.error("Hubo un error al guardar el plato.", { description: "Revisa la consola para ver el detalle." });
     }
   };
 
@@ -176,7 +177,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
     setCategoryFormData({ label: '' });
   } catch (error) {
     console.error(error);
-    alert("Error al crear categoría rápida.");
+    toast.error("Error al crear categoría rápida.");
   }
 };
 
@@ -337,25 +338,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
             <h2 className="text-2xl font-bold text-[#4B2E2D] mb-3">¿Eliminar del Menú?</h2>
             <div className="flex gap-4 w-full mt-4">
               <button onClick={() => setItemToDelete(null)} className="flex-1 py-3 px-4 font-bold text-[#4B2E2D] bg-transparent border-2 border-[#4B2E2D] rounded-xl transition-all">Cancelar</button>
-              <button 
-  onClick={async () => { 
-    if (!itemToDelete) return;
-    try {
-      // 1. Le decimos al Backend que elimine el plato en MongoDB
-      await platosService.remove(itemToDelete);
-      
-      // 2. Si el backend responde con éxito, lo borramos de la pantalla
-      setDishes(dishes.filter(d => d.id !== itemToDelete));
-      setItemToDelete(null);
-    } catch (error) {
-      console.error("Error al eliminar el plato:", error);
-      alert("Hubo un problema al intentar eliminar el plato de la base de datos.");
-    }
-  }} 
-  className="flex-1 py-3 px-4 bg-[#D0543A] text-white font-bold rounded-xl transition-all border-2 border-[#D0543A] hover:bg-[#b5462f] active:scale-95"
->
-  Sí, Eliminar
-</button>
+              <button onClick={() => { setDishes(dishes.filter(d => d.id !== itemToDelete)); setItemToDelete(null); }} className="flex-1 py-3 px-4 bg-[#D0543A] text-white font-bold rounded-xl transition-all border-2 border-[#D0543A]">Sí, Eliminar</button>
             </div>
           </div>
         </div>

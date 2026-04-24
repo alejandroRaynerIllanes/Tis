@@ -4,6 +4,7 @@ import { Plus, Edit2, Trash2, X, AlertTriangle } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import { WaiterView } from '../WaiterView';
 import { MAX_VIP_TABLES } from '../../data/constants';
+import { toast } from 'sonner';
 
 interface TableManagementProps {
   locations: any[];
@@ -44,7 +45,7 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
   const handleSaveTable = (e: React.FormEvent) => {
     e.preventDefault();
     if (!tableFormData.number || !tableFormData.capacity) return;
-    if (Number(tableFormData.capacity) > 20) { alert("Capacidad máxima 20."); return; }
+    if (Number(tableFormData.capacity) > 20) { toast.warning("Capacidad máxima es de 20 personas."); return; }
 
     if (tableFormData.tableType === 'vip') {
       const currentVipTables = tables.filter(t => t.type === 'vip');

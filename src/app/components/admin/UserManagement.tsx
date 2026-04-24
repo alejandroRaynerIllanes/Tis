@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, X, AlertTriangle, Users, Shield, UserCheck, UserCog } from 'lucide-react';
 import { usersService, BackendUser } from '../../services/users.service';
+import { toast } from 'sonner';
 
 export function UserManagement() {
   const [users, setUsers] = useState<BackendUser[]>([]);
@@ -68,7 +69,7 @@ export function UserManagement() {
       setIsUserModalOpen(false);
     } catch (error) {
       console.error("Error al guardar usuario en BD:", error);
-      alert("Hubo un error al guardar. Verifica la consola.");
+      toast.error("Hubo un error al guardar.", { description: "Verifica la consola para más detalles." });
     }
   };
 
@@ -247,33 +248,7 @@ export function UserManagement() {
             <p className="text-[#4B2E2D]/80 mb-8 leading-relaxed font-medium">Esta acción eliminará la cuenta del usuario permanentemente de la Base de Datos y no se puede deshacer.</p>
             <div className="flex items-center justify-center gap-4 w-full">
               <button onClick={() => setUserToDelete(null)} className="flex-1 py-3 px-4 font-bold text-[#4B2E2D] bg-transparent border-2 border-[#4B2E2D] rounded-xl hover:bg-[#4B2E2D] hover:text-white transition-all">Cancelar</button>
-              <button 
-  type="button" 
-  onClick={async (e) => { 
-    e.preventDefault(); 
-    
-    if (!userToDelete) return;
-
-    try {
-      // 1. Elimina el usuario en el backend
-      await usersService.remove(userToDelete); 
-      
-      // 2. MAGIA: Le pedimos a React que descargue la lista fresca de MongoDB
-      await cargarUsuarios();
-      
-      // 3. Cerramos el modal
-      setUserToDelete(null);
-      alert("✅ Usuario eliminado permanentemente.");
-      
-    } catch (error) {
-      console.error("Error al eliminar:", error);
-      alert("Fallo al conectar con el servidor.");
-    }
-  }} 
-  className="flex-1 py-3 px-4 bg-[#D0543A] hover:bg-[#b5462f] text-white font-bold rounded-xl transition-all shadow-lg cursor-pointer relative z-50 pointer-events-auto"
->
-  Sí, Eliminar
-</button>
+              <button onClick={() => handleDeleteUser(userToDelete)} className="flex-1 py-3 px-4 bg-[#D0543A] text-white font-bold rounded-xl shadow-lg hover:bg-[#b5462f] hover:shadow-xl active:scale-[0.98] transition-all border-2 border-[#D0543A]">Sí, Eliminar</button>
             </div>
           </div>
         </div>

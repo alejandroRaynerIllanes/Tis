@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Plus, Edit2, Trash2, X, AlertTriangle } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import { categoriesService } from '../../services/categories.service';
+import { toast } from 'sonner';
 
 interface CategoryManagementProps {
   categories: any[];
@@ -57,7 +58,7 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
       setIsCategoryModalOpen(false);
     } catch (error) {
       console.error("Error al guardar categoría:", error);
-      alert("Hubo un error al conectar con el servidor.");
+      toast.error("Hubo un error al conectar con el servidor.");
     } finally {
       setIsLoading(false);
     }
@@ -71,7 +72,7 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
       setCategoryToDelete(null);
     } catch (error) {
       console.error("Error al eliminar categoría:", error);
-      alert("No se pudo eliminar la categoría. Verifica que no tenga platos asignados.");
+      toast.error("No se pudo eliminar la categoría.", { description: "Verifica que no tenga platos asignados." });
     }
   };
 

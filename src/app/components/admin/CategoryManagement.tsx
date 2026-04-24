@@ -117,7 +117,7 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
           {categories.map(cat => (
             <div key={cat.id} className="bg-white p-6 rounded-2xl shadow-xl flex items-center justify-between group border border-transparent hover:border-[#E57C5D]/30 transition-all duration-300 hover:shadow-2xl hover:-translate-y-1">
               <h3 className="text-xl font-bold text-[#4B2E2D]">{cat.label}</h3>
-              <div className="flex gap-2 opacity-0 lg:opacity-100 group-hover:opacity-100 transition-opacity">
+              <div className="flex gap-2">
                 <button onClick={() => handleOpenEditCategoryModal(cat)} className="p-2 text-[#4B2E2D]/50 hover:text-[#D0543A] hover:bg-[#FCE4D6] rounded-lg transition-all" aria-label="Editar"><Edit2 size={18} /></button>
                 <button onClick={() => setCategoryToDelete(cat.id)} className="p-2 text-[#4B2E2D]/50 hover:text-[#D0543A] hover:bg-[#D0543A]/10 rounded-lg transition-all" aria-label="Eliminar"><Trash2 size={18} /></button>
               </div>

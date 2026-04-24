@@ -43,6 +43,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+  const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     title: '', category: '', description: '', price: '',
@@ -227,6 +228,19 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
     }
   };
 
+  // 🚀 Eliminar categoría desde la vista del menú
+  const handleDeleteCategory = async (id: string) => {
+    try {
+      await categoriesService.remove(id);
+      setCategories(categories.filter(c => c.id !== id));
+      setCategoryToDelete(null);
+      toast.success("Categoría eliminada de la base de datos.");
+    } catch (error) {
+      console.error("Error al eliminar la categoría:", error);
+      toast.error("No se pudo eliminar la categoría.", { description: "Asegúrate de que no tenga platos asignados." });
+    }
+  };
+
   const handleSaveCategory = async (e: React.FormEvent) => {
   e.preventDefault();
   if (!categoryFormData.label) return;
@@ -277,6 +291,9 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
             <div key={category.id} ref={el => { categoryRefs.current[category.id] = el; }} className="flex flex-col gap-5">
               <div className="flex items-center gap-2 sm:gap-3">
                 <h2 className="text-xl sm:text-2xl font-bold text-[#4B2E2D] shrink-0">{category.label}</h2>
+                <button onClick={() => setCategoryToDelete(category.id)} className="p-1.5 text-[#4B2E2D]/40 hover:text-[#D0543A] hover:bg-[#D0543A]/10 rounded-lg transition-all" aria-label="Eliminar categoría">
+                  <Trash2 size={20} />
+                </button>
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#E57C5D]/15 text-[#D0543A] border border-[#E57C5D]/25 shrink-0">{categoryDishes.length} platos</span>
                 <div className="h-0.5 flex-1 bg-[#E57C5D]/25 rounded-full"></div>
               </div>
@@ -400,6 +417,21 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
             <div className="flex gap-4 w-full mt-4">
               <button onClick={() => setItemToDelete(null)} className="flex-1 py-3 px-4 font-bold text-[#4B2E2D] bg-transparent border-2 border-[#4B2E2D] rounded-xl transition-all">Cancelar</button>
               <button onClick={() => itemToDelete && handleDeleteDish(itemToDelete)} className="flex-1 py-3 px-4 bg-[#D0543A] text-white font-bold rounded-xl transition-all border-2 border-[#D0543A]">Sí, Eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Eliminar Categoría */}
+      {categoryToDelete !== null && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#FCE4D6] w-full max-w-[400px] border-[4px] border-[#D0543A] rounded-3xl p-8 relative shadow-2xl flex flex-col items-center text-center">
+            <AlertTriangle size={32} className="text-[#D0543A] mb-4" />
+            <h2 className="text-2xl font-bold text-[#4B2E2D] mb-3">¿Eliminar Categoría?</h2>
+            <p className="text-sm text-[#4B2E2D]/70 mb-4">Asegúrate de que no haya platos en esta categoría.</p>
+            <div className="flex gap-4 w-full mt-4">
+              <button onClick={() => setCategoryToDelete(null)} className="flex-1 py-3 px-4 font-bold text-[#4B2E2D] bg-transparent border-2 border-[#4B2E2D] rounded-xl transition-all">Cancelar</button>
+              <button onClick={() => categoryToDelete && handleDeleteCategory(categoryToDelete)} className="flex-1 py-3 px-4 bg-[#D0543A] text-white font-bold rounded-xl transition-all border-2 border-[#D0543A]">Sí, Eliminar</button>
             </div>
           </div>
         </div>

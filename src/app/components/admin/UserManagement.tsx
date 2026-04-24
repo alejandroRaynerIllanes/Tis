@@ -59,13 +59,24 @@ export function UserManagement() {
 
       if (userEditingId) {
         if (userFormData.password) payload.password = userFormData.password;
-        await usersService.update(userEditingId, payload);
+        const response: any = await usersService.update(userEditingId, payload);
+        
+        // El backend devuelve { mensaje, usuario }, extraemos el usuario y normalizamos el ID
+        const updatedUser = response.usuario || response;
+        setUsers(users.map(u => u._id === userEditingId ? { ...updatedUser, _id: updatedUser._id || updatedUser.id } : u));
+        toast.success("Usuario actualizado correctamente.");
       } else {
         payload.password = userFormData.password;
-        await usersService.create(payload);
+        const response: any = await usersService.create(payload);
+        
+        // Extraemos el usuario y normalizamos el ID para que React lo entienda
+        const createdUser = response.usuario || response;
+        setUsers([...users, { ...createdUser, _id: createdUser._id || createdUser.id }]);
+        toast.success("Usuario creado correctamente.");
       }
 
-      await cargarUsuarios();
+      // ¡La magia! Ya no descargamos todos los usuarios de la base de datos
+      // await cargarUsuarios();
       setIsUserModalOpen(false);
     } catch (error) {
       console.error("Error al guardar usuario en BD:", error);

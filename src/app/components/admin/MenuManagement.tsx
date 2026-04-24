@@ -243,9 +243,28 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
 
   const handleSaveCategory = async (e: React.FormEvent) => {
   e.preventDefault();
-  if (!categoryFormData.label) return;
+  
+  const nombreLimpio = categoryFormData.label.trim();
+  if (!nombreLimpio) {
+    toast.warning("El nombre de la categoría no puede estar vacío.");
+    return;
+  }
+
+  if (nombreLimpio.length < 3 || /^(.)\1+$/.test(nombreLimpio)) {
+    toast.warning("Ingresa un nombre de categoría válido (mínimo 3 caracteres).");
+    return;
+  }
+
+  const isDuplicate = categories.some(
+    cat => cat.label.toLowerCase() === nombreLimpio.toLowerCase()
+  );
+  if (isDuplicate) {
+    toast.warning("Ya existe una categoría con este nombre.");
+    return;
+  }
+
   try {
-    const created = await categoriesService.create(categoryFormData.label);
+    const created = await categoriesService.create(nombreLimpio);
     setCategories([...categories, { id: created._id, label: created.nombre }]);
     setMenuFilter('all');
     setIsCategoryModalOpen(false);
@@ -444,7 +463,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
             <button onClick={() => setIsCategoryModalOpen(false)} className="absolute top-4 right-4 text-[#4B2E2D]/50 hover:text-[#D0543A]"><X size={24} /></button>
             <h2 className="text-3xl font-bold text-[#4B2E2D] mb-6">Nueva Categoría</h2>
             <form onSubmit={handleSaveCategory}>
-              <input type="text" required value={categoryFormData.label} onChange={(e) => setCategoryFormData({ label: e.target.value })} className="w-full px-4 py-3 rounded-xl border-2 border-[#E57C5D] text-[#4B2E2D] mb-6" placeholder="Ej: Platos Especiales" />
+              <input type="text" required value={categoryFormData.label} onChange={(e) => setCategoryFormData({ label: e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s]/g, '') })} className="w-full px-4 py-3 rounded-xl border-2 border-[#E57C5D] text-[#4B2E2D] mb-6" placeholder="Ej: Platos Especiales" />
               <div className="flex justify-end gap-4"><button type="submit" className="px-8 py-3 bg-[#D0543A] text-white font-bold rounded-xl">Guardar</button></div>
             </form>
           </div>

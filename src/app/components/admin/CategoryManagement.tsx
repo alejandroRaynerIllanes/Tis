@@ -53,13 +53,34 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
   // 🚀 CONECTADO AL BACKEND (Crear y Editar)
   const handleSaveCategory = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!categoryFormData.label) return;
+    
+    // 1. Limpiar espacios al inicio y final
+    const nombreLimpio = categoryFormData.label.trim();
+    if (!nombreLimpio) {
+      toast.warning("El nombre de la categoría no puede estar vacío.");
+      return;
+    }
+
+    // 2. Longitud mínima y caracteres repetidos (ej: "aaa")
+    if (nombreLimpio.length < 3 || /^(.)\1+$/.test(nombreLimpio)) {
+      toast.warning("Ingresa un nombre de categoría válido (mínimo 3 caracteres).");
+      return;
+    }
+
+    // 3. Evitar duplicados (Ignorando mayúsculas/minúsculas y la categoría actual si estamos editando)
+    const isDuplicate = categories.some(
+      cat => cat.label.toLowerCase() === nombreLimpio.toLowerCase() && cat.id !== categoryEditingId
+    );
+    if (isDuplicate) {
+      toast.warning("Ya existe una categoría con este nombre.");
+      return;
+    }
 
     setIsLoading(true);
     try {
       if (categoryEditingId) {
         // PUT: Actualizar en BD
-        const updated = await categoriesService.update(categoryEditingId, categoryFormData.label);
+        const updated = await categoriesService.update(categoryEditingId, nombreLimpio);
         
         // Actualizamos los platos locales si el nombre de la categoría cambió
         const oldCat = categories.find(c => c.id === categoryEditingId);
@@ -71,7 +92,7 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
         setCategories(categories.map(cat => cat.id === categoryEditingId ? { ...cat, label: updated.nombre } : cat));
       } else {
         // POST: Crear en BD
-        const created = await categoriesService.create(categoryFormData.label);
+        const created = await categoriesService.create(nombreLimpio);
         // Guardamos usando el _id real de MongoDB
         setCategories([...categories, { id: created._id, label: created.nombre }]);
       }

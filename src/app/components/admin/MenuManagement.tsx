@@ -33,9 +33,9 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
       const platosFormateados = data.map((p: any) => ({
         id: p._id,
         name: p.nombre,
-        category: p.categoria, // Si el backend manda un objeto en vez de un ID, aquí se rompe
+        // FIX: El backend popula la categoría, así que extraemos el _id del objeto.
+        category: typeof p.categoria === 'object' && p.categoria !== null ? p.categoria._id : p.categoria,
         price: p.precio,
-        // Seguro de vida: Si no hay imagen, pon la de por defecto
         image: p.imagenUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmb29kfGVufDF8fHx8MTc3MzM3OTc2OHww&ixlib=rb-4.1.0&q=80&w=1080',
         description: p.descripcion,
         status: (p.disponible ? 'Disponible' : 'Agotado') as 'Disponible' | 'Agotado'
@@ -145,24 +145,59 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
 
       if (editingId) {
         console.log("4. Editando plato existente...");
-        await platosService.update(editingId, datosParaBackend);
+        const platoActualizado = await platosService.update(editingId, datosParaBackend);
+        
+        // ✨ OPTIMIZACIÓN: Actualizamos solo el plato editado en el estado local
+        setDishes(dishes.map(d => d.id === editingId ? {
+          id: platoActualizado._id,
+          name: platoActualizado.nombre,
+          category: typeof platoActualizado.categoria === 'object' ? platoActualizado.categoria._id : platoActualizado.categoria,
+          price: platoActualizado.precio,
+          image: platoActualizado.imagenUrl,
+          description: platoActualizado.descripcion,
+          status: (platoActualizado.disponible ? 'Disponible' : 'Agotado') as 'Disponible' | 'Agotado'
+        } : d));
+
       } else {
         console.log("4. Creando nuevo plato...");
-        const respuesta = await platosService.create(datosParaBackend);
-        console.log("5. Respuesta del servidor:", respuesta);
+        const platoCreado = await platosService.create(datosParaBackend);
+        console.log("5. Respuesta del servidor:", platoCreado);
+
+        // ✨ OPTIMIZACIÓN: Añadimos el nuevo plato al estado local sin recargar todo
+        setDishes([...dishes, {
+          id: platoCreado._id,
+          name: platoCreado.nombre,
+          category: typeof platoCreado.categoria === 'object' ? platoCreado.categoria._id : platoCreado.categoria,
+          price: platoCreado.precio,
+          image: platoCreado.imagenUrl,
+          description: platoCreado.descripcion,
+          status: (platoCreado.disponible ? 'Disponible' : 'Agotado') as 'Disponible' | 'Agotado'
+        }]);
       }
 
-      console.log("6. Éxito. Recargando interfaz...");
-      await cargarPlatos();
+      // Ya no necesitamos recargar toda la lista desde la BD
+      // await cargarPlatos();
       setIsModalOpen(false);
       
-      // Feedback visual de éxito
       toast.success("¡Plato guardado con éxito en la Base de Datos!");
 
     } catch (error) {
-      // Si el backend rechaza la petición (ej. error 500 o 400), caerá aquí
       console.error("❌ Error CRÍTICO al guardar el plato:", error);
       toast.error("Hubo un error al guardar el plato.", { description: "Revisa la consola para ver el detalle." });
+    }
+  };
+
+  // 🚀 BUG FIX: Conectar la eliminación a la base de datos
+  const handleDeleteDish = async (id: string) => {
+    try {
+      await platosService.remove(id);
+      // Actualizamos el estado local para que el cambio sea instantáneo
+      setDishes(dishes.filter(d => d.id !== id));
+      setItemToDelete(null);
+      toast.success("Plato eliminado de la base de datos.");
+    } catch (error) {
+      console.error("Error al eliminar el plato:", error);
+      toast.error("No se pudo eliminar el plato.");
     }
   };
 
@@ -338,7 +373,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
             <h2 className="text-2xl font-bold text-[#4B2E2D] mb-3">¿Eliminar del Menú?</h2>
             <div className="flex gap-4 w-full mt-4">
               <button onClick={() => setItemToDelete(null)} className="flex-1 py-3 px-4 font-bold text-[#4B2E2D] bg-transparent border-2 border-[#4B2E2D] rounded-xl transition-all">Cancelar</button>
-              <button onClick={() => { setDishes(dishes.filter(d => d.id !== itemToDelete)); setItemToDelete(null); }} className="flex-1 py-3 px-4 bg-[#D0543A] text-white font-bold rounded-xl transition-all border-2 border-[#D0543A]">Sí, Eliminar</button>
+              <button onClick={() => itemToDelete && handleDeleteDish(itemToDelete)} className="flex-1 py-3 px-4 bg-[#D0543A] text-white font-bold rounded-xl transition-all border-2 border-[#D0543A]">Sí, Eliminar</button>
             </div>
           </div>
         </div>

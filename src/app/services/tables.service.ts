@@ -12,12 +12,12 @@ export interface BackendTable {
 }
 
 export const tablesService = {
-  getAll: () => api.get<BackendTable[]>('/api/mesas'),
+  getAll: () => api.get<BackendTable[]>('/mesas'),
   
   // Usamos Partial para permitir enviar solo los datos necesarios al crear/actualizar
-  create: (data: Partial<BackendTable>) => api.post<BackendTable>('/api/mesas', data),
+  create: (data: Partial<BackendTable>) => api.post<BackendTable>('/mesas', data),
   
-  update: (id: string, data: Partial<BackendTable>) => api.put<BackendTable>(`/api/mesas/${id}`, data),
+  update: (id: string, data: Partial<BackendTable>) => api.put<BackendTable>(`/mesas/${id}`, data),
   
-  remove: (id: string) => api.delete<{ mensaje: string }>(`/api/mesas/${id}`)
+  remove: (id: string) => api.delete<{ mensaje: string }>(`/mesas/${id}`)
 };

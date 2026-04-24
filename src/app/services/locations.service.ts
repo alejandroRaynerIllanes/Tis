@@ -6,11 +6,11 @@ export interface BackendLocation {
 }
 
 export const locationsService = {
-  getAll: () => api.get<BackendLocation[]>('/api/ubicaciones'),
+  getAll: () => api.get<BackendLocation[]>('/ubicaciones'),
   
-  create: (nombre: string) => api.post<BackendLocation>('/api/ubicaciones', { nombre }),
+  create: (nombre: string) => api.post<BackendLocation>('/ubicaciones', { nombre }),
   
-  update: (id: string, nombre: string) => api.put<BackendLocation>(`/api/ubicaciones/${id}`, { nombre }),
+  update: (id: string, nombre: string) => api.put<BackendLocation>(`/ubicaciones/${id}`, { nombre }),
   
-  remove: (id: string) => api.delete<{ mensaje: string }>(`/api/ubicaciones/${id}`)
+  remove: (id: string) => api.delete<{ mensaje: string }>(`/ubicaciones/${id}`)
 };

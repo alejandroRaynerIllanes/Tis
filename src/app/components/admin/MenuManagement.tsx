@@ -19,23 +19,25 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
   
   const [formData, setFormData] = useState({
     title: '', category: '', description: '', price: '',
-    image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmb29kfGVufDF8fHx8MTc3MzM3OTc2OHww&ixlib=rb-4.1.0&q=80&w=1080'
+    image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmb29kfGVufDF8fHx8MTc3MzM3OTc2OHww&ixlib=rb-4.1.0&q=80&w=1080',
+    imagePublicId: ''
   });
 
   // Cargar platos reales de MongoDB
- // Cargar platos reales de MongoDB
   const cargarPlatos = async () => {
     try {
       const data = await platosService.getAll();
-      console.log("🍔 Datos crudos desde el backend:", data); // <-- ESTO NOS DIRÁ LA VERDAD
+      console.log("🍔 Datos crudos desde el backend:", data);
 
       const platosFormateados = data.map((p: any) => ({
         id: p._id,
         name: p.nombre,
-        category: p.categoria, // Si el backend manda un objeto en vez de un ID, aquí se rompe
+        // Extraer el _id si es un objeto populado, o usar directamente si es un string
+        category: typeof p.categoria === 'object' ? p.categoria._id : p.categoria,
+        categoryName: typeof p.categoria === 'object' ? p.categoria.nombre : p.categoria,
         price: p.precio,
-        // Seguro de vida: Si no hay imagen, pon la de por defecto
         image: p.imagenUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmb29kfGVufDF8fHx8MTc3MzM3OTc2OHww&ixlib=rb-4.1.0&q=80&w=1080',
+        imagePublicId: p.imagenPublicId || '',
         description: p.descripcion,
         status: (p.disponible ? 'Disponible' : 'Agotado') as 'Disponible' | 'Agotado'
       }));
@@ -71,7 +73,11 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
     try {
       setIsUploading(true);
       const response = await uploadService.uploadImage(file);
-      setFormData(prev => ({ ...prev, image: response.url }));
+      setFormData(prev => ({ 
+        ...prev, 
+        image: response.url,
+        imagePublicId: response.publicId 
+      }));
     } catch (error) {
       console.error("Error al subir la imagen:", error);
       alert("Hubo un problema al subir la foto.");
@@ -95,7 +101,8 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
     setEditingId(null);
     setFormData({
       title: '', category: preset, description: '', price: '',
-      image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmb29kfGVufDF8fHx8MTc3MzM3OTc2OHww&ixlib=rb-4.1.0&q=80&w=1080'
+      image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmb29kfGVufDF8fHx8MTc3MzM3OTc2OHww&ixlib=rb-4.1.0&q=80&w=1080',
+      imagePublicId: ''
     });
     setIsModalOpen(true);
   };
@@ -110,7 +117,14 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
     setEditingId(dish.id);
     setIsPresetCategory(false);
     presetCategoryRef.current = '';
-    setFormData({ title: dish.name, category: dish.category, description: dish.description || '', price: String(dish.price), image: dish.image });
+    setFormData({ 
+      title: dish.name, 
+      category: dish.category, 
+      description: dish.description || '', 
+      price: String(dish.price), 
+      image: dish.image,
+      imagePublicId: dish.imagePublicId || ''
+    });
     setIsModalOpen(true);
   };
 
@@ -137,6 +151,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
         descripcion: formData.description,
         precio: Number(formData.price),
         imagenUrl: formData.image,
+        imagenPublicId: formData.imagePublicId,
         categoria: formData.category, // Debe ser el _id de Mongo de la categoría
         disponible: true
       };

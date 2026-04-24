@@ -11,7 +11,7 @@ import { Dashboard } from './admin/Dashboard';
 import { MenuManagement } from './admin/MenuManagement';
 import { CategoryManagement } from './admin/CategoryManagement';
 import { TableManagement } from './admin/TableManagement';
-import { UserManagement } from './admin/UserManagement';
+import { UserManagement } from './UserManagement';
 import { ReportsSection } from './admin/ReportsSection';
 import { VIPClients } from './VIPClients';
 

@@ -1,6 +1,8 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { io } from 'socket.io-client';
 import type { Product, ProductStatus, Table, TableStatus, OrderItem, ReservationInfo } from '../types';
 import { defaultProducts, defaultTables } from '../data/mock-data';
+import { tablesService } from '../services/tables.service';
 import { VIP_CLIENT_NAMES } from '../data/constants';
 import { calculateReservationDuration, calculateEndTime, timesOverlap, getCurrentActiveReservation } from '../utils/reservations';
 
@@ -27,6 +29,9 @@ interface AppContextType {
   getActiveReservation: (tableId: string) => ReservationInfo | null;
   setProducts: React.Dispatch<React.SetStateAction<Product[]>>;
   setTables: React.Dispatch<React.SetStateAction<Table[]>>;
+  createTable: (payload: { name: string; capacity: number; location: string; type?: string }) => Promise<any>;
+  updateTable: (id: string, payload: { name?: string; capacity?: number; location?: string; type?: string }) => Promise<any>;
+  deleteTable: (id: string) => Promise<boolean>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -37,12 +42,103 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [orders, setOrders] = useState<Record<string, OrderItem[]>>({});
   const [reservations, setReservations] = useState<Record<string, ReservationInfo[]>>({});
 
+  // Cargar mesas desde backend al montar
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const fetched = await tablesService.getAll();
+        if (mounted && Array.isArray(fetched)) {
+          setTables(fetched);
+        }
+      } catch (err) {
+        console.warn('No se pudieron cargar mesas desde backend, usando datos locales', err);
+      }
+    })();
+    return () => { mounted = false };
+  }, []);
+
+  // Socket.io: sincronizar mesas en tiempo real
+  useEffect(() => {
+    const baseApi = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+    const socketUrl = baseApi.replace(/\/api\/?$/, '');
+    let socket: any = null;
+    try {
+      socket = io(socketUrl);
+      socket.on('connect', () => console.log('Socket connected', socket.id));
+
+      socket.on('mesas:created', (payload: any) => {
+        setTables(current => {
+          if (current.find((t: any) => t.id === payload.id)) return current;
+          return [...current, payload];
+        });
+      });
+
+      socket.on('mesas:updated', (payload: any) => {
+        setTables(current => current.map((t: any) => t.id === payload.id ? payload : t));
+      });
+
+      socket.on('mesas:deleted', (payload: any) => {
+        setTables(current => current.filter((t: any) => t.id !== payload.id));
+      });
+    } catch (err) {
+      console.warn('Socket init failed', err);
+    }
+
+    return () => {
+      try { socket?.disconnect(); } catch (e) { }
+    };
+  }, []);
+
   const updateProductStatus = (id: string, status: ProductStatus) => {
     setProducts(products.map(p => p.id === id ? { ...p, status } : p));
   };
 
   const updateTableStatus = (id: string, status: TableStatus) => {
-    setTables(tables.map(t => t.id === id ? { ...t, status } : t));
+    // Actualización optimista en frontend
+    setTables(current => current.map(t => t.id === id ? { ...t, status } : t));
+
+    // Persistir en backend (no await para mantener UX responsiva)
+    tablesService.updateState(id, status).then((updated) => {
+      if (updated) {
+        setTables(current => current.map(t => t.id === id ? updated : t));
+      }
+    }).catch((err) => {
+      console.error('Error actualizando estado de mesa:', err);
+    });
+  };
+
+  const createTable = async (payload: { name: string; capacity: number; location: string; type?: string }) => {
+    try {
+      const created = await tablesService.create({ name: payload.name, capacity: payload.capacity, location: payload.location, type: payload.type });
+      setTables(current => [...current, created]);
+      return created;
+    } catch (err) {
+      console.error('Error creando mesa:', err);
+      throw err;
+    }
+  };
+
+  const updateTable = async (id: string, payload: { name?: string; capacity?: number; location?: string; type?: string }) => {
+    try {
+      const updated = await tablesService.update(id, payload);
+      setTables(current => current.map(t => t.id === id ? updated : t));
+      return updated;
+    } catch (err) {
+      console.error('Error actualizando mesa:', err);
+      throw err;
+    }
+  };
+
+  const deleteTable = async (id: string) => {
+    try {
+      await tablesService.remove(id);
+      setTables(current => current.filter(t => t.id !== id));
+      return true;
+    } catch (err) {
+      console.error('Error eliminando mesa:', err);
+      throw err;
+    }
   };
 
   const addOrderItem = (tableId: string, product: Product) => {
@@ -262,7 +358,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     cancelReservation,
     getActiveReservation,
     setProducts,
-    setTables
+    setTables,
+    // Nuevas operaciones persistentes
+    createTable,
+    updateTable,
+    deleteTable
   };
 
   return (

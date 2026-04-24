@@ -4,6 +4,7 @@ import { Catalog } from "./components/Catalog";
 import { WaiterView } from "./components/WaiterView";
 import { NotFound } from "./components/NotFound";
 import { UserManagement } from "./components/UserManagement";
+import { ChefView } from "./components/ChefView";
 import { UnderConstruction } from "./components/UnderConstruction";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AppProvider } from "./context/AppContext";
@@ -46,6 +47,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <WaiterView />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "chef-view",
+        element: (
+          <ProtectedRoute>
+            <ChefView />
           </ProtectedRoute>
         ),
       },

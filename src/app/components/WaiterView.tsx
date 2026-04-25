@@ -209,7 +209,7 @@ export function WaiterView({
   const [paymentProcessing, setPaymentProcessing] = useState(false);
 
   const role    = localStorage.getItem('userRole');
-  const isAdmin = role === 'admin';
+  const isAdmin = role === 'admin' || role === 'administrador';
 
   const handleLogout = () => {
     localStorage.clear();
@@ -768,30 +768,32 @@ export function WaiterView({
                       )}
                     </div>
                     <div className="flex items-center gap-1">
-                      {isEmbedded && isAdmin && (
-                        <div className="flex items-center gap-1 opacity-0 lg:opacity-100 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={(e) => openReserveModal(e, t.id)}
-                            className="p-2 rounded-xl text-blue-600/60 hover:text-blue-700 hover:bg-blue-500/10 transition-all bg-black/5"
-                            aria-label="Reservar mesa"
-                            title="Reservar mesa"
-                          >
-                            <CalendarDays size={16} />
-                          </button>
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); onEditTable?.(t); }}
-                            className="p-2 rounded-xl text-[#4B2E2D]/50 hover:text-[#D0543A] hover:bg-white/40 transition-all bg-black/5" aria-label="Editar"
-                          >
-                            <Edit2 size={16} />
-                          </button>
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); onDeleteTable?.(t.id); }}
-                            className="p-2 rounded-xl text-[#4B2E2D]/50 hover:text-red-600 hover:bg-red-500/10 transition-all bg-black/5" aria-label="Eliminar"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-1 opacity-0 lg:opacity-100 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => openReserveModal(e, t.id)}
+                          className="p-2 rounded-xl text-blue-600/60 hover:text-blue-700 hover:bg-blue-500/10 transition-all bg-black/5"
+                          aria-label="Reservar mesa"
+                          title="Reservar mesa"
+                        >
+                          <CalendarDays size={16} />
+                        </button>
+                        {isEmbedded && isAdmin && (
+                          <>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); onEditTable?.(t); }}
+                              className="p-2 rounded-xl text-[#4B2E2D]/50 hover:text-[#D0543A] hover:bg-white/40 transition-all bg-black/5" aria-label="Editar"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); onDeleteTable?.(t.id); }}
+                              className="p-2 rounded-xl text-[#4B2E2D]/50 hover:text-red-600 hover:bg-red-500/10 transition-all bg-black/5" aria-label="Eliminar"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </>
+                        )}
+                      </div>
                       <div className={`p-2 rounded-xl transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-3 ${cfg.iconClass} bg-black/5`}>
                         {getStateIcon(t.status, 28)}
                       </div>

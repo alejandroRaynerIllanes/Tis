@@ -1,10 +1,11 @@
 // ─── Servicio de Usuarios (CRUD) ─────────────────────────────────────────────
+//src/app/services/users.service.ts
 
 import { api } from './api';
 
 // Tipo del usuario como viene del backend
 export interface BackendUser {
-  id: number;
+  _id: string;        // <-- CORRECCIÓN: _id como string (MongoDB)
   nombre: string;
   apellido: string;
   ci: string;
@@ -21,7 +22,7 @@ export interface CreateUserPayload {
   apellido: string;
   ci: string;
   email: string;
-  contraseña: string;
+  password: string;   // <-- CORRECCIÓN: 'password' en lugar de 'contraseña'
   rol: string;
 }
 
@@ -31,7 +32,7 @@ export interface UpdateUserPayload {
   apellido?: string;
   ci?: string;
   email?: string;
-  contraseña?: string;
+  password?: string;  // <-- CORRECCIÓN: 'password' en lugar de 'contraseña'
   rol?: string;
 }
 
@@ -46,18 +47,19 @@ export const usersService = {
     return api.post<BackendUser>('/usuarios', payload);
   },
 
-  // PUT /usuarios/:id — Editar usuario
-  async update(id: number, payload: UpdateUserPayload): Promise<BackendUser> {
+  // PUT /usuarios/:id — Editar usuario (usando ID string)
+  async update(id: string, payload: UpdateUserPayload): Promise<BackendUser> {
     return api.put<BackendUser>(`/usuarios/${id}`, payload);
   },
 
   // PATCH /usuarios/:id/estado — Activar/Desactivar usuario
-  async toggleStatus(id: number): Promise<BackendUser> {
-    return api.patch<BackendUser>(`/usuarios/${id}/estado`);
+  // <-- CORRECCIÓN: Añadido el parámetro 'nuevoEstado' para enviarlo en el Body
+  async toggleStatus(id: string, nuevoEstado: boolean): Promise<BackendUser> {
+    return api.patch<BackendUser>(`/usuarios/${id}/estado`, { estado: nuevoEstado });
   },
 
-  // DELETE /usuarios/:id — Eliminar usuario
-  async remove(id: number): Promise<void> {
+  // DELETE /usuarios/:id — Eliminar usuario (usando ID string)
+  async remove(id: string): Promise<void> {
     return api.delete<void>(`/usuarios/${id}`);
   },
 };

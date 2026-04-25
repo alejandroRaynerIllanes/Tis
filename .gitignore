@@ -1,1 +1,36 @@
+# 1. Dependencias (¡Lo más pesado, NUNCA se sube!)
 node_modules/
+
+# 2. Variables de Entorno (¡Seguridad!)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*
+!.env.example
+
+# 3. Carpetas de construcción (Archivos generados por Vite)
+dist/
+dist-ssr/
+build/
+.vite/
+
+# 4. Logs de errores
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 5. Archivos del Sistema Operativo
+.DS_Store
+Thumbs.db
+
+# 6. Caché de TypeScript y Linters
+*.tsbuildinfo
+.eslintcache
+
+# 7. Configuraciones locales de editores (Opcional)
+.vscode/*
+!.vscode/extensions.json
+.idea/

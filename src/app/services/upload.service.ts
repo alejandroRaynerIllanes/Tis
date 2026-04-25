@@ -1,27 +1,18 @@
-// ─── Servicio de Cloudinary (Upload/Delete de imágenes) ──────────────────────
-
+// src/app/services/upload.service.ts
 import { api } from './api';
 
-interface UploadResponse {
-  url: string;
-  publicId: string;
-}
-
-interface DeleteResponse {
-  message: string;
-}
-
 export const uploadService = {
-  // POST /api/upload — Subir imagen (form-data, key: "imagen")
-  async uploadImage(file: File): Promise<UploadResponse> {
+  // Función para subir una imagen a nuestro backend (que a su vez la sube a Cloudinary)
+  async uploadImage(file: File): Promise<{ url: string; publicId: string }> {
+    // Usamos FormData porque estamos enviando un archivo físico, no un JSON de texto
     const formData = new FormData();
+    // 'imagen' es el nombre exacto que configuramos en multer (upload.single('imagen'))
     formData.append('imagen', file);
 
-    return api.post<UploadResponse>('/api/upload', formData);
-  },
-
-  // DELETE /api/upload — Eliminar imagen por publicId
-  async deleteImage(publicId: string): Promise<DeleteResponse> {
-    return api.delete<DeleteResponse>('/api/upload', { publicId });
-  },
+    // Hacemos el POST a tu servidor Express
+    // api.post es el cliente que tus compañeros configuraron (ya maneja el Token JWT)
+    const response = await api.post<{ url: string; publicId: string }>('/upload', formData);
+    
+    return response;
+  }
 };

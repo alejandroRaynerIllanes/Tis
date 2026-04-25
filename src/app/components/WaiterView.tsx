@@ -1,3 +1,4 @@
+//src/app/components/WaiterView.tsx
 import {
   ChevronLeft, LogOut, Users, Clock, CheckCircle2, Receipt,
   MapPin, Search, X, ChefHat, Plus, UtensilsCrossed, Trash2, ShoppingBag, CreditCard, Edit2, MessageSquare,
@@ -942,7 +943,7 @@ export function WaiterView({
                             <h3 className={`text-[14px] font-black leading-tight truncate w-full ${!isActive ? 'text-gray-400 line-through' : 'text-[#4B2E2D]'}`}>
                               {dish.name}
                             </h3>
-                            <span className="text-[10px] font-bold text-gray-500 truncate mt-0.5">{dish.category}</span>
+                            
                             <span className="text-[11px] text-gray-400 truncate w-full" title={dish.description || 'Sin descripción'}>
                               {dish.description || 'Sin descripción'}
                             </span>

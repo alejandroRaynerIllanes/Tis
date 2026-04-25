@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { io } from 'socket.io-client';
+import { getToken } from '../services/api';
 import type { Product, ProductStatus, Table, TableStatus, OrderItem, ReservationInfo } from '../types';
 import { defaultProducts, defaultTables } from '../data/mock-data';
 import { tablesService } from '../services/tables.service';
@@ -42,9 +43,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [orders, setOrders] = useState<Record<string, OrderItem[]>>({});
   const [reservations, setReservations] = useState<Record<string, ReservationInfo[]>>({});
 
-  // Cargar mesas desde backend al montar
+  // Cargar mesas desde backend al montar (solo si hay token)
   useEffect(() => {
     let mounted = true;
+    const token = getToken();
+    if (!token) {
+      // Evitar peticiones que devuelvan 401 cuando no esté autenticado
+      return () => { mounted = false };
+    }
+
     (async () => {
       try {
         const fetched = await tablesService.getAll();
@@ -58,28 +65,51 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     return () => { mounted = false };
   }, []);
 
-  // Socket.io: sincronizar mesas en tiempo real
+  const getTableId = (table: any) => table?.id || table?._id;
+
+  // Socket.io: sincronizar mesas en tiempo real (solo si hay token)
   useEffect(() => {
+    const token = getToken();
+    if (!token) return;
+
     const baseApi = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
     const socketUrl = baseApi.replace(/\/api\/?$/, '');
     let socket: any = null;
     try {
-      socket = io(socketUrl);
+      socket = io(socketUrl, { auth: { token } });
       socket.on('connect', () => console.log('Socket connected', socket.id));
 
       socket.on('mesas:created', (payload: any) => {
         setTables(current => {
-          if (current.find((t: any) => t.id === payload.id)) return current;
-          return [...current, payload];
+          const items = Array.isArray(payload) ? payload : [payload];
+          const existingIds = new Set(current.map((t: any) => getTableId(t)));
+          const additions = items.filter((item: any) => !existingIds.has(getTableId(item)));
+          if (additions.length === 0) return current;
+          return [...current, ...additions.map((item: any) => ({ ...item, id: getTableId(item) }))];
         });
       });
 
       socket.on('mesas:updated', (payload: any) => {
-        setTables(current => current.map((t: any) => t.id === payload.id ? payload : t));
+        const items = Array.isArray(payload) ? payload : [payload];
+        setTables(current => {
+          const next = [...current];
+          items.forEach((item: any) => {
+            const itemId = getTableId(item);
+            const index = next.findIndex((t: any) => getTableId(t) === itemId);
+            if (index !== -1) {
+              next[index] = { ...item, id: itemId };
+            } else {
+              next.push({ ...item, id: itemId });
+            }
+          });
+          return next;
+        });
       });
 
       socket.on('mesas:deleted', (payload: any) => {
-        setTables(current => current.filter((t: any) => t.id !== payload.id));
+        const items = Array.isArray(payload) ? payload : [payload];
+        const idsToRemove = new Set(items.map((item: any) => getTableId(item)));
+        setTables(current => current.filter((t: any) => !idsToRemove.has(getTableId(t))));
       });
     } catch (err) {
       console.warn('Socket init failed', err);
@@ -94,6 +124,27 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setProducts(products.map(p => p.id === id ? { ...p, status } : p));
   };
 
+  const addTableIfMissing = (newTable: Table) => {
+    const newId = getTableId(newTable);
+    setTables(current => {
+      if (current.some(t => getTableId(t) === newId)) {
+        return current;
+      }
+      return [...current, { ...newTable, id: newId }];
+    });
+  };
+
+  const mergeTable = (newTable: Table) => {
+    const newId = getTableId(newTable);
+    setTables(current => {
+      const exists = current.some(t => getTableId(t) === newId);
+      if (exists) {
+        return current.map(t => getTableId(t) === newId ? { ...newTable, id: newId } : t);
+      }
+      return [...current, { ...newTable, id: newId }];
+    });
+  };
+
   const updateTableStatus = (id: string, status: TableStatus) => {
     // Actualización optimista en frontend
     setTables(current => current.map(t => t.id === id ? { ...t, status } : t));
@@ -101,7 +152,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     // Persistir en backend (no await para mantener UX responsiva)
     tablesService.updateState(id, status).then((updated) => {
       if (updated) {
-        setTables(current => current.map(t => t.id === id ? updated : t));
+        mergeTable(updated);
       }
     }).catch((err) => {
       console.error('Error actualizando estado de mesa:', err);
@@ -111,7 +162,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const createTable = async (payload: { name: string; capacity: number; location: string; type?: string }) => {
     try {
       const created = await tablesService.create({ name: payload.name, capacity: payload.capacity, location: payload.location, type: payload.type });
-      setTables(current => [...current, created]);
+      addTableIfMissing(created);
       return created;
     } catch (err) {
       console.error('Error creando mesa:', err);

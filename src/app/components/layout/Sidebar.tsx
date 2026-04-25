@@ -1,32 +1,49 @@
-import { LayoutDashboard, UtensilsCrossed, ChefHat, Users, BarChart2, Crown, LogOut, X } from 'lucide-react';
+import {
+  LayoutDashboard,
+  UtensilsCrossed,
+  ChefHat,
+  Users,
+  BarChart2,
+  Crown,
+  LogOut,
+  X
+} from 'lucide-react'
 
-export type AdminView = 'dashboard' | 'tables' | 'menu' | 'users' | 'reports' | 'vip-clients';
+export type AdminView = 'dashboard' | 'tables' | 'menu' | 'users' | 'reports' | 'vip-clients'
 
 interface SidebarProps {
-  activeView: AdminView;
-  sidebarOpen: boolean;
-  onViewChange: (view: AdminView) => void;
-  onClose: () => void;
-  onLogout: () => void;
+  activeView: AdminView
+  sidebarOpen: boolean
+  onViewChange: (view: AdminView) => void
+  onClose: () => void
+  onLogout: () => void
 }
 
 const NAV_ITEMS: { view: AdminView; icon: React.ReactNode; label: string }[] = [
-  { view: 'dashboard',   icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
-  { view: 'tables',      icon: <UtensilsCrossed size={20} />, label: 'Mesas' },
-  { view: 'menu',        icon: <ChefHat size={20} />,         label: 'Menú' },
-  { view: 'users',       icon: <Users size={20} />,           label: 'Usuarios' },
-  { view: 'reports',     icon: <BarChart2 size={20} />,       label: 'Reportes' },
-  { view: 'vip-clients', icon: <Crown size={20} />,           label: 'Clientes VIP' },
-];
+  { view: 'dashboard', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
+  { view: 'tables', icon: <UtensilsCrossed size={20} />, label: 'Mesas' },
+  { view: 'menu', icon: <ChefHat size={20} />, label: 'Menú' },
+  { view: 'users', icon: <Users size={20} />, label: 'Usuarios' },
+  { view: 'reports', icon: <BarChart2 size={20} />, label: 'Reportes' },
+  { view: 'vip-clients', icon: <Crown size={20} />, label: 'Clientes VIP' }
+]
 
-export function Sidebar({ activeView, sidebarOpen, onViewChange, onClose, onLogout }: SidebarProps) {
+export function Sidebar({
+  activeView,
+  sidebarOpen,
+  onViewChange,
+  onClose,
+  onLogout
+}: SidebarProps) {
   return (
-    <aside className={`
+    <aside
+      className={`
       fixed lg:relative inset-y-0 left-0 z-30
       w-72 bg-[#4B2E2D] text-white flex flex-col h-full shadow-2xl
       transition-transform duration-300 ease-in-out
       ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-    `}>
+    `}
+    >
       {/* Logo + cerrar en mobile */}
       <div className="p-6 lg:p-8 pb-4 flex items-start justify-between">
         <div>
@@ -45,7 +62,10 @@ export function Sidebar({ activeView, sidebarOpen, onViewChange, onClose, onLogo
         {NAV_ITEMS.map(({ view, icon, label }) => (
           <button
             key={view}
-            onClick={() => { onViewChange(view); onClose(); }}
+            onClick={() => {
+              onViewChange(view)
+              onClose()
+            }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
               activeView === view
                 ? 'bg-[#E57C5D] text-white shadow-lg shadow-[#E57C5D]/20'
@@ -68,5 +88,5 @@ export function Sidebar({ activeView, sidebarOpen, onViewChange, onClose, onLogo
         </button>
       </div>
     </aside>
-  );
+  )
 }

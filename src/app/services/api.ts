@@ -90,7 +90,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.message || data.error || `Error ${response.status}`);
+   throw new Error(data.mensaje || data.message || data.error || `Error ${response.status}`);
   }
 
   return data as T;

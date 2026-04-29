@@ -1,95 +1,96 @@
 // src/app/components/admin/CategoryManagement.tsx
-import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, X, AlertTriangle } from 'lucide-react';
-import { useAppContext } from '../../context/AppContext';
-import { categoriesService } from '../../services/categories.service';
-import { toast } from 'sonner';
+import { useState, useEffect } from 'react'
+import { Plus, Edit2, Trash2, X, AlertTriangle } from 'lucide-react'
+import { useAppContext } from '../../context/AppContext'
+import { categoriesService } from '../../services/categories.service'
+import { toast } from 'sonner'
 
 export interface UICategory {
-  id: string;
-  label: string;
+  id: string
+  label: string
 }
 
 interface CategoryManagementProps {
-  categories: UICategory[];
-  setCategories: (cats: UICategory[]) => void;
+  categories: UICategory[]
+  setCategories: (cats: UICategory[]) => void
 }
 
 export function CategoryManagement({ categories, setCategories }: CategoryManagementProps) {
-  const { products: dishes, setProducts: setDishes } = useAppContext();
-  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-  const [categoryEditingId, setCategoryEditingId] = useState<string | null>(null);
-  const [categoryFormData, setCategoryFormData] = useState({ label: '' });
-  const[categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const { products: dishes, setProducts: setDishes } = useAppContext()
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
+  const [categoryEditingId, setCategoryEditingId] = useState<string | null>(null)
+  const [categoryFormData, setCategoryFormData] = useState({ label: '' })
+  const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // 🚀 PASO 1: Listado dinámico (Consumir las categorías desde el backend al abrir)
   useEffect(() => {
     const cargarCategorias = async () => {
       try {
-        const data = await categoriesService.getAll();
-        setCategories(data.map((cat: any) => ({ id: cat._id, label: cat.nombre })));
+        const data = await categoriesService.getAll()
+        setCategories(data.map((cat: any) => ({ id: cat._id, label: cat.nombre })))
       } catch (error) {
-        console.error("Error al cargar categorías:", error);
-        toast.error("Error al cargar las categorías desde el servidor.");
+        console.error('Error al cargar categorías:', error)
+        toast.error('Error al cargar las categorías desde el servidor.')
       }
-    };
-    cargarCategorias();
-  },[]);
+    }
+    cargarCategorias()
+  }, [])
 
   const handleOpenAddCategoryModal = () => {
-    setCategoryEditingId(null);
-    setCategoryFormData({ label: '' });
-    setIsCategoryModalOpen(true);
-  };
+    setCategoryEditingId(null)
+    setCategoryFormData({ label: '' })
+    setIsCategoryModalOpen(true)
+  }
 
   const handleOpenEditCategoryModal = (category: UICategory) => {
-    setCategoryEditingId(category.id);
-    setCategoryFormData({ label: category.label });
-    setIsCategoryModalOpen(true);
-  };
+    setCategoryEditingId(category.id)
+    setCategoryFormData({ label: category.label })
+    setIsCategoryModalOpen(true)
+  }
 
   // 🚀 CONECTADO AL BACKEND (Crear y Editar)
   const handleSaveCategory = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+    e.preventDefault()
+
     // 1. Limpiar espacios al inicio y final
-    const nombreLimpio = categoryFormData.label.trim();
+    const nombreLimpio = categoryFormData.label.trim()
     if (!nombreLimpio) {
-      toast.warning("El nombre de la categoría no puede estar vacío.");
-      return;
+      toast.warning('El nombre de la categoría no puede estar vacío.')
+      return
     }
 
     // 2. Longitud mínima y caracteres repetidos (ej: "aaa")
     if (nombreLimpio.length < 3 || /^(.)\1+$/.test(nombreLimpio)) {
-      toast.warning("Ingresa un nombre de categoría válido (mínimo 3 caracteres).");
-      return;
+      toast.warning('Ingresa un nombre de categoría válido (mínimo 3 caracteres).')
+      return
     }
 
     // 3. Evitar duplicados (Ignorando mayúsculas/minúsculas y la categoría actual si estamos editando)
     const isDuplicate = categories.some(
-      cat => cat.label.toLowerCase() === nombreLimpio.toLowerCase() && cat.id !== categoryEditingId
-    );
+      (cat) =>
+        cat.label.toLowerCase() === nombreLimpio.toLowerCase() && cat.id !== categoryEditingId
+    )
     if (isDuplicate) {
-      toast.warning("Ya existe una categoría con este nombre.");
-      return;
+      toast.warning('Ya existe una categoría con este nombre.')
+      return
     }
 
-    setIsLoading(true);
+    setIsLoading(true)
     try {
       if (categoryEditingId) {
         // PUT: Actualizar en BD
-        const updated = await categoriesService.update(categoryEditingId, nombreLimpio);
-        
+        const updated = await categoriesService.update(categoryEditingId, nombreLimpio)
+
         // Actualizamos los platos locales si el nombre de la categoría cambió
-        const oldCat = categories.find((c) => c.id === categoryEditingId);
+        const oldCat = categories.find((c) => c.id === categoryEditingId)
         if (oldCat && oldCat.label !== updated.nombre) {
           setDishes(
             dishes.map((d) =>
               d.category === categoryEditingId ? { ...d, category: updated.nombre } : d
             )
-          );
+          )
         }
 
         // Actualizamos la lista local mapeando el formato
@@ -97,39 +98,41 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
           categories.map((cat) =>
             cat.id === categoryEditingId ? { ...cat, label: updated.nombre } : cat
           )
-        );
-        toast.success("Categoría actualizada con éxito.");
+        )
+        toast.success('Categoría actualizada con éxito.')
       } else {
         // POST: Crear en BD
-        const created = await categoriesService.create(nombreLimpio);
+        const created = await categoriesService.create(nombreLimpio)
         // Guardamos usando el _id real de MongoDB
-        setCategories([...categories, { id: created._id, label: created.nombre }]);
-        toast.success("Categoría creada con éxito.");
+        setCategories([...categories, { id: created._id, label: created.nombre }])
+        toast.success('Categoría creada con éxito.')
       }
-      setIsCategoryModalOpen(false);
+      setIsCategoryModalOpen(false)
     } catch (error) {
-      console.error("Error al guardar categoría:", error);
-      toast.error("Hubo un error al conectar con el servidor.");
+      console.error('Error al guardar categoría:', error)
+      toast.error('Hubo un error al conectar con el servidor.')
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   // 🚀 CONECTADO AL BACKEND (Eliminar)
   const handleDeleteCategory = async (categoryId: string) => {
-    setIsDeleting(true);
+    setIsDeleting(true)
     try {
-      await categoriesService.remove(categoryId);
-      setCategories(categories.filter(cat => cat.id !== categoryId));
-      setCategoryToDelete(null);
-      toast.success("Categoría eliminada con éxito.");
+      await categoriesService.remove(categoryId)
+      setCategories(categories.filter((cat) => cat.id !== categoryId))
+      setCategoryToDelete(null)
+      toast.success('Categoría eliminada con éxito.')
     } catch (error) {
-      console.error("Error al eliminar categoría:", error);
-      toast.error("No se pudo eliminar la categoría.", { description: "Verifica que no tenga platos asignados." });
+      console.error('Error al eliminar categoría:', error)
+      toast.error('No se pudo eliminar la categoría.', {
+        description: 'Verifica que no tenga platos asignados.'
+      })
     } finally {
-      setIsDeleting(false);
+      setIsDeleting(false)
     }
-  };
+  }
 
   return (
     <>
@@ -231,15 +234,15 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
             <AlertTriangle size={32} className="text-[#D0543A] mb-4" />
             <h2 className="text-2xl font-bold text-[#4B2E2D] mb-3">¿Eliminar Categoría?</h2>
             <div className="flex gap-4 w-full mt-4">
-              <button 
-                onClick={() => setCategoryToDelete(null)} 
-                disabled={isDeleting} 
+              <button
+                onClick={() => setCategoryToDelete(null)}
+                disabled={isDeleting}
                 className="flex-1 py-3 px-4 font-bold text-[#4B2E2D] border-2 border-[#4B2E2D] rounded-xl disabled:opacity-50"
               >
                 Cancelar
               </button>
-              <button 
-                onClick={() => handleDeleteCategory(categoryToDelete)} 
+              <button
+                onClick={() => handleDeleteCategory(categoryToDelete)}
                 disabled={isDeleting}
                 className={`flex-1 py-3 px-4 text-white font-bold rounded-xl transition-all ${isDeleting ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#D0543A] hover:bg-[#b5462f]'}`}
               >
@@ -250,5 +253,5 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
         </div>
       )}
     </>
-  );
+  )
 }

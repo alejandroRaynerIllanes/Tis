@@ -88,10 +88,16 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     return {} as T;
   }
 
-  const data = await response.json();
+  let data: any = {};
+  try {
+    data = await response.json();
+  } catch (e) {
+    data = {};
+  }
 
   if (!response.ok) {
-    throw new Error(data.message || data.error || `Error ${response.status}`);
+    const errMsg = data?.message || data?.error || data?.mensaje || data?.msg || `Error ${response.status}`;
+    throw new Error(errMsg);
   }
 
   return data as T;

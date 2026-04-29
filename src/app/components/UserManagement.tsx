@@ -9,12 +9,12 @@ import { usersService, type BackendUser } from '../services/users.service';
 
 type Role = 'Administrador' | 'Mesero' | 'Cocinero' | 'Cajero';
 
-// Mapeo de roles frontend ↔ backend
+// Mapeo de roles frontend ↔ backend (coincide con el enum del backend)
 const ROLE_TO_BACKEND: Record<Role, string> = {
-  'Administrador': 'administrador',
-  'Mesero': 'mesero',
-  'Cocinero': 'cocinero',
-  'Cajero': 'cajero',
+  'Administrador': 'Administrador',
+  'Mesero': 'Mesero',
+  'Cocinero': 'Cocinero',
+  'Cajero': 'Cajero',
 };
 
 const ROLE_FROM_BACKEND: Record<string, Role> = {

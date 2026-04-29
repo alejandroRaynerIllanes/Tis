@@ -16,8 +16,10 @@ export interface UIDish {
   id: string
   name: string
   category: string
+  categoryName?: string // <-- Añadido para evitar error de TS
   price: number
   image: string
+  imagePublicId?: string // <-- Añadido para evitar error de TS
   description?: string
   status: 'Disponible' | 'Agotado'
 }
@@ -28,6 +30,7 @@ interface BackendDish {
   categoria: any // Puede ser el string (ID) o el objeto populado
   precio: number
   imagenUrl?: string
+  imagenPublicId?: string // <-- AÑADIDO AQUI (Soluciona el error de TS 2339)
   descripcion?: string
   disponible: boolean
 }
@@ -51,26 +54,27 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
     description: '',
     price: '',
     image:
-      'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmb29kfGVufDF8fHx8MTc3MzM3OTc2OHww&ixlib=rb-4.1.0&q=80&w=1080'
+      'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmb29kfGVufDF8fHx8MTc3MzM3OTc2OHww&ixlib=rb-4.1.0&q=80&w=1080',
+    imagePublicId: ''
   })
 
-  // Cargar platos reales de MongoDB
   // Cargar platos reales de MongoDB
   const cargarPlatos = async () => {
     try {
       const data = await platosService.getAll()
-      console.log('🍔 Datos crudos desde el backend:', data) // <-- ESTO NOS DIRÁ LA VERDAD
+      console.log('🍔 Datos crudos desde el backend:', data)
 
       const platosFormateados: UIDish[] = data.map((p: BackendDish) => ({
         id: p._id,
         name: p.nombre,
-        // FIX: El backend popula la categoría, así que extraemos el _id del objeto.
-        category:
-          typeof p.categoria === 'object' && p.categoria !== null ? p.categoria._id : p.categoria,
+        // Extraer el _id si es un objeto populado, o usar directamente si es un string
+        category: typeof p.categoria === 'object' ? p.categoria._id : p.categoria,
+        categoryName: typeof p.categoria === 'object' ? p.categoria.nombre : p.categoria,
         price: p.precio,
         image:
           p.imagenUrl ||
           'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmb29kfGVufDF8fHx8MTc3MzM3OTc2OHww&ixlib=rb-4.1.0&q=80&w=1080',
+        imagePublicId: p.imagenPublicId || '',
         description: p.descripcion,
         status: (p.disponible ? 'Disponible' : 'Agotado') as 'Disponible' | 'Agotado'
       }))
@@ -106,7 +110,11 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
     try {
       setIsUploading(true)
       const response = await uploadService.uploadImage(file)
-      setFormData((prev) => ({ ...prev, image: response.url }))
+      setFormData((prev) => ({
+        ...prev,
+        image: response.url,
+        imagePublicId: response.publicId
+      }))
     } catch (error) {
       console.error('Error al subir la imagen:', error)
       toast.error('Hubo un problema al subir la foto.')
@@ -134,7 +142,8 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
       description: '',
       price: '',
       image:
-        'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmb29kfGVufDF8fHx8MTc3MzM3OTc2OHww&ixlib=rb-4.1.0&q=80&w=1080'
+        'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmb29kfGVufDF8fHx8MTc3MzM3OTc2OHww&ixlib=rb-4.1.0&q=80&w=1080',
+      imagePublicId: ''
     })
     setIsModalOpen(true)
   }
@@ -145,7 +154,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
     }
   }, [isModalOpen])
 
-  const handleOpenEditModal = (dish: UIDish) => {
+  const handleOpenEditModal = (dish: any) => {
     setEditingId(dish.id)
     setIsPresetCategory(false)
     presetCategoryRef.current = ''
@@ -154,7 +163,8 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
       category: dish.category,
       description: dish.description || '',
       price: String(dish.price),
-      image: dish.image
+      image: dish.image,
+      imagePublicId: dish.imagePublicId || ''
     })
     setIsModalOpen(true)
   }
@@ -163,13 +173,11 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
     e.preventDefault()
     console.log('1. Botón guardar presionado. Datos actuales:', formData)
 
-    // 1. Validamos con alertas para que NO sea silencioso
     if (!formData.title || !formData.price || !formData.category) {
       toast.warning('Por favor llena el nombre, el precio y selecciona una categoría.')
       return
     }
 
-    // Tu backend EXIGE una descripción según el modelo de Mongoose
     if (!formData.description || formData.description.trim() === '') {
       toast.warning('La descripción es obligatoria para poder guardar en la base de datos.')
       return
@@ -182,7 +190,8 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
         descripcion: formData.description,
         precio: Number(formData.price),
         imagenUrl: formData.image,
-        categoria: formData.category, // Debe ser el _id de Mongo de la categoría
+        imagenPublicId: formData.imagePublicId,
+        categoria: formData.category,
         disponible: true
       }
       console.log('3. Paquete listo para enviar:', datosParaBackend)
@@ -191,7 +200,6 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
         console.log('4. Editando plato existente...')
         const platoActualizado = await platosService.update(editingId, datosParaBackend)
 
-        // ✨ OPTIMIZACIÓN: Actualizamos solo el plato editado en el estado local
         setDishes(
           dishes.map((d) =>
             d.id === editingId
@@ -203,7 +211,8 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
                       ? platoActualizado.categoria._id
                       : platoActualizado.categoria,
                   price: platoActualizado.precio,
-                  image: platoActualizado.imagenUrl,
+                  image: platoActualizado.imagenUrl || '',
+                  imagePublicId: platoActualizado.imagenPublicId,
                   description: platoActualizado.descripcion,
                   status: (platoActualizado.disponible ? 'Disponible' : 'Agotado') as
                     | 'Disponible'
@@ -217,7 +226,6 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
         const platoCreado = await platosService.create(datosParaBackend)
         console.log('5. Respuesta del servidor:', platoCreado)
 
-        // ✨ OPTIMIZACIÓN: Añadimos el nuevo plato al estado local sin recargar todo
         setDishes([
           ...dishes,
           {
@@ -228,17 +236,15 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
                 ? platoCreado.categoria._id
                 : platoCreado.categoria,
             price: platoCreado.precio,
-            image: platoCreado.imagenUrl,
+            image: platoCreado.imagenUrl || '',
+            imagePublicId: platoCreado.imagenPublicId,
             description: platoCreado.descripcion,
             status: (platoCreado.disponible ? 'Disponible' : 'Agotado') as 'Disponible' | 'Agotado'
           }
         ])
       }
 
-      // Ya no necesitamos recargar toda la lista desde la BD
-      // await cargarPlatos();
       setIsModalOpen(false)
-
       toast.success('¡Plato guardado con éxito en la Base de Datos!')
     } catch (error) {
       console.error('❌ Error CRÍTICO al guardar el plato:', error)
@@ -248,11 +254,9 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
     }
   }
 
-  // 🚀 BUG FIX: Conectar la eliminación a la base de datos
   const handleDeleteDish = async (id: string) => {
     try {
       await platosService.remove(id)
-      // Actualizamos el estado local para que el cambio sea instantáneo
       setDishes(dishes.filter((d) => d.id !== id))
       setItemToDelete(null)
       toast.success('Plato eliminado de la base de datos.')
@@ -262,7 +266,6 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
     }
   }
 
-  // 🚀 Eliminar categoría desde la vista del menú
   const handleDeleteCategory = async (id: string) => {
     try {
       await categoriesService.remove(id)
@@ -497,7 +500,6 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
             </h2>
 
             <form className="space-y-5" onSubmit={handleSaveDish}>
-              {/* COMPONENTE DE UPLOAD INTEGRADO AQUÍ */}
               <div>
                 <label className="block text-sm font-bold text-[#4B2E2D] mb-2">
                   Subir Fotografía

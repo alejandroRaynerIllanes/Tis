@@ -14,7 +14,7 @@ interface TableManagementProps {
 }
 
 export function TableManagement({ locations, setLocations }: TableManagementProps) {
-  const { tables, setTables } = useAppContext()
+  const { tables, setTables, createTable, updateTable, deleteTable } = useAppContext()
 
   // Estados Modales
   const [isTableModalOpen, setIsTableModalOpen] = useState(false)
@@ -91,7 +91,7 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
     e.preventDefault()
     if (!tableFormData.number || !tableFormData.capacity) return
     if (Number(tableFormData.capacity) > 20) {
-      toast.warning('Capacidad máxima es de 20 personas.')
+      alert('Capacidad máxima 20.')
       return
     }
 
@@ -107,67 +107,26 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
     }
 
     try {
-      const payload = {
-        numero: tableFormData.number,
-        capacidad: Number(tableFormData.capacity),
-        ubicacion: tableFormData.locationId,
-        tipo: tableFormData.tableType,
-        estado: 'Disponible' as const
-      }
-
       if (tableEditingId) {
-        const updated = await tablesService.update(tableEditingId, payload)
-        setTables(
-          tables.map((t) =>
-            t.id === tableEditingId
-              ? {
-                  ...t,
-                  name: updated.numero,
-                  capacity: updated.capacidad,
-                  location:
-                    typeof updated.ubicacion === 'object'
-                      ? updated.ubicacion._id
-                      : updated.ubicacion,
-                  type: updated.tipo
-                }
-              : t
-          )
-        )
-        toast.success('Mesa actualizada correctamente.')
+        await updateTable(tableEditingId, {
+          name: tableFormData.number,
+          capacity: Number(tableFormData.capacity),
+          location: tableFormData.locationId,
+          type: tableFormData.tableType
+        })
       } else {
-        const created = await tablesService.create(payload)
-        setTables([
-          ...tables,
-          {
-            id: created._id,
-            name: created.numero,
-            capacity: created.capacidad,
-            location:
-              typeof created.ubicacion === 'object' ? created.ubicacion._id : created.ubicacion,
-            status: created.estado,
-            type: created.tipo
-          }
-        ])
-        toast.success('Mesa creada correctamente.')
+        await createTable({
+          name: tableFormData.number,
+          capacity: Number(tableFormData.capacity),
+          location: tableFormData.locationId,
+          type: tableFormData.tableType
+        })
       }
-
       setVipLimitError(false)
       setIsTableModalOpen(false)
-    } catch (error) {
-      console.error('Error al guardar la mesa:', error)
-      toast.error('Hubo un error al guardar la mesa.')
-    }
-  }
-
-  const handleDeleteTable = async (tableId: string) => {
-    try {
-      await tablesService.remove(tableId)
-      setTables(tables.filter((t) => t.id !== tableId))
-      setTableToDelete(null)
-      toast.success('Mesa eliminada.')
-    } catch (error) {
-      console.error('Error al eliminar la mesa:', error)
-      toast.error('Error al eliminar la mesa.')
+    } catch (err) {
+      console.error('Error guardando mesa', err)
+      alert('No se pudo guardar la mesa en el servidor. Revisa la consola.')
     }
   }
 
@@ -205,7 +164,6 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
       toast.success('Ubicación eliminada.')
     } catch (error: any) {
       console.error('Error al eliminar la ubicación:', error)
-      // Mostrar el mensaje exacto del backend (ej: "No puedes eliminar porque tiene mesas")
       toast.error(error.message || 'No se pudo eliminar la ubicación.')
     }
   }
@@ -252,6 +210,7 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
                   className="w-full px-4 py-3 rounded-xl border-2 border-[#E57C5D]"
                 />
               </div>
+
               <div>
                 <label className="block text-sm font-bold text-[#4B2E2D] mb-2">Capacidad</label>
                 <input
@@ -266,6 +225,7 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
                   className="w-full px-4 py-3 rounded-xl border-2 border-[#E57C5D]"
                 />
               </div>
+
               <div>
                 <label className="block text-sm font-bold text-[#4B2E2D] mb-2">Ubicación</label>
                 <select
@@ -286,6 +246,7 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
                   ))}
                 </select>
               </div>
+
               <div>
                 <label className="block text-sm font-bold text-[#4B2E2D] mb-2">Tipo de Mesa</label>
                 <select
@@ -304,11 +265,13 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
                   <option value="vip">VIP</option>
                 </select>
               </div>
+
               {vipLimitError && (
                 <div className="bg-red-50 border-2 border-red-200 rounded-xl p-3">
                   <p className="text-sm font-bold text-red-700">Límite de mesas VIP alcanzado.</p>
                 </div>
               )}
+
               <div className="flex justify-end gap-4 mt-4">
                 <button
                   type="button"
@@ -432,7 +395,15 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
                 Cancelar
               </button>
               <button
-                onClick={() => tableToDelete && handleDeleteTable(tableToDelete)}
+                onClick={async () => {
+                  try {
+                    if (tableToDelete) await deleteTable(tableToDelete)
+                    setTableToDelete(null)
+                  } catch (err) {
+                    console.error(err)
+                    alert('No se pudo eliminar la mesa.')
+                  }
+                }}
                 className="flex-1 py-3 px-4 bg-[#D0543A] text-white font-bold rounded-xl"
               >
                 Eliminar

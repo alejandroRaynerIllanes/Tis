@@ -1,6 +1,7 @@
 // ─── Configuración base de la API ────────────────────────────────────────────
 // Cambia esta URL a la de tu backend real
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+// Por defecto asumimos que las rutas del backend están bajo '/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
 
 interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown

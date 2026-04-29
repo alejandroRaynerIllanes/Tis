@@ -1,23 +1,20 @@
 import { api } from './api'
-import { BackendLocation } from './locations.service'
 
-export interface BackendTable {
-  _id: string
-  numero: string
-  capacidad: number
-  // La ubicación puede venir como un ID (string) o como el objeto completo (gracias al populate)
-  ubicacion: BackendLocation | string
-  tipo: 'normal' | 'vip'
-  estado: 'Disponible' | 'Ocupada' | 'Reservada'
+export interface TablePayload {
+  name?: string
+  capacity?: number
+  location?: string
+  status?: string
+  type?: string
 }
 
 export const tablesService = {
-  getAll: () => api.get<BackendTable[]>('/mesas'),
-
-  // Usamos Partial para permitir enviar solo los datos necesarios al crear/actualizar
-  create: (data: Partial<BackendTable>) => api.post<BackendTable>('/mesas', data),
-
-  update: (id: string, data: Partial<BackendTable>) => api.put<BackendTable>(`/mesas/${id}`, data),
-
-  remove: (id: string) => api.delete<{ mensaje: string }>(`/mesas/${id}`)
+  getAll: (location?: string) =>
+    api.get<any[]>(`/mesas${location ? `?location=${encodeURIComponent(location)}` : ''}`),
+  getById: (id: string) => api.get<any>(`/mesas/${id}`),
+  create: (payload: TablePayload) => api.post<any>(`/mesas`, payload),
+  update: (id: string, payload: TablePayload) => api.put<any>(`/mesas/${id}`, payload),
+  updateState: (id: string, status: string) =>
+    api.patch<any>(`/mesas/${id}/estado`, { estado: status }),
+  remove: (id: string) => api.delete<any>(`/mesas/${id}`)
 }

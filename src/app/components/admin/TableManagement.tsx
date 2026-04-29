@@ -11,7 +11,7 @@ interface TableManagementProps {
 }
 
 export function TableManagement({ locations, setLocations }: TableManagementProps) {
-  const { tables, setTables } = useAppContext()
+  const { tables, setTables, createTable, updateTable, deleteTable } = useAppContext()
 
   // Estados Modales
   const [isTableModalOpen, setIsTableModalOpen] = useState(false)
@@ -56,7 +56,7 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
     setIsTableModalOpen(true)
   }
 
-  const handleSaveTable = (e: React.FormEvent) => {
+  const handleSaveTable = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!tableFormData.number || !tableFormData.capacity) return
     if (Number(tableFormData.capacity) > 20) {
@@ -75,35 +75,28 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
       }
     }
 
-    if (tableEditingId) {
-      setTables(
-        tables.map((t) =>
-          t.id === tableEditingId
-            ? {
-                ...t,
-                name: tableFormData.number,
-                capacity: Number(tableFormData.capacity),
-                location: tableFormData.locationId,
-                type: tableFormData.tableType
-              }
-            : t
-        )
-      )
-    } else {
-      setTables([
-        ...tables,
-        {
-          id: Date.now().toString(),
+    try {
+      if (tableEditingId) {
+        await updateTable(tableEditingId, {
           name: tableFormData.number,
           capacity: Number(tableFormData.capacity),
           location: tableFormData.locationId,
-          status: 'Disponible',
           type: tableFormData.tableType
-        }
-      ])
+        })
+      } else {
+        await createTable({
+          name: tableFormData.number,
+          capacity: Number(tableFormData.capacity),
+          location: tableFormData.locationId,
+          type: tableFormData.tableType
+        })
+      }
+      setVipLimitError(false)
+      setIsTableModalOpen(false)
+    } catch (err) {
+      console.error('Error guardando mesa', err)
+      alert('No se pudo guardar la mesa en el servidor. Revisa la consola.')
     }
-    setVipLimitError(false)
-    setIsTableModalOpen(false)
   }
 
   // -- Funciones de Ubicaciones --
@@ -209,6 +202,7 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
                   ))}
                 </select>
               </div>
+
               <div>
                 <label className="block text-sm font-bold text-[#4B2E2D] mb-2">Tipo de Mesa</label>
                 <select
@@ -355,9 +349,14 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
                 Cancelar
               </button>
               <button
-                onClick={() => {
-                  setTables(tables.filter((t) => t.id !== tableToDelete))
-                  setTableToDelete(null)
+                onClick={async () => {
+                  try {
+                    if (tableToDelete) await deleteTable(tableToDelete)
+                    setTableToDelete(null)
+                  } catch (err) {
+                    console.error(err)
+                    alert('No se pudo eliminar la mesa.')
+                  }
                 }}
                 className="flex-1 py-3 px-4 bg-[#D0543A] text-white font-bold rounded-xl"
               >

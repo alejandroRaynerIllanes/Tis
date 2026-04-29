@@ -1,12 +1,18 @@
 // src/app/components/admin/CategoryManagement.tsx
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, Edit2, Trash2, X, AlertTriangle } from 'lucide-react'
 import { useAppContext } from '../../context/AppContext'
 import { categoriesService } from '../../services/categories.service'
+import { toast } from 'sonner'
+
+export interface UICategory {
+  id: string
+  label: string
+}
 
 interface CategoryManagementProps {
-  categories: any[]
-  setCategories: (cats: any[]) => void
+  categories: UICategory[]
+  setCategories: (cats: UICategory[]) => void
 }
 
 export function CategoryManagement({ categories, setCategories }: CategoryManagementProps) {
@@ -16,6 +22,21 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
   const [categoryFormData, setCategoryFormData] = useState({ label: '' })
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  // 🚀 PASO 1: Listado dinámico (Consumir las categorías desde el backend al abrir)
+  useEffect(() => {
+    const cargarCategorias = async () => {
+      try {
+        const data = await categoriesService.getAll()
+        setCategories(data.map((cat: any) => ({ id: cat._id, label: cat.nombre })))
+      } catch (error) {
+        console.error('Error al cargar categorías:', error)
+        toast.error('Error al cargar las categorías desde el servidor.')
+      }
+    }
+    cargarCategorias()
+  }, [])
 
   const handleOpenAddCategoryModal = () => {
     setCategoryEditingId(null)
@@ -23,7 +44,7 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
     setIsCategoryModalOpen(true)
   }
 
-  const handleOpenEditCategoryModal = (category: any) => {
+  const handleOpenEditCategoryModal = (category: UICategory) => {
     setCategoryEditingId(category.id)
     setCategoryFormData({ label: category.label })
     setIsCategoryModalOpen(true)
@@ -32,13 +53,35 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
   // 🚀 CONECTADO AL BACKEND (Crear y Editar)
   const handleSaveCategory = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!categoryFormData.label) return
+
+    // 1. Limpiar espacios al inicio y final
+    const nombreLimpio = categoryFormData.label.trim()
+    if (!nombreLimpio) {
+      toast.warning('El nombre de la categoría no puede estar vacío.')
+      return
+    }
+
+    // 2. Longitud mínima y caracteres repetidos (ej: "aaa")
+    if (nombreLimpio.length < 3 || /^(.)\1+$/.test(nombreLimpio)) {
+      toast.warning('Ingresa un nombre de categoría válido (mínimo 3 caracteres).')
+      return
+    }
+
+    // 3. Evitar duplicados (Ignorando mayúsculas/minúsculas y la categoría actual si estamos editando)
+    const isDuplicate = categories.some(
+      (cat) =>
+        cat.label.toLowerCase() === nombreLimpio.toLowerCase() && cat.id !== categoryEditingId
+    )
+    if (isDuplicate) {
+      toast.warning('Ya existe una categoría con este nombre.')
+      return
+    }
 
     setIsLoading(true)
     try {
       if (categoryEditingId) {
         // PUT: Actualizar en BD
-        const updated = await categoriesService.update(categoryEditingId, categoryFormData.label)
+        const updated = await categoriesService.update(categoryEditingId, nombreLimpio)
 
         // Actualizamos los platos locales si el nombre de la categoría cambió
         const oldCat = categories.find((c) => c.id === categoryEditingId)
@@ -58,14 +101,14 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
         )
       } else {
         // POST: Crear en BD
-        const created = await categoriesService.create(categoryFormData.label)
+        const created = await categoriesService.create(nombreLimpio)
         // Guardamos usando el _id real de MongoDB
         setCategories([...categories, { id: created._id, label: created.nombre }])
       }
       setIsCategoryModalOpen(false)
     } catch (error) {
       console.error('Error al guardar categoría:', error)
-      alert('Hubo un error al conectar con el servidor.')
+      toast.error('Hubo un error al conectar con el servidor.')
     } finally {
       setIsLoading(false)
     }
@@ -73,13 +116,19 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
 
   // 🚀 CONECTADO AL BACKEND (Eliminar)
   const handleDeleteCategory = async (categoryId: string) => {
+    setIsDeleting(true)
     try {
       await categoriesService.remove(categoryId)
       setCategories(categories.filter((cat) => cat.id !== categoryId))
       setCategoryToDelete(null)
+      toast.success('Categoría eliminada con éxito.')
     } catch (error) {
       console.error('Error al eliminar categoría:', error)
-      alert('No se pudo eliminar la categoría. Verifica que no tenga platos asignados.')
+      toast.error('No se pudo eliminar la categoría.', {
+        description: 'Verifica que no tenga platos asignados.'
+      })
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -108,7 +157,7 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
               className="bg-white p-6 rounded-2xl shadow-xl flex items-center justify-between group border border-transparent hover:border-[#E57C5D]/30 transition-all duration-300 hover:shadow-2xl hover:-translate-y-1"
             >
               <h3 className="text-xl font-bold text-[#4B2E2D]">{cat.label}</h3>
-              <div className="flex gap-2 opacity-0 lg:opacity-100 group-hover:opacity-100 transition-opacity">
+              <div className="flex gap-2">
                 <button
                   onClick={() => handleOpenEditCategoryModal(cat)}
                   className="p-2 text-[#4B2E2D]/50 hover:text-[#D0543A] hover:bg-[#FCE4D6] rounded-lg transition-all"
@@ -185,15 +234,17 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
             <div className="flex gap-4 w-full mt-4">
               <button
                 onClick={() => setCategoryToDelete(null)}
-                className="flex-1 py-3 px-4 font-bold text-[#4B2E2D] border-2 border-[#4B2E2D] rounded-xl"
+                disabled={isDeleting}
+                className="flex-1 py-3 px-4 font-bold text-[#4B2E2D] border-2 border-[#4B2E2D] rounded-xl disabled:opacity-50"
               >
                 Cancelar
               </button>
               <button
                 onClick={() => handleDeleteCategory(categoryToDelete)}
-                className="flex-1 py-3 px-4 bg-[#D0543A] text-white font-bold rounded-xl"
+                disabled={isDeleting}
+                className={`flex-1 py-3 px-4 text-white font-bold rounded-xl transition-all ${isDeleting ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#D0543A] hover:bg-[#b5462f]'}`}
               >
-                Sí, Eliminar
+                {isDeleting ? 'Eliminando...' : 'Sí, Eliminar'}
               </button>
             </div>
           </div>

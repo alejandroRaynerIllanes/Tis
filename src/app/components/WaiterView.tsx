@@ -1,39 +1,12 @@
 //src/app/components/WaiterView.tsx
 import {
-  ChevronLeft,
-  LogOut,
-  Users,
-  Clock,
-  CheckCircle2,
-  Receipt,
-  MapPin,
-  Search,
-  X,
-  ChefHat,
-  Plus,
-  UtensilsCrossed,
-  Trash2,
-  ShoppingBag,
-  CreditCard,
-  Edit2,
-  MessageSquare,
-  CalendarDays,
-  UserCheck,
-  Ban,
-  XCircle,
-  AlertTriangle,
-  Banknote,
-  QrCode,
-  Wallet,
-  Smartphone,
-  Percent,
-  Printer,
-  Crown,
-  Zap
-} from 'lucide-react'
-import { useNavigate } from 'react-router'
-import { useState, MouseEvent } from 'react'
-import { toast } from 'sonner'
+  ChevronLeft, LogOut, Users, Clock, CheckCircle2, Receipt,
+  MapPin, Search, X, ChefHat, Plus, UtensilsCrossed, Trash2, ShoppingBag, CreditCard, Edit2, MessageSquare,
+  CalendarDays, UserCheck, Ban, XCircle, AlertTriangle, Banknote, QrCode, Wallet, Smartphone, Percent, Printer, Crown, Zap
+} from 'lucide-react';
+import { useNavigate } from 'react-router';
+import { useState, MouseEvent } from 'react';
+import { toast } from 'sonner';
 
 import { useAppContext, Product, TableStatus, Table, ReservationInfo } from '../context/AppContext'
 import { ReservationsListModal } from './ReservationsListModal'
@@ -243,8 +216,8 @@ export function WaiterView({
   const [tipPercent, setTipPercent] = useState<number>(0)
   const [paymentProcessing, setPaymentProcessing] = useState(false)
 
-  const role = localStorage.getItem('userRole')
-  const isAdmin = role === 'admin'
+  const role    = localStorage.getItem('userRole');
+  const isAdmin = role === 'admin';
 
   const handleLogout = () => {
     localStorage.clear()
@@ -364,34 +337,36 @@ export function WaiterView({
   }
 
   const validateReservation = (): boolean => {
-    const errs: Partial<Record<keyof ReservationFormData, string>> = {}
-    if (!reservationForm.clientName.trim()) errs.clientName = 'El nombre es obligatorio.'
-    if (!reservationForm.guestCount || reservationForm.guestCount < 1)
-      errs.guestCount = 'Mínimo 1 persona.'
-    if (!reservationForm.date) errs.date = 'Selecciona una fecha.'
-    if (!reservationForm.time) errs.time = 'Selecciona una hora.'
-    setReservationErrors(errs)
-    return Object.keys(errs).length === 0
-  }
+    const errs: Partial<Record<keyof ReservationFormData, string>> = {};
+    if (!reservationForm.clientName.trim()) errs.clientName = 'El nombre es obligatorio.';
+    if (!reservationForm.guestCount || reservationForm.guestCount < 1) errs.guestCount = 'Mínimo 1 persona.';
+    if (!reservationForm.date) errs.date = 'Selecciona una fecha.';
+    if (!reservationForm.time) errs.time = 'Selecciona una hora.';
+    setReservationErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
 
   const handleConfirmReservation = () => {
     if (!reservingTableId || !validateReservation()) return
 
     try {
+      const reservingTable = tables.find(t => t.id === reservingTableId);
+      const tableName = reservingTable?.name || 'Mesa';
+      
       // Mapear datos del formulario al formato ReservationInfo (time -> startTime)
       reserveTable(reservingTableId, {
         clientName: reservationForm.clientName,
         guestCount: reservationForm.guestCount,
         date: reservationForm.date,
-        startTime: reservationForm.time // Mapear 'time' a 'startTime'
-      })
-
+        startTime: reservationForm.time, // Mapear 'time' a 'startTime'
+      });
+      
       // Cerrar modal solo si la reserva fue exitosa
       setReservingTableId(null)
       setReservationForm({ clientName: '', guestCount: 1, date: '', time: '' })
 
       // Mostrar notificación de éxito
-      toast.success('Reserva creada exitosamente')
+      toast.success('Reserva creada exitosamente');
     } catch (error) {
       // Mostrar error al usuario
       toast.error(error instanceof Error ? error.message : 'Error al crear la reserva')
@@ -762,31 +737,21 @@ export function WaiterView({
                           >
                             <CalendarDays size={16} />
                           </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              onEditTable?.(t)
-                            }}
-                            className="p-2 rounded-xl text-[#4B2E2D]/50 hover:text-[#D0543A] hover:bg-white/40 transition-all bg-black/5"
-                            aria-label="Editar"
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); onEditTable?.(t); }}
+                            className="p-2 rounded-xl text-[#4B2E2D]/50 hover:text-[#D0543A] hover:bg-white/40 transition-all bg-black/5" aria-label="Editar"
                           >
                             <Edit2 size={16} />
                           </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              onDeleteTable?.(t.id)
-                            }}
-                            className="p-2 rounded-xl text-[#4B2E2D]/50 hover:text-red-600 hover:bg-red-500/10 transition-all bg-black/5"
-                            aria-label="Eliminar"
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); onDeleteTable?.(t.id); }}
+                            className="p-2 rounded-xl text-[#4B2E2D]/50 hover:text-red-600 hover:bg-red-500/10 transition-all bg-black/5" aria-label="Eliminar"
                           >
                             <Trash2 size={16} />
                           </button>
                         </div>
                       )}
-                      <div
-                        className={`p-2 rounded-xl transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-3 ${cfg.iconClass} bg-black/5`}
-                      >
+                      <div className={`p-2 rounded-xl transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-3 ${cfg.iconClass} bg-black/5`}>
                         {getStateIcon(t.status, 28)}
                       </div>
                     </div>
@@ -871,62 +836,41 @@ export function WaiterView({
               relative z-10 w-full max-w-[440px] lg:max-w-[480px] bg-white shadow-2xl rounded-3xl
               flex flex-col transform transition-all duration-300 ease-out overflow-hidden max-h-[90vh]
               animate-in zoom-in-95 duration-300
-            `}
-            >
-              {/* Header del panel derecho */}
-              {(() => {
-                const vipClientName = vipClientNameGlobal
-                return (
-                  <div
-                    className={`pt-6 pb-4 px-5 border-b shrink-0 ${
-                      isVipOrder
-                        ? 'bg-gradient-to-b from-[#2C1A0E] to-[#3D2318] border-amber-800/40'
-                        : activeTable.status === 'Esperando pago'
-                          ? 'bg-[#FFF9F0] border-[#E6A23C]/30'
-                          : 'bg-[#FFF5F0] border-[#FCE4D6]/60'
-                    }`}
+            `}>
+            
+            {/* Header del panel derecho */}
+            {(() => {
+              const vipClientName = vipClientNameGlobal;
+              return (
+            <div className={`pt-6 pb-4 px-5 border-b shrink-0 ${
+              isVipOrder
+                ? 'bg-gradient-to-b from-[#2C1A0E] to-[#3D2318] border-amber-800/40'
+                : activeTable.status === 'Esperando pago' ? 'bg-[#FFF9F0] border-[#E6A23C]/30' : 'bg-[#FFF5F0] border-[#FCE4D6]/60'
+            }`}>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className={`font-black text-2xl ${isVipOrder ? 'text-white' : 'text-[#4B2E2D]'}`}>{activeTable.name}</h3>
+                    {isVipOrder && <Crown size={18} className="text-yellow-300 drop-shadow" strokeWidth={2.5} />}
+                  </div>
+                  <p className={`text-sm font-bold mt-1 ${
+                    isVipOrder ? 'text-white/65' :
+                    activeTable.status === 'Disponible' ? 'text-[#2C2C2C]/80' :
+                    activeTable.status === 'Ocupada' ? 'text-[#D96C4A]' : 
+                    activeTable.status === 'Esperando pago' ? 'text-[#E6A23C]' : 'text-[#6B3E2E]'
+                  }`}>
+                    {activeTable.status}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleCloseModal}
+                    className={`p-2 rounded-xl transition-colors ${isVipOrder ? 'text-white/50 hover:bg-white/10' : 'text-[#4B2E2D]/50 hover:bg-black/5'}`}
                   >
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3
-                            className={`font-black text-2xl ${isVipOrder ? 'text-white' : 'text-[#4B2E2D]'}`}
-                          >
-                            {activeTable.name}
-                          </h3>
-                          {isVipOrder && (
-                            <Crown
-                              size={18}
-                              className="text-yellow-300 drop-shadow"
-                              strokeWidth={2.5}
-                            />
-                          )}
-                        </div>
-                        <p
-                          className={`text-sm font-bold mt-1 ${
-                            isVipOrder
-                              ? 'text-white/65'
-                              : activeTable.status === 'Disponible'
-                                ? 'text-[#2C2C2C]/80'
-                                : activeTable.status === 'Ocupada'
-                                  ? 'text-[#D96C4A]'
-                                  : activeTable.status === 'Esperando pago'
-                                    ? 'text-[#E6A23C]'
-                                    : 'text-[#6B3E2E]'
-                          }`}
-                        >
-                          {activeTable.status}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={handleCloseModal}
-                          className={`p-2 rounded-xl transition-colors ${isVipOrder ? 'text-white/50 hover:bg-white/10' : 'text-[#4B2E2D]/50 hover:bg-black/5'}`}
-                        >
-                          <X size={24} />
-                        </button>
-                      </div>
-                    </div>
+                    <X size={24} />
+                  </button>
+                </div>
+              </div>
 
                     {/* Banner de prioridad VIP */}
                     {isVipOrder && (
@@ -1696,6 +1640,7 @@ export function WaiterView({
 
           {/* Modal Content */}
           <div className="relative z-10 w-full max-w-[500px] bg-white shadow-2xl rounded-3xl flex flex-col transform transition-all duration-300 ease-out overflow-hidden max-h-[90vh] animate-in zoom-in-95 duration-300">
+            
             {/* Header */}
             <div className="pt-6 pb-4 px-6 bg-gradient-to-br from-[#D96C4A] to-[#C25838] text-white">
               <div className="flex items-center justify-between mb-2">

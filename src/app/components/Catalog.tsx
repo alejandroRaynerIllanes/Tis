@@ -2,6 +2,7 @@
 import { useNavigate } from 'react-router';
 import { useState, useEffect } from 'react';
 import { categoriesService } from '../services/categories.service';
+import { locationsService } from '../services/locations.service';
 import { INITIAL_CATEGORIES, INITIAL_LOCATIONS } from '../data/constants';
 import type { AdminView } from './layout/Sidebar';
 import { Sidebar } from './layout/Sidebar';
@@ -35,6 +36,18 @@ export function Catalog() {
       }
     };
     cargarCategorias();
+  }, []);
+  // Cargar ubicaciones reales de la Base de Datos
+  useEffect(() => {
+    const cargarUbicaciones = async () => {
+      try {
+        const data = await locationsService.getAll();
+        setLocations(data.map(d => ({ id: d.id, name: d.name })));
+      } catch (error) {
+        console.warn('No se pudieron cargar ubicaciones de MongoDB, usando locales', error);
+      }
+    };
+    cargarUbicaciones();
   }, []);
   useEffect(() => {
     const role = localStorage.getItem('userRole');

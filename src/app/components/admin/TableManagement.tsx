@@ -4,6 +4,7 @@ import { Plus, Edit2, Trash2, X, AlertTriangle } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import { WaiterView } from '../WaiterView';
 import { MAX_VIP_TABLES } from '../../data/constants';
+import { locationsService } from '../../services/locations.service';
 
 interface TableManagementProps {
   locations: any[];
@@ -67,14 +68,20 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
   };
 
   // -- Funciones de Ubicaciones --
-  const handleSaveLocation = (e: React.FormEvent) => {
+  const handleSaveLocation = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!locationFormData.name) return;
     if (locationEditingId) {
+      // Edit local copy only (minimal change). Optionally implement API update later.
       setLocations(locations.map(loc => loc.id === locationEditingId ? { ...loc, name: locationFormData.name } : loc));
     } else {
-      const newId = locationFormData.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-      setLocations([...locations, { id: newId, name: locationFormData.name }]);
+      try {
+        const created = await locationsService.create(locationFormData.name);
+        setLocations([...locations, { id: created.id, name: created.name }]);
+      } catch (err) {
+        console.error('Error creando ubicación:', err);
+        alert('No se pudo crear la ubicación en el servidor. Revisa la consola.');
+      }
     }
     setShowLocationForm(false);
     setLocationFormData({ name: '' });

@@ -145,13 +145,14 @@ export function UserManagement() {
     try {
       if (editingUser) {
         // PUT /usuarios/:id
-        await usersService.update(editingUser.id, {
-          nombre: formData.firstName,
-          apellido: formData.lastName,
+        // CAMBIO en el else de creación:
+        await usersService.create({
+          nombre: formData.firstName,   // El backend espera 'nombre'
+          apellido: formData.lastName, // El backend espera 'apellido'
           ci: formData.ci,
           email: formData.email,
+          password: formData.password,
           rol: ROLE_TO_BACKEND[formData.role],
-          ...(formData.password ? { password: formData.password } : {}),
         });
         toast.success('Usuario actualizado correctamente');
       } else {

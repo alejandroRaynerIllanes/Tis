@@ -137,7 +137,6 @@ export function UserManagement() {
     setEditingUser(null);
   };
 
-  // Crear o editar usuario via API
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitLoading(true);
@@ -145,14 +144,13 @@ export function UserManagement() {
     try {
       if (editingUser) {
         // PUT /usuarios/:id
-        // CAMBIO en el else de creación:
-        await usersService.create({
-          nombre: formData.firstName,   // El backend espera 'nombre'
-          apellido: formData.lastName, // El backend espera 'apellido'
+        await usersService.update(editingUser.id, {
+          nombre: formData.firstName,
+          apellido: formData.lastName,
           ci: formData.ci,
           email: formData.email,
-          password: formData.password,
           rol: ROLE_TO_BACKEND[formData.role],
+          ...(formData.password ? { password: formData.password } : {}),
         });
         toast.success('Usuario actualizado correctamente');
       } else {
@@ -172,8 +170,11 @@ export function UserManagement() {
         });
         toast.success('Usuario creado correctamente');
       }
+      
+      // ESTO DEBE ESTAR DENTRO DEL TRY
       handleCloseModal();
       await fetchUsers();
+
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Error al guardar usuario';
       toast.error(msg);

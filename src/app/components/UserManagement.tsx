@@ -160,10 +160,11 @@ export function UserManagement() {
           setSubmitLoading(false);
           return;
         }
+        // Dentro de handleSubmit, en la parte del 'else' (Crear Nuevo)
         await usersService.create({
-          nombre: formData.firstName,
-          apellido: formData.lastName,
-          ci: formData.ci,
+          nombre: formData.firstName,   // Asegúrate de usar 'nombre'
+          apellido: formData.lastName, // Asegúrate de usar 'apellido'
+          ci: formData.ci,             // Asegúrate de enviar el 'ci'
           email: formData.email,
           password: formData.password,
           rol: ROLE_TO_BACKEND[formData.role],

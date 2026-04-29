@@ -34,6 +34,8 @@ export function Login() {
     try {
       // 1. Extraemos los datos del authService
       const { role, token, user } = await authService.login(username.trim(), password);
+      localStorage.setItem('authToken', token); // Nombre clave para que funcione el interceptor
+      localStorage.setItem('authUser', JSON.stringify(user));
 
       // 2. USAMOS LAS FUNCIONES IMPORTADAS (Esto quita el error de nombre)
       setToken(token);       // Guarda automáticamente como 'authToken'

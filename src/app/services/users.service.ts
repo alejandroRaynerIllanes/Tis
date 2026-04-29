@@ -5,7 +5,7 @@ import { api } from './api';
 
 // Tipo del usuario como viene del backend
 export interface BackendUser {
-  _id: string;        // <-- CORRECCIÓN: _id como string (MongoDB)
+  _id: string;       
   nombre: string;
   apellido: string;
   ci: string;

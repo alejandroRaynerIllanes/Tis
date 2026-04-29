@@ -9,12 +9,12 @@ import { usersService, type BackendUser } from '../services/users.service';
 
 type Role = 'Administrador' | 'Mesero' | 'Cocinero' | 'Cajero';
 
-// Mapeo de roles frontend ↔ backend
+// Mapeo de roles frontend ↔ backend (coincide con el enum del backend)
 const ROLE_TO_BACKEND: Record<Role, string> = {
-  'Administrador': 'administrador',
-  'Mesero': 'mesero',
-  'Cocinero': 'cocinero',
-  'Cajero': 'cajero',
+  'Administrador': 'Administrador',
+  'Mesero': 'Mesero',
+  'Cocinero': 'Cocinero',
+  'Cajero': 'Cajero',
 };
 
 const ROLE_FROM_BACKEND: Record<string, Role> = {
@@ -24,21 +24,28 @@ const ROLE_FROM_BACKEND: Record<string, Role> = {
   'cajero': 'Cajero',
 };
 
-function mapUserFromBackend(u: BackendUser): BackendUser & { displayRole: Role; displayName: string } {
+
+
+function mapUserFromBackend(u: BackendUser): DisplayUser {
   return {
     ...u,
-    displayRole: ROLE_FROM_BACKEND[u.rol.toLowerCase()] || 'Mesero',
+    id: u._id, // Ahora TypeScript reconocerá _id porque lo agregaste a la interfaz
+    displayRole: ROLE_FROM_BACKEND[u.rol?.toLowerCase()] || 'Mesero', // Agregado '?' para evitar el crash
     displayName: `${u.nombre} ${u.apellido}`,
-  };
+  } as DisplayUser;
 }
 
-type DisplayUser = ReturnType<typeof mapUserFromBackend>;
+type DisplayUser = BackendUser & { 
+  id: string;          // Mapeamos el _id de Mongo a id para facilitar el uso
+  displayRole: Role; 
+  displayName: string 
+};
 
 export function UserManagement() {
   const [users, setUsers] = useState<DisplayUser[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [actionLoading, setActionLoading] = useState<String | null>(null);
   
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -130,7 +137,6 @@ export function UserManagement() {
     setEditingUser(null);
   };
 
-  // Crear o editar usuario via API
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitLoading(true);
@@ -144,7 +150,7 @@ export function UserManagement() {
           ci: formData.ci,
           email: formData.email,
           rol: ROLE_TO_BACKEND[formData.role],
-          ...(formData.password ? { contraseña: formData.password } : {}),
+          ...(formData.password ? { password: formData.password } : {}),
         });
         toast.success('Usuario actualizado correctamente');
       } else {
@@ -154,18 +160,22 @@ export function UserManagement() {
           setSubmitLoading(false);
           return;
         }
+        // Dentro de handleSubmit, en la parte del 'else' (Crear Nuevo)
         await usersService.create({
-          nombre: formData.firstName,
-          apellido: formData.lastName,
-          ci: formData.ci,
+          nombre: formData.firstName,   // Asegúrate de usar 'nombre'
+          apellido: formData.lastName, // Asegúrate de usar 'apellido'
+          ci: formData.ci,             // Asegúrate de enviar el 'ci'
           email: formData.email,
-          contraseña: formData.password,
+          password: formData.password,
           rol: ROLE_TO_BACKEND[formData.role],
         });
         toast.success('Usuario creado correctamente');
       }
+      
+      // ESTO DEBE ESTAR DENTRO DEL TRY
       handleCloseModal();
       await fetchUsers();
+
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Error al guardar usuario';
       toast.error(msg);
@@ -178,7 +188,7 @@ export function UserManagement() {
   const handleToggleStatus = async (user: DisplayUser) => {
     setActionLoading(user.id);
     try {
-      await usersService.toggleStatus(user.id);
+      await usersService.toggleStatus(user.id, !user.estado);
       const newEstado = !user.estado;
       toast.success(`${user.displayName} ahora está ${newEstado ? 'activo' : 'inactivo'}`);
       await fetchUsers();
@@ -272,7 +282,7 @@ export function UserManagement() {
                 
                 <div className="relative z-10 flex justify-between items-start mb-4">
                   <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-[#6B3E2E] to-[#D96C4A] text-white flex items-center justify-center font-bold text-xl shadow-md border-2 border-white">
-                    {user.nombre.charAt(0).toUpperCase()}
+                    {(user.nombre ? user.nombre.charAt(0).toUpperCase() : '')}
                   </div>
                   <div className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 border ${
                     user.estado 

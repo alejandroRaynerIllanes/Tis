@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { User, Lock, Eye, EyeOff, ChefHat, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { authService } from '../services/auth.service';
-
+import { setToken, setStoredUser } from '../services/api';
 
 export function Login() {
   const [username, setUsername] = useState('');
@@ -32,8 +32,17 @@ export function Login() {
     setIsLoading(true);
 
     try {
-      const { role } = await authService.login(username.trim(), password);
+      // 1. Extraemos los datos del authService
+      const { role, token, user } = await authService.login(username.trim(), password);
+      localStorage.setItem('authToken', token); // Nombre clave para que funcione el interceptor
+      localStorage.setItem('authUser', JSON.stringify(user));
 
+      // 2. USAMOS LAS FUNCIONES IMPORTADAS (Esto quita el error de nombre)
+      setToken(token);       // Guarda automáticamente como 'authToken'
+      setStoredUser(user);   // Guarda automáticamente como 'authUser'
+      localStorage.setItem('userRole', role);
+
+      // 3. Navegación
       if (role === 'admin') {
         navigate('/catalog', { replace: true });
       } else if (role === 'waiter') {

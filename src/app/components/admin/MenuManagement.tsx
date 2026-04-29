@@ -5,9 +5,36 @@ import { useAppContext } from '../../context/AppContext'
 import { uploadService } from '../../services/upload.service'
 import { categoriesService } from '../../services/categories.service'
 import { platosService } from '../../services/platos.service'
+import { toast } from 'sonner'
+
+export interface UICategory {
+  id: string
+  label: string
+}
+
+export interface UIDish {
+  id: string
+  name: string
+  category: string
+  price: number
+  image: string
+  description?: string
+  status: 'Disponible' | 'Agotado'
+}
+
+interface BackendDish {
+  _id: string
+  nombre: string
+  categoria: any // Puede ser el string (ID) o el objeto populado
+  precio: number
+  imagenUrl?: string
+  descripcion?: string
+  disponible: boolean
+}
+
 interface MenuManagementProps {
-  categories: any[]
-  setCategories: (cats: any[]) => void
+  categories: UICategory[]
+  setCategories: (cats: UICategory[]) => void
 }
 
 export function MenuManagement({ categories, setCategories }: MenuManagementProps) {
@@ -16,6 +43,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [itemToDelete, setItemToDelete] = useState<string | null>(null)
+  const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
     title: '',
@@ -33,12 +61,13 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
       const data = await platosService.getAll()
       console.log('🍔 Datos crudos desde el backend:', data) // <-- ESTO NOS DIRÁ LA VERDAD
 
-      const platosFormateados = data.map((p: any) => ({
+      const platosFormateados: UIDish[] = data.map((p: BackendDish) => ({
         id: p._id,
         name: p.nombre,
-        category: p.categoria, // Si el backend manda un objeto en vez de un ID, aquí se rompe
+        // FIX: El backend popula la categoría, así que extraemos el _id del objeto.
+        category:
+          typeof p.categoria === 'object' && p.categoria !== null ? p.categoria._id : p.categoria,
         price: p.precio,
-        // Seguro de vida: Si no hay imagen, pon la de por defecto
         image:
           p.imagenUrl ||
           'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmb29kfGVufDF8fHx8MTc3MzM3OTc2OHww&ixlib=rb-4.1.0&q=80&w=1080',
@@ -70,7 +99,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
     if (!file) return
 
     if (file.size > 5 * 1024 * 1024) {
-      alert('El archivo pesa más de 5MB.')
+      toast.error('El archivo pesa más de 5MB.')
       return
     }
 
@@ -80,7 +109,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
       setFormData((prev) => ({ ...prev, image: response.url }))
     } catch (error) {
       console.error('Error al subir la imagen:', error)
-      alert('Hubo un problema al subir la foto.')
+      toast.error('Hubo un problema al subir la foto.')
     } finally {
       setIsUploading(false)
     }
@@ -116,7 +145,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
     }
   }, [isModalOpen])
 
-  const handleOpenEditModal = (dish: any) => {
+  const handleOpenEditModal = (dish: UIDish) => {
     setEditingId(dish.id)
     setIsPresetCategory(false)
     presetCategoryRef.current = ''
@@ -136,13 +165,13 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
 
     // 1. Validamos con alertas para que NO sea silencioso
     if (!formData.title || !formData.price || !formData.category) {
-      alert('⚠️ Por favor llena el nombre, el precio y selecciona una categoría.')
+      toast.warning('Por favor llena el nombre, el precio y selecciona una categoría.')
       return
     }
 
     // Tu backend EXIGE una descripción según el modelo de Mongoose
     if (!formData.description || formData.description.trim() === '') {
-      alert('⚠️ La descripción es obligatoria para poder guardar en la base de datos.')
+      toast.warning('La descripción es obligatoria para poder guardar en la base de datos.')
       return
     }
 
@@ -160,40 +189,125 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
 
       if (editingId) {
         console.log('4. Editando plato existente...')
-        await platosService.update(editingId, datosParaBackend)
+        const platoActualizado = await platosService.update(editingId, datosParaBackend)
+
+        // ✨ OPTIMIZACIÓN: Actualizamos solo el plato editado en el estado local
+        setDishes(
+          dishes.map((d) =>
+            d.id === editingId
+              ? {
+                  id: platoActualizado._id,
+                  name: platoActualizado.nombre,
+                  category:
+                    typeof platoActualizado.categoria === 'object'
+                      ? platoActualizado.categoria._id
+                      : platoActualizado.categoria,
+                  price: platoActualizado.precio,
+                  image: platoActualizado.imagenUrl,
+                  description: platoActualizado.descripcion,
+                  status: (platoActualizado.disponible ? 'Disponible' : 'Agotado') as
+                    | 'Disponible'
+                    | 'Agotado'
+                }
+              : d
+          )
+        )
       } else {
         console.log('4. Creando nuevo plato...')
-        const respuesta = await platosService.create(datosParaBackend)
-        console.log('5. Respuesta del servidor:', respuesta)
+        const platoCreado = await platosService.create(datosParaBackend)
+        console.log('5. Respuesta del servidor:', platoCreado)
+
+        // ✨ OPTIMIZACIÓN: Añadimos el nuevo plato al estado local sin recargar todo
+        setDishes([
+          ...dishes,
+          {
+            id: platoCreado._id,
+            name: platoCreado.nombre,
+            category:
+              typeof platoCreado.categoria === 'object'
+                ? platoCreado.categoria._id
+                : platoCreado.categoria,
+            price: platoCreado.precio,
+            image: platoCreado.imagenUrl,
+            description: platoCreado.descripcion,
+            status: (platoCreado.disponible ? 'Disponible' : 'Agotado') as 'Disponible' | 'Agotado'
+          }
+        ])
       }
 
-      console.log('6. Éxito. Recargando interfaz...')
-      await cargarPlatos()
+      // Ya no necesitamos recargar toda la lista desde la BD
+      // await cargarPlatos();
       setIsModalOpen(false)
 
-      // Feedback visual de éxito
-      alert('✅ ¡Plato guardado con éxito en la Base de Datos!')
+      toast.success('¡Plato guardado con éxito en la Base de Datos!')
     } catch (error) {
-      // Si el backend rechaza la petición (ej. error 500 o 400), caerá aquí
       console.error('❌ Error CRÍTICO al guardar el plato:', error)
-      alert(
-        "❌ Hubo un error al guardar. Presiona F12 y revisa la pestaña 'Console' para ver el detalle."
-      )
+      toast.error('Hubo un error al guardar el plato.', {
+        description: 'Revisa la consola para ver el detalle.'
+      })
+    }
+  }
+
+  // 🚀 BUG FIX: Conectar la eliminación a la base de datos
+  const handleDeleteDish = async (id: string) => {
+    try {
+      await platosService.remove(id)
+      // Actualizamos el estado local para que el cambio sea instantáneo
+      setDishes(dishes.filter((d) => d.id !== id))
+      setItemToDelete(null)
+      toast.success('Plato eliminado de la base de datos.')
+    } catch (error) {
+      console.error('Error al eliminar el plato:', error)
+      toast.error('No se pudo eliminar el plato.')
+    }
+  }
+
+  // 🚀 Eliminar categoría desde la vista del menú
+  const handleDeleteCategory = async (id: string) => {
+    try {
+      await categoriesService.remove(id)
+      setCategories(categories.filter((c) => c.id !== id))
+      setCategoryToDelete(null)
+      toast.success('Categoría eliminada de la base de datos.')
+    } catch (error) {
+      console.error('Error al eliminar la categoría:', error)
+      toast.error('No se pudo eliminar la categoría.', {
+        description: 'Asegúrate de que no tenga platos asignados.'
+      })
     }
   }
 
   const handleSaveCategory = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!categoryFormData.label) return
+
+    const nombreLimpio = categoryFormData.label.trim()
+    if (!nombreLimpio) {
+      toast.warning('El nombre de la categoría no puede estar vacío.')
+      return
+    }
+
+    if (nombreLimpio.length < 3 || /^(.)\1+$/.test(nombreLimpio)) {
+      toast.warning('Ingresa un nombre de categoría válido (mínimo 3 caracteres).')
+      return
+    }
+
+    const isDuplicate = categories.some(
+      (cat) => cat.label.toLowerCase() === nombreLimpio.toLowerCase()
+    )
+    if (isDuplicate) {
+      toast.warning('Ya existe una categoría con este nombre.')
+      return
+    }
+
     try {
-      const created = await categoriesService.create(categoryFormData.label)
+      const created = await categoriesService.create(nombreLimpio)
       setCategories([...categories, { id: created._id, label: created.nombre }])
       setMenuFilter('all')
       setIsCategoryModalOpen(false)
       setCategoryFormData({ label: '' })
     } catch (error) {
       console.error(error)
-      alert('Error al crear categoría rápida.')
+      toast.error('Error al crear categoría rápida.')
     }
   }
 
@@ -266,6 +380,13 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
                   <h2 className="text-xl sm:text-2xl font-bold text-[#4B2E2D] shrink-0">
                     {category.label}
                   </h2>
+                  <button
+                    onClick={() => setCategoryToDelete(category.id)}
+                    className="p-1.5 text-[#4B2E2D]/40 hover:text-[#D0543A] hover:bg-[#D0543A]/10 rounded-lg transition-all"
+                    aria-label="Eliminar categoría"
+                  >
+                    <Trash2 size={20} />
+                  </button>
                   <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#E57C5D]/15 text-[#D0543A] border border-[#E57C5D]/25 shrink-0">
                     {categoryDishes.length} platos
                   </span>
@@ -498,21 +619,35 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
                 Cancelar
               </button>
               <button
-                onClick={async () => {
-                  if (!itemToDelete) return
-                  try {
-                    // 1. Le decimos al Backend que elimine el plato en MongoDB
-                    await platosService.remove(itemToDelete)
+                onClick={() => itemToDelete && handleDeleteDish(itemToDelete)}
+                className="flex-1 py-3 px-4 bg-[#D0543A] text-white font-bold rounded-xl transition-all border-2 border-[#D0543A]"
+              >
+                Sí, Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-                    // 2. Si el backend responde con éxito, lo borramos de la pantalla
-                    setDishes(dishes.filter((d) => d.id !== itemToDelete))
-                    setItemToDelete(null)
-                  } catch (error) {
-                    console.error('Error al eliminar el plato:', error)
-                    alert('Hubo un problema al intentar eliminar el plato de la base de datos.')
-                  }
-                }}
-                className="flex-1 py-3 px-4 bg-[#D0543A] text-white font-bold rounded-xl transition-all border-2 border-[#D0543A] hover:bg-[#b5462f] active:scale-95"
+      {/* Modal Eliminar Categoría */}
+      {categoryToDelete !== null && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#FCE4D6] w-full max-w-[400px] border-[4px] border-[#D0543A] rounded-3xl p-8 relative shadow-2xl flex flex-col items-center text-center">
+            <AlertTriangle size={32} className="text-[#D0543A] mb-4" />
+            <h2 className="text-2xl font-bold text-[#4B2E2D] mb-3">¿Eliminar Categoría?</h2>
+            <p className="text-sm text-[#4B2E2D]/70 mb-4">
+              Asegúrate de que no haya platos en esta categoría.
+            </p>
+            <div className="flex gap-4 w-full mt-4">
+              <button
+                onClick={() => setCategoryToDelete(null)}
+                className="flex-1 py-3 px-4 font-bold text-[#4B2E2D] bg-transparent border-2 border-[#4B2E2D] rounded-xl transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => categoryToDelete && handleDeleteCategory(categoryToDelete)}
+                className="flex-1 py-3 px-4 bg-[#D0543A] text-white font-bold rounded-xl transition-all border-2 border-[#D0543A]"
               >
                 Sí, Eliminar
               </button>
@@ -537,7 +672,11 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
                 type="text"
                 required
                 value={categoryFormData.label}
-                onChange={(e) => setCategoryFormData({ label: e.target.value })}
+                onChange={(e) =>
+                  setCategoryFormData({
+                    label: e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s]/g, '')
+                  })
+                }
                 className="w-full px-4 py-3 rounded-xl border-2 border-[#E57C5D] text-[#4B2E2D] mb-6"
                 placeholder="Ej: Platos Especiales"
               />

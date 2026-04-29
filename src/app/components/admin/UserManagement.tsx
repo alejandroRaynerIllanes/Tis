@@ -12,6 +12,7 @@ import {
   UserCog
 } from 'lucide-react'
 import { usersService, BackendUser } from '../../services/users.service'
+import { toast } from 'sonner'
 
 export function UserManagement() {
   const [users, setUsers] = useState<BackendUser[]>([])
@@ -89,17 +90,34 @@ export function UserManagement() {
 
       if (userEditingId) {
         if (userFormData.password) payload.password = userFormData.password
-        await usersService.update(userEditingId, payload)
+        const response: any = await usersService.update(userEditingId, payload)
+
+        // El backend devuelve { mensaje, usuario }, extraemos el usuario y normalizamos el ID
+        const updatedUser = response.usuario || response
+        setUsers(
+          users.map((u) =>
+            u._id === userEditingId ? { ...updatedUser, _id: updatedUser._id || updatedUser.id } : u
+          )
+        )
+        toast.success('Usuario actualizado correctamente.')
       } else {
         payload.password = userFormData.password
-        await usersService.create(payload)
+        const response: any = await usersService.create(payload)
+
+        // Extraemos el usuario y normalizamos el ID para que React lo entienda
+        const createdUser = response.usuario || response
+        setUsers([...users, { ...createdUser, _id: createdUser._id || createdUser.id }])
+        toast.success('Usuario creado correctamente.')
       }
 
-      await cargarUsuarios()
+      // ¡La magia! Ya no descargamos todos los usuarios de la base de datos
+      // await cargarUsuarios();
       setIsUserModalOpen(false)
     } catch (error) {
       console.error('Error al guardar usuario en BD:', error)
-      alert('Hubo un error al guardar. Verifica la consola.')
+      toast.error('Hubo un error al guardar.', {
+        description: 'Verifica la consola para más detalles.'
+      })
     }
   }
 
@@ -395,28 +413,8 @@ export function UserManagement() {
                 Cancelar
               </button>
               <button
-                type="button"
-                onClick={async (e) => {
-                  e.preventDefault()
-
-                  if (!userToDelete) return
-
-                  try {
-                    // 1. Elimina el usuario en el backend
-                    await usersService.remove(userToDelete)
-
-                    // 2. MAGIA: Le pedimos a React que descargue la lista fresca de MongoDB
-                    await cargarUsuarios()
-
-                    // 3. Cerramos el modal
-                    setUserToDelete(null)
-                    alert('✅ Usuario eliminado permanentemente.')
-                  } catch (error) {
-                    console.error('Error al eliminar:', error)
-                    alert('Fallo al conectar con el servidor.')
-                  }
-                }}
-                className="flex-1 py-3 px-4 bg-[#D0543A] hover:bg-[#b5462f] text-white font-bold rounded-xl transition-all shadow-lg cursor-pointer relative z-50 pointer-events-auto"
+                onClick={() => handleDeleteUser(userToDelete)}
+                className="flex-1 py-3 px-4 bg-[#D0543A] text-white font-bold rounded-xl shadow-lg hover:bg-[#b5462f] hover:shadow-xl active:scale-[0.98] transition-all border-2 border-[#D0543A]"
               >
                 Sí, Eliminar
               </button>

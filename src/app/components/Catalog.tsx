@@ -38,7 +38,7 @@ export function Catalog() {
   }, [])
   useEffect(() => {
     const role = localStorage.getItem('userRole')
-    if (role !== 'admin') {
+    if (role !== 'admin' && role !== 'administrador') {
       navigate('/waiter-view')
     }
   }, [navigate])

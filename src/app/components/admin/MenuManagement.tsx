@@ -26,7 +26,7 @@ export interface UIDish {
 interface BackendDish {
   _id: string
   nombre: string
-  categoria: any
+  categoria: any // Puede ser el string (ID) o el objeto populado
   precio: number
   imagenUrl?: string
   imagenPublicId?: string
@@ -61,9 +61,12 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
   const cargarPlatos = async () => {
     try {
       const data = await platosService.getAll()
+      console.log('🍔 Datos crudos desde el backend:', data)
+
       const platosFormateados: UIDish[] = data.map((p: BackendDish) => ({
         id: p._id,
         name: p.nombre,
+        // El backend popula la categoría, así que extraemos el _id del objeto.
         category:
           typeof p.categoria === 'object' && p.categoria !== null ? p.categoria._id : p.categoria,
         price: p.precio,
@@ -173,6 +176,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
       return
     }
 
+    // Tu backend EXIGE una descripción según el modelo de Mongoose
     if (!formData.description || formData.description.trim() === '') {
       toast.warning('La descripción es obligatoria para poder guardar en la base de datos.')
       return
@@ -189,7 +193,10 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
         disponible: true
       }
 
+      console.log('3. Paquete listo para enviar:', datosParaBackend)
+
       if (editingId) {
+        console.log('4. Editando plato existente...')
         const platoActualizado = await platosService.update(editingId, datosParaBackend)
 
         // Optimización: Actualizamos solo el plato editado en el estado local
@@ -216,7 +223,9 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
           )
         )
       } else {
+        console.log('4. Creando nuevo plato...')
         const platoCreado = await platosService.create(datosParaBackend)
+        console.log('5. Respuesta del servidor:', platoCreado)
 
         // Optimización: Añadimos el nuevo plato al estado local sin recargar todo
         setDishes([
@@ -250,6 +259,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
   const handleDeleteDish = async (id: string) => {
     try {
       await platosService.remove(id)
+      // Actualizamos el estado local para que el cambio sea instantáneo
       setDishes(dishes.filter((d) => d.id !== id))
       setItemToDelete(null)
       toast.success('Plato eliminado de la base de datos.')

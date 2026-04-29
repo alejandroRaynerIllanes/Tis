@@ -77,8 +77,9 @@ export function UserManagement() {
       !userFormData.ci ||
       !userFormData.email ||
       !userFormData.role
-    )
+    ) {
       return
+    }
 
     try {
       const payload: any = {

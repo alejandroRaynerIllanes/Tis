@@ -205,6 +205,7 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
       toast.success('Ubicación eliminada.')
     } catch (error: any) {
       console.error('Error al eliminar la ubicación:', error)
+      // Mostrar el mensaje exacto del backend (ej: "No puedes eliminar porque tiene mesas")
       toast.error(error.message || 'No se pudo eliminar la ubicación.')
     }
   }

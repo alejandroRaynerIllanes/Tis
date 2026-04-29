@@ -1,4 +1,3 @@
-// src/app/components/Catalog.tsx
 import { useNavigate } from 'react-router'
 import { useState, useEffect } from 'react'
 import { categoriesService } from '../services/categories.service'
@@ -6,7 +5,7 @@ import { INITIAL_CATEGORIES, INITIAL_LOCATIONS } from '../data/constants'
 import type { AdminView } from './layout/Sidebar'
 import { Sidebar } from './layout/Sidebar'
 
-// 🔥 Importaciones Modulares (La Magia de la Arquitectura Limpia)
+// 🔥 Importaciones Modulares
 import { Dashboard } from './admin/Dashboard'
 import { MenuManagement } from './admin/MenuManagement'
 import { CategoryManagement } from './admin/CategoryManagement'
@@ -20,27 +19,27 @@ export function Catalog() {
   const [activeView, setActiveView] = useState<AdminView | 'categories' | 'locations'>('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  // Estado local que comparten varios componentes
+  // Estado compartido
   const [categories, setCategories] = useState(INITIAL_CATEGORIES)
   const [locations, setLocations] = useState(INITIAL_LOCATIONS)
 
-  // Cargar categorías reales de la Base de Datos
+  // 🔧 Cargar categorías desde backend
   useEffect(() => {
     const cargarCategorias = async () => {
       try {
         const data = await categoriesService.getAll()
-        // Mapeamos la respuesta (_id, nombre) a las propiedades (id, label) que espera tu frontend
         setCategories(data.map((c) => ({ id: c._id, label: c.nombre })))
       } catch (error) {
         console.error('Error al cargar categorías de MongoDB:', error)
       }
     }
+
     cargarCategorias()
   }, [])
 
+  // 🔧 Validación de rol
   useEffect(() => {
     const role = localStorage.getItem('userRole')
-    // Cristhian: validación adicional para 'administrador'
     if (role !== 'admin' && role !== 'administrador') {
       navigate('/waiter-view')
     }

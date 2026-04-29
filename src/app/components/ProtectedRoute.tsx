@@ -24,6 +24,7 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
 
     const isAdmin = userRole === 'admin' || userRole === 'administrador'
 
+    // Si requiere admin y el usuario no es admin, redirigir
     if (requireAdmin && !isAdmin) {
       navigate('/waiter-view', { replace: true })
       setIsChecking(false)

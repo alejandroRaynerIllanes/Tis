@@ -1,9 +1,12 @@
 // src/app/components/admin/TableManagement.tsx
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, Edit2, Trash2, X, AlertTriangle } from 'lucide-react'
 import { useAppContext } from '../../context/AppContext'
 import { WaiterView } from '../WaiterView'
 import { MAX_VIP_TABLES } from '../../data/constants'
+import { toast } from 'sonner'
+import { locationsService } from '../../services/locations.service'
+import { tablesService } from '../../services/tables.service'
 
 interface TableManagementProps {
   locations: any[]
@@ -11,7 +14,7 @@ interface TableManagementProps {
 }
 
 export function TableManagement({ locations, setLocations }: TableManagementProps) {
-  const { tables, setTables, createTable, updateTable, deleteTable } = useAppContext()
+  const { tables, setTables } = useAppContext()
 
   // Estados Modales
   const [isTableModalOpen, setIsTableModalOpen] = useState(false)
@@ -30,6 +33,34 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
   const [locationFormData, setLocationFormData] = useState({ name: '' })
   const [locationToDelete, setLocationToDelete] = useState<string | null>(null)
   const [showLocationForm, setShowLocationForm] = useState(false)
+
+  // 🚀 Cargar datos reales desde el backend al iniciar
+  const cargarDatos = async () => {
+    try {
+      const [locs, tabs] = await Promise.all([locationsService.getAll(), tablesService.getAll()])
+
+      setLocations(locs.map((l) => ({ id: l._id, name: l.nombre })))
+
+      setTables(
+        tabs.map((t) => ({
+          id: t._id,
+          name: t.numero,
+          capacity: t.capacidad,
+          // Si la ubicación viene expandida (objeto), tomamos su _id
+          location: typeof t.ubicacion === 'object' ? t.ubicacion._id : t.ubicacion,
+          type: t.tipo,
+          status: t.estado
+        }))
+      )
+    } catch (error) {
+      console.error('Error al cargar mesas y ubicaciones:', error)
+      toast.error('Error al cargar los datos desde el servidor.')
+    }
+  }
+
+  useEffect(() => {
+    cargarDatos()
+  }, [])
 
   // -- Funciones de Mesas --
   const handleOpenAddTableModal = () => {
@@ -60,7 +91,7 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
     e.preventDefault()
     if (!tableFormData.number || !tableFormData.capacity) return
     if (Number(tableFormData.capacity) > 20) {
-      alert('Capacidad máxima 20.')
+      toast.warning('Capacidad máxima es de 20 personas.')
       return
     }
 
@@ -76,54 +107,106 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
     }
 
     try {
-      if (tableEditingId) {
-        await updateTable(tableEditingId, {
-          name: tableFormData.number,
-          capacity: Number(tableFormData.capacity),
-          location: tableFormData.locationId,
-          type: tableFormData.tableType
-        })
-      } else {
-        await createTable({
-          name: tableFormData.number,
-          capacity: Number(tableFormData.capacity),
-          location: tableFormData.locationId,
-          type: tableFormData.tableType
-        })
+      const payload = {
+        numero: tableFormData.number,
+        capacidad: Number(tableFormData.capacity),
+        ubicacion: tableFormData.locationId,
+        tipo: tableFormData.tableType,
+        estado: 'Disponible' as const
       }
+
+      if (tableEditingId) {
+        const updated = await tablesService.update(tableEditingId, payload)
+        setTables(
+          tables.map((t) =>
+            t.id === tableEditingId
+              ? {
+                  ...t,
+                  name: updated.numero,
+                  capacity: updated.capacidad,
+                  location:
+                    typeof updated.ubicacion === 'object'
+                      ? updated.ubicacion._id
+                      : updated.ubicacion,
+                  type: updated.tipo
+                }
+              : t
+          )
+        )
+        toast.success('Mesa actualizada correctamente.')
+      } else {
+        const created = await tablesService.create(payload)
+        setTables([
+          ...tables,
+          {
+            id: created._id,
+            name: created.numero,
+            capacity: created.capacidad,
+            location:
+              typeof created.ubicacion === 'object' ? created.ubicacion._id : created.ubicacion,
+            status: created.estado,
+            type: created.tipo
+          }
+        ])
+        toast.success('Mesa creada correctamente.')
+      }
+
       setVipLimitError(false)
       setIsTableModalOpen(false)
-    } catch (err) {
-      console.error('Error guardando mesa', err)
-      alert('No se pudo guardar la mesa en el servidor. Revisa la consola.')
+    } catch (error) {
+      console.error('Error al guardar la mesa:', error)
+      toast.error('Hubo un error al guardar la mesa.')
+    }
+  }
+
+  const handleDeleteTable = async (tableId: string) => {
+    try {
+      await tablesService.remove(tableId)
+      setTables(tables.filter((t) => t.id !== tableId))
+      setTableToDelete(null)
+      toast.success('Mesa eliminada.')
+    } catch (error) {
+      console.error('Error al eliminar la mesa:', error)
+      toast.error('Error al eliminar la mesa.')
     }
   }
 
   // -- Funciones de Ubicaciones --
-  const handleSaveLocation = (e: React.FormEvent) => {
+  const handleSaveLocation = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!locationFormData.name) return
-    if (locationEditingId) {
-      setLocations(
-        locations.map((loc) =>
-          loc.id === locationEditingId ? { ...loc, name: locationFormData.name } : loc
+    try {
+      if (locationEditingId) {
+        const updated = await locationsService.update(locationEditingId, locationFormData.name)
+        setLocations(
+          locations.map((loc) =>
+            loc.id === locationEditingId ? { ...loc, name: updated.nombre } : loc
+          )
         )
-      )
-    } else {
-      const newId = locationFormData.name
-        .toLowerCase()
-        .replace(/\s+/g, '-')
-        .replace(/[^a-z0-9-]/g, '')
-      setLocations([...locations, { id: newId, name: locationFormData.name }])
+      } else {
+        const created = await locationsService.create(locationFormData.name)
+        setLocations([...locations, { id: created._id, name: created.nombre }])
+      }
+      setShowLocationForm(false)
+      setLocationFormData({ name: '' })
+      toast.success('Ubicación guardada con éxito.')
+    } catch (error) {
+      console.error('Error al guardar la ubicación:', error)
+      toast.error('Error al guardar la ubicación.')
     }
-    setShowLocationForm(false)
-    setLocationFormData({ name: '' })
   }
 
-  const handleDeleteLocation = (locationId: string) => {
-    setLocations(locations.filter((loc) => loc.id !== locationId))
-    setTables(tables.filter((t) => t.location !== locationId))
-    setLocationToDelete(null)
+  const handleDeleteLocation = async (locationId: string) => {
+    try {
+      await locationsService.remove(locationId)
+      setLocations(locations.filter((loc) => loc.id !== locationId))
+      setTables(tables.filter((t) => t.location !== locationId))
+      setLocationToDelete(null)
+      toast.success('Ubicación eliminada.')
+    } catch (error: any) {
+      console.error('Error al eliminar la ubicación:', error)
+      toast.error(error.message || 'No se pudo eliminar la ubicación.')
+    }
   }
 
   return (
@@ -349,15 +432,7 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
                 Cancelar
               </button>
               <button
-                onClick={async () => {
-                  try {
-                    if (tableToDelete) await deleteTable(tableToDelete)
-                    setTableToDelete(null)
-                  } catch (err) {
-                    console.error(err)
-                    alert('No se pudo eliminar la mesa.')
-                  }
-                }}
+                onClick={() => tableToDelete && handleDeleteTable(tableToDelete)}
                 className="flex-1 py-3 px-4 bg-[#D0543A] text-white font-bold rounded-xl"
               >
                 Eliminar
@@ -380,7 +455,7 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
                 Cancelar
               </button>
               <button
-                onClick={() => handleDeleteLocation(locationToDelete)}
+                onClick={() => locationToDelete && handleDeleteLocation(locationToDelete)}
                 className="flex-1 py-3 px-4 bg-[#D0543A] text-white font-bold rounded-xl"
               >
                 Eliminar

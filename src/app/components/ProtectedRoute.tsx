@@ -13,27 +13,27 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
 
   useEffect(() => {
     const userRole = localStorage.getItem('userRole')
+    const token = localStorage.getItem('authToken')
 
-    // Si no hay rol, redirigir al login
-    if (!userRole) {
+    // Sin sesión válida → login
+    if (!userRole || !token) {
       navigate('/', { replace: true })
       setIsChecking(false)
       return
     }
 
-    // Si requiere admin y el usuario no es admin, redirigir
-    if (requireAdmin && userRole !== 'admin') {
+    const isAdmin = userRole === 'admin' || userRole === 'administrador'
+
+    if (requireAdmin && !isAdmin) {
       navigate('/waiter-view', { replace: true })
       setIsChecking(false)
       return
     }
 
-    // Usuario autorizado
     setIsAuthorized(true)
     setIsChecking(false)
   }, [navigate, requireAdmin])
 
-  // Mostrar un fallback mientras se verifica
   if (isChecking) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-[#4B2E2D]">
@@ -42,7 +42,6 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
     )
   }
 
-  // Si no está autorizado, mostrar un mensaje (aunque se redirige)
   if (!isAuthorized) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-[#4B2E2D]">
@@ -51,6 +50,5 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
     )
   }
 
-  // Usuario autorizado, mostrar el contenido
   return <>{children}</>
 }

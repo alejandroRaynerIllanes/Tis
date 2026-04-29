@@ -10,6 +10,7 @@ export interface Product {
   description?: string
   status: ProductStatus
   image: string
+  imagePublicId?: string
 }
 
 export type TableStatus = 'Disponible' | 'Ocupada' | 'Esperando pago' | 'Reservada'

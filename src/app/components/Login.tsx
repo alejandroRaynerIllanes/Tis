@@ -1,3 +1,4 @@
+// src/app/components/Login.tsx
 import { useState, useEffect } from 'react'
 import { User, Lock, Eye, EyeOff, ChefHat, AlertCircle } from 'lucide-react'
 import { useNavigate } from 'react-router'
@@ -15,11 +16,13 @@ export function Login() {
     const userRole = localStorage.getItem('userRole')
     const token = localStorage.getItem('authToken')
     if (userRole && token) {
-      if (userRole === 'admin') {
+      if (userRole === 'admin' || userRole === 'administrador') {
         navigate('/catalog', { replace: true })
-      } else if (userRole === 'waiter') {
+      } else if (userRole === 'waiter' || userRole === 'mesero') {
         navigate('/waiter-view', { replace: true })
-      } else if (userRole === 'chef' || userRole === 'cashier') {
+      } else if (userRole === 'chef' || userRole === 'cocinero') {
+        navigate('/chef-view', { replace: true })
+      } else if (userRole === 'cashier' || userRole === 'cajero') {
         navigate('/en-construccion', { replace: true })
       }
     }
@@ -33,10 +36,12 @@ export function Login() {
     try {
       const { role } = await authService.login(username.trim(), password)
 
-      if (role === 'admin') {
+      if (role === 'admin' || role === 'administrador') {
         navigate('/catalog', { replace: true })
-      } else if (role === 'waiter') {
+      } else if (role === 'waiter' || role === 'mesero') {
         navigate('/waiter-view', { replace: true })
+      } else if (role === 'chef' || role === 'cocinero') {
+        navigate('/chef-view', { replace: true })
       } else {
         navigate('/en-construccion', { replace: true })
       }

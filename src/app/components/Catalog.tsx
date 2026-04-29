@@ -23,6 +23,7 @@ export function Catalog() {
   // Estado local que comparten varios componentes
   const [categories, setCategories] = useState(INITIAL_CATEGORIES)
   const [locations, setLocations] = useState(INITIAL_LOCATIONS)
+
   // Cargar categorías reales de la Base de Datos
   useEffect(() => {
     const cargarCategorias = async () => {
@@ -36,9 +37,11 @@ export function Catalog() {
     }
     cargarCategorias()
   }, [])
+
   useEffect(() => {
     const role = localStorage.getItem('userRole')
-    if (role !== 'admin') {
+    // Cristhian: validación adicional para 'administrador'
+    if (role !== 'admin' && role !== 'administrador') {
       navigate('/waiter-view')
     }
   }, [navigate])

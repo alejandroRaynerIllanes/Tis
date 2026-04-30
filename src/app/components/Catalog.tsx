@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router'
 import { useState, useEffect } from 'react'
 import { categoriesService } from '../services/categories.service'
+import { locationsService } from '../services/locations.service'
 import { INITIAL_CATEGORIES, INITIAL_LOCATIONS } from '../data/constants'
 import type { AdminView } from './layout/Sidebar'
 import { Sidebar } from './layout/Sidebar'
@@ -23,18 +24,27 @@ export function Catalog() {
   const [categories, setCategories] = useState(INITIAL_CATEGORIES)
   const [locations, setLocations] = useState(INITIAL_LOCATIONS)
 
-  // 🔧 Cargar categorías desde backend
+  // 🔧 Cargar categorías y ubicaciones desde backend
   useEffect(() => {
-    const cargarCategorias = async () => {
+    const cargarDatos = async () => {
       try {
-        const data = await categoriesService.getAll()
-        setCategories(data.map((c) => ({ id: c._id, label: c.nombre })))
+        const dataCat = await categoriesService.getAll()
+        setCategories(dataCat.map((c: any) => ({ id: c._id || c.id, label: c.nombre || c.name })))
       } catch (error) {
         console.error('Error al cargar categorías de MongoDB:', error)
       }
+
+      try {
+        const dataLoc = await locationsService.getAll()
+        if (dataLoc && dataLoc.length > 0) {
+          setLocations(dataLoc.map((d: any) => ({ id: d.id, name: d.name })))
+        }
+      } catch (error) {
+        console.warn('No se pudieron cargar ubicaciones de MongoDB, usando locales:', error)
+      }
     }
 
-    cargarCategorias()
+    cargarDatos()
   }, [])
 
   // 🔧 Validación de rol

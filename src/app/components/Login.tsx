@@ -1,8 +1,8 @@
-// src/app/components/Login.tsx
 import { useState, useEffect } from 'react'
 import { User, Lock, Eye, EyeOff, ChefHat, AlertCircle } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { authService } from '../services/auth.service'
+import { setToken, setStoredUser } from '../services/api'
 
 export function Login() {
   const [username, setUsername] = useState('')
@@ -34,8 +34,15 @@ export function Login() {
     setIsLoading(true)
 
     try {
-      const { role } = await authService.login(username.trim(), password)
+      // Obtenemos los datos completos (mejora de Gustavo)
+      const { role, token, user } = await authService.login(username.trim(), password)
 
+      // Guardamos la sesión usando las utilidades de la API
+      setToken(token)
+      setStoredUser(user)
+      localStorage.setItem('userRole', role)
+
+      // Validamos los roles (tu mejora)
       if (role === 'admin' || role === 'administrador') {
         navigate('/catalog', { replace: true })
       } else if (role === 'waiter' || role === 'mesero') {

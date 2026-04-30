@@ -1,8 +1,7 @@
-// ─── Servicio de Autenticación ───────────────────────────────────────────────
+// ─── Servicio de Autenticación Corregido ─────────────────────────────────────
 
 import { api, setToken, setStoredUser, clearToken, clearStoredUser, type AuthUser } from './api'
 
-// 1. CORRECCIÓN AQUÍ: Cambiamos 'usuario' por 'email' y 'contraseña' por 'password'
 interface LoginRequest {
   email: string
   password: string
@@ -13,7 +12,6 @@ interface LoginResponse {
   usuario: AuthUser
 }
 
-// Mapeo de rol del backend al rol interno del frontend
 const ROLE_MAP: Record<string, string> = {
   administrador: 'admin',
   admin: 'admin',
@@ -28,28 +26,31 @@ function mapRole(backendRole: string): string {
 
 export const authService = {
   // POST /auth/login
-  async login(usuario: string, contraseña: string): Promise<{ user: AuthUser; role: string }> {
-    // 2. CORRECCIÓN AQUÍ: Asignamos las variables a los nombres que el backend espera
+  // CAMBIO AQUÍ: Agregamos 'token: string' al Promise de retorno
+  async login(
+    usuario: string,
+    contraseña: string
+  ): Promise<{ user: AuthUser; role: string; token: string }> {
     const data = await api.post<LoginResponse>(
       '/auth/login',
       {
         email: usuario,
         password: contraseña
-      } as LoginRequest,
+      },
       { skipAuth: true }
     )
 
-    // Guardar token y datos del usuario
+    // Guardar en localStorage usando tus funciones de api.ts
     setToken(data.token)
     setStoredUser(data.usuario)
 
     const role = mapRole(data.usuario.rol)
     localStorage.setItem('userRole', role)
 
-    return { user: data.usuario, role }
+    // CAMBIO AQUÍ: Retornamos también el token para que Login.tsx lo vea
+    return { user: data.usuario, role, token: data.token }
   },
 
-  // Cerrar sesión (solo frontend)
   logout(): void {
     clearToken()
     clearStoredUser()

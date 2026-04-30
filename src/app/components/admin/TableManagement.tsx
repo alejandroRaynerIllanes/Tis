@@ -252,6 +252,7 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
                   className="w-full px-4 py-3 rounded-xl border-2 border-[#E57C5D]"
                 />
               </div>
+
               <div>
                 <label className="block text-sm font-bold text-[#4B2E2D] mb-2">Capacidad</label>
                 <input
@@ -266,6 +267,7 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
                   className="w-full px-4 py-3 rounded-xl border-2 border-[#E57C5D]"
                 />
               </div>
+
               <div>
                 <label className="block text-sm font-bold text-[#4B2E2D] mb-2">Ubicación</label>
                 <select
@@ -305,11 +307,13 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
                   <option value="vip">VIP</option>
                 </select>
               </div>
+
               {vipLimitError && (
                 <div className="bg-red-50 border-2 border-red-200 rounded-xl p-3">
                   <p className="text-sm font-bold text-red-700">Límite de mesas VIP alcanzado.</p>
                 </div>
               )}
+
               <div className="flex justify-end gap-4 mt-4">
                 <button
                   type="button"
@@ -442,6 +446,7 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
           </div>
         </div>
       )}
+
       {locationToDelete !== null && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#FCE4D6] w-full max-w-[400px] border-[4px] border-[#D0543A] rounded-3xl p-8 relative flex flex-col items-center text-center">

@@ -66,9 +66,11 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
       const platosFormateados: UIDish[] = data.map((p: BackendDish) => ({
         id: p._id,
         name: p.nombre,
-        // El backend popula la categoría, así que extraemos el _id del objeto.
+        // El backend popula la categoría, así que extraemos el _id del objeto
         category:
           typeof p.categoria === 'object' && p.categoria !== null ? p.categoria._id : p.categoria,
+        categoryName:
+          typeof p.categoria === 'object' && p.categoria !== null ? p.categoria.nombre : undefined,
         price: p.precio,
         image:
           p.imagenUrl ||
@@ -189,7 +191,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
         precio: Number(formData.price),
         imagenUrl: formData.image,
         imagenPublicId: formData.imagePublicId,
-        categoria: formData.category,
+        categoria: formData.category, // Debe ser el _id de Mongo de la categoría
         disponible: true
       }
 

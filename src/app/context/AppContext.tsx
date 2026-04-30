@@ -1,4 +1,3 @@
-// src/app/context/AppContext.tsx
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react'
 import { io } from 'socket.io-client'
 import { getToken } from '../services/api'

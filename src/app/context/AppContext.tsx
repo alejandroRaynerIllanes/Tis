@@ -117,7 +117,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         id: p._id || p.id,
         name: p.nombre,
         price: p.precio,
-        category: typeof p.categoria === 'object' ? p.categoria._id : p.categoria,
+        category: p.categoria && typeof p.categoria === 'object' ? (p.categoria._id ?? '') : (p.categoria ?? ''),
         description: p.descripcion,
         status: p.disponible ? 'Disponible' : 'Agotado',
         image: p.imagenUrl || ''

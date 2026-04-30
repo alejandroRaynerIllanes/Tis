@@ -29,18 +29,22 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
       const data = await platosService.getAll();
       console.log("🍔 Datos crudos desde el backend:", data);
 
-      const platosFormateados = data.map((p: any) => ({
-        id: p._id,
-        name: p.nombre,
-        // Extraer el _id si es un objeto populado, o usar directamente si es un string
-        category: typeof p.categoria === 'object' ? p.categoria._id : p.categoria,
-        categoryName: typeof p.categoria === 'object' ? p.categoria.nombre : p.categoria,
-        price: p.precio,
-        image: p.imagenUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmb29kfGVufDF8fHx8MTc3MzM3OTc2OHww&ixlib=rb-4.1.0&q=80&w=1080',
-        imagePublicId: p.imagenPublicId || '',
-        description: p.descripcion,
-        status: (p.disponible ? 'Disponible' : 'Agotado') as 'Disponible' | 'Agotado'
-      }));
+      const platosFormateados = data.map((p: any) => {
+        const categoryId = p.categoria && typeof p.categoria === 'object' ? (p.categoria._id ?? '') : (p.categoria ?? '');
+        const categoryName = p.categoria && typeof p.categoria === 'object' ? (p.categoria.nombre ?? '') : (p.categoria ?? '');
+
+        return {
+          id: p._id,
+          name: p.nombre,
+          category: categoryId,
+          categoryName: categoryName,
+          price: p.precio,
+          image: p.imagenUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmb29kfGVufDF8fHx8MTc3MzM3OTc2OHww&ixlib=rb-4.1.0&q=80&w=1080',
+          imagePublicId: p.imagenPublicId || '',
+          description: p.descripcion,
+          status: (p.disponible ? 'Disponible' : 'Agotado') as 'Disponible' | 'Agotado'
+        };
+      });
       
       console.log("✨ Platos formateados para React:", platosFormateados);
       setDishes(platosFormateados);
@@ -164,9 +168,31 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
         console.log("4. Creando nuevo plato...");
         const respuesta = await platosService.create(datosParaBackend);
         console.log("5. Respuesta del servidor:", respuesta);
+
+        // Añadir nuevo plato al estado inmediatamente para que la UI lo muestre
+        try {
+          const catId = respuesta.categoria && typeof respuesta.categoria === 'object' ? (respuesta.categoria._id ?? '') : (respuesta.categoria ?? '');
+          const catName = respuesta.categoria && typeof respuesta.categoria === 'object' ? (respuesta.categoria.nombre ?? '') : (respuesta.categoria ?? '');
+
+          const nuevoFormateado = {
+            id: respuesta._id,
+            name: respuesta.nombre,
+            category: catId,
+            categoryName: catName,
+            price: respuesta.precio,
+            image: respuesta.imagenUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmb29kfGVufDF8fHx8MTc3MzM3OTc2OHww&ixlib=rb-4.1.0&q=80&w=1080',
+            imagePublicId: respuesta.imagenPublicId || '',
+            description: respuesta.descripcion,
+            status: (respuesta.disponible ? 'Disponible' : 'Agotado') as 'Disponible' | 'Agotado'
+          };
+          setDishes(prev => [nuevoFormateado, ...prev]);
+        } catch (e) {
+          console.warn('No se pudo insertar localmente el plato creado:', e);
+        }
       }
 
       console.log("6. Éxito. Recargando interfaz...");
+      // Intentamos recargar completamente desde backend (si falla, al menos el nuevo plato ya está en pantalla)
       await cargarPlatos();
       setIsModalOpen(false);
       

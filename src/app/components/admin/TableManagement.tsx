@@ -13,6 +13,31 @@ interface TableManagementProps {
   setLocations: (locs: any[]) => void
 }
 
+type ManagedTable = {
+  id?: string
+  _id?: string
+  name?: string
+  nombre?: string
+  numero?: string | number
+  location?: string
+  ubicacion?: string
+  status?: string
+  estado?: string
+}
+
+const getTableDisplayName = (table: ManagedTable) => {
+  return table.name || table.nombre || table.numero || ''
+}
+
+const getTableLocation = (table: ManagedTable) => {
+  return table.location || table.ubicacion || ''
+}
+
+const isDeletedTable = (table: ManagedTable) => {
+  const status = table.status || table.estado || ''
+  return status.toLowerCase() === 'eliminada' || status.toLowerCase() === 'eliminado'
+}
+
 export function TableManagement({ locations, setLocations }: TableManagementProps) {
   const { tables, setTables } = useAppContext()
 
@@ -78,9 +103,9 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
   const handleOpenEditTableModal = (table: any) => {
     setTableEditingId(table.id)
     setTableFormData({
-      number: table.name,
+      number: String(getTableDisplayName(table)),
       capacity: table.capacity || 2,
-      locationId: table.location,
+      locationId: getTableLocation(table),
       tableType: table.type || 'normal'
     })
     setVipLimitError(false)
@@ -200,7 +225,7 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
     try {
       await locationsService.remove(locationId)
       setLocations(locations.filter((loc) => loc.id !== locationId))
-      setTables(tables.filter((t) => t.location !== locationId))
+      setTables(tables.filter((t) => getTableLocation(t) !== locationId))
       setLocationToDelete(null)
       toast.success('Ubicación eliminada.')
     } catch (error: any) {
@@ -281,8 +306,8 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
                   <option value="" disabled>
                     Selecciona...
                   </option>
-                  {locations.map((loc) => (
-                    <option key={loc.id} value={loc.id}>
+                  {locations.map((loc, index) => (
+                    <option key={loc.id || loc._id || index} value={loc.id}>
                       {loc.name}
                     </option>
                   ))}
@@ -358,12 +383,14 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
                   <Plus size={20} /> Añadir Ubicación
                 </button>
                 <div className="space-y-3 max-h-[400px] overflow-y-auto">
-                  {locations.map((loc) => {
-                    const tablesCount = tables.filter((t) => t.location === loc.id).length
+                  {locations.map((loc, index) => {
+                    const tablesCount = tables.filter(
+                      (t) => !isDeletedTable(t) && getTableLocation(t) === loc.id
+                    ).length
                     return (
                       <div
-                        key={loc.id}
-                        className="bg-[#FCE4D6]/30 p-4 rounded-xl flex items-center justify-between group border border-transparent"
+                        key={loc.id || loc._id || index}
+                        className="bg-[#FCE4D6]/30 p-4 rounded-xl flex items-center justify-between group border border-transparent opacity-100"
                       >
                         <div>
                           <h3 className="text-lg font-bold text-[#4B2E2D]">{loc.name}</h3>

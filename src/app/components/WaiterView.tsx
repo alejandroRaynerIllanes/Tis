@@ -1,4 +1,3 @@
-//src/app/components/WaiterView.tsx
 import {
   ChevronLeft,
   LogOut,
@@ -32,7 +31,8 @@ import {
   Zap
 } from 'lucide-react'
 import { useNavigate } from 'react-router'
-import { useState, MouseEvent } from 'react'
+// ✅ CORRECCIÓN: Añadido useMemo
+import { useState, MouseEvent, useMemo } from 'react'
 import { toast } from 'sonner'
 import jsPDF from 'jspdf'
 
@@ -52,6 +52,8 @@ interface ReservationFormData {
 }
 
 interface TableConfig {
+  bgClass: string
+  borderClass: string
   cardStyle: React.CSSProperties
   textClass: string
   iconClass: string
@@ -60,10 +62,30 @@ interface TableConfig {
   dotColor: string
 }
 
-function getTableConfig(state: TableStatus): TableConfig {
+type TableWithFallbacks = Table & {
+  _id?: string
+  nombre?: string
+  numero?: string | number
+  ubicacion?: string
+  isActive?: boolean
+}
+
+const getTableDisplayName = (table: Table) => {
+  const tableWithFallbacks = table as TableWithFallbacks
+  return tableWithFallbacks.name || tableWithFallbacks.nombre || tableWithFallbacks.numero
+}
+
+const getTableLocation = (table: Table) => {
+  const tableWithFallbacks = table as TableWithFallbacks
+  return tableWithFallbacks.location || tableWithFallbacks.ubicacion || ''
+}
+
+function getTableConfig(state: string): TableConfig {
   switch (state) {
-    case 'Disponible':
+    case 'disponible':
       return {
+        bgClass: 'bg-[#F5E6D3]',
+        borderClass: 'border-[#6B3E2E]/15',
         cardStyle: {
           background: '#F5E6D3',
           boxShadow: '0 4px 14px -4px rgba(44,44,44,0.1), inset 0 1px 0 rgba(255,255,255,0.6)',
@@ -79,8 +101,10 @@ function getTableConfig(state: TableStatus): TableConfig {
         statusLabel: 'Disponible',
         dotColor: '#F5E6D3'
       }
-    case 'Ocupada':
+    case 'ocupada':
       return {
+        bgClass: 'bg-[#D96C4A]',
+        borderClass: 'border-[#D96C4A]',
         cardStyle: {
           background: '#D96C4A',
           boxShadow: '0 6px 18px -4px rgba(217,108,74,0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
@@ -96,8 +120,10 @@ function getTableConfig(state: TableStatus): TableConfig {
         statusLabel: 'Ocupada',
         dotColor: '#D96C4A'
       }
-    case 'Esperando pago':
+    case 'esperando pago':
       return {
+        bgClass: 'bg-[#E6A23C]',
+        borderClass: 'border-[#E6A23C]',
         cardStyle: {
           background: '#E6A23C',
           boxShadow: '0 6px 18px -4px rgba(230,162,60,0.4), inset 0 1px 0 rgba(255,255,255,0.3)',
@@ -113,8 +139,10 @@ function getTableConfig(state: TableStatus): TableConfig {
         statusLabel: 'Esperando Pago',
         dotColor: '#E6A23C'
       }
-    case 'Reservada':
+    case 'reservada':
       return {
+        bgClass: 'bg-[#6B3E2E]',
+        borderClass: 'border-[#6B3E2E]',
         cardStyle: {
           background: '#6B3E2E',
           boxShadow: '0 6px 18px -4px rgba(107,62,46,0.5), inset 0 1px 0 rgba(255,255,255,0.1)',
@@ -132,10 +160,19 @@ function getTableConfig(state: TableStatus): TableConfig {
       }
     default:
       return {
-        cardStyle: {},
-        textClass: 'text-[#4B2E2D]',
-        iconClass: 'opacity-60',
-        badgeStyle: {},
+        bgClass: 'bg-white',
+        borderClass: 'border-gray-200',
+        cardStyle: {
+          background: '#FFFFFF',
+          border: '1px solid #E5E7EB'
+        },
+        textClass: 'text-gray-700',
+        iconClass: 'opacity-60 text-gray-700',
+        badgeStyle: {
+          background: '#FFFFFF',
+          border: '1px solid #E5E7EB',
+          color: '#374151'
+        },
         statusLabel: '',
         dotColor: '#ccc'
       }
@@ -164,8 +201,6 @@ const STATE_FILTERS: { key: StateFilter; label: string; dot: string | null }[] =
   { key: 'Esperando pago', label: 'Esperando pago', dot: '#E6A23C' },
   { key: 'Reservada', label: 'Reservada', dot: '#6B3E2E' }
 ]
-
-const LOCATIONS = ['Todas', 'Interior', 'Terraza', 'Patio', 'Zona VIP']
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 
@@ -206,6 +241,13 @@ export function WaiterView({
   console.log('[WaiterView] Context OK - tables:', tables.length)
 
   const navigate = useNavigate()
+
+  // ✅ CORRECCIÓN: LOCATIONS derivado dinámicamente
+  const LOCATIONS = useMemo(
+    () => ['Todas', ...Array.from(new Set(tables.map(getTableLocation).filter(Boolean))).sort()],
+    [tables]
+  )
+
   const [activeLocation, setActiveLocation] = useState(LOCATIONS[0])
   const [stateFilter, setStateFilter] = useState<StateFilter>('all')
   const [searchQuery, setSearchQuery] = useState('')
@@ -252,12 +294,10 @@ export function WaiterView({
     navigate('/', { replace: true })
   }
 
+  // ✅ CORRECCIÓN: filtro null-safe para las ubicaciones dinámicas
   const filteredTables = tables.filter((t) => {
-    const locationMatch =
-      activeLocation === 'Todas' ||
-      (activeLocation === 'Zona VIP'
-        ? t.location === 'zona-vip'
-        : t.location.toLowerCase() === activeLocation.toLowerCase())
+    const tableLoc = getTableLocation(t).toLowerCase()
+    const locationMatch = activeLocation === 'Todas' || tableLoc === activeLocation.toLowerCase()
     return locationMatch && (stateFilter === 'all' || t.status === stateFilter)
   })
 
@@ -286,11 +326,11 @@ export function WaiterView({
     setMenuPanelOpen(true)
   }
 
-  // Conteos para los badges de filtro
+  // Conteos para los badges de filtro (Añadido `?? ''` por seguridad preventiva)
   const locationTables =
     activeLocation === 'Todas'
       ? tables
-      : tables.filter((t) => t.location.toLowerCase() === activeLocation.toLowerCase())
+      : tables.filter((t) => getTableLocation(t).toLowerCase() === activeLocation.toLowerCase())
   const tableCounts = locationTables.reduce(
     (acc, t) => {
       acc[t.status] = (acc[t.status] ?? 0) + 1
@@ -631,6 +671,7 @@ export function WaiterView({
     })
   }
 
+  console.log('DEPURACIÓN - Totales:', tables?.length, 'Filtradas:', filteredTables?.length)
   console.log('[WaiterView] About to return JSX...')
 
   return (
@@ -748,9 +789,9 @@ export function WaiterView({
             {/* Spacer for proper left scroll padding */}
             <div className="w-1 sm:w-2 shrink-0" aria-hidden="true" />
             <div className="flex gap-1.5 sm:gap-2 items-center shrink-0">
-              {LOCATIONS.map((loc) => (
+              {LOCATIONS.map((loc, index) => (
                 <button
-                  key={loc}
+                  key={loc || index}
                   onClick={() => setActiveLocation(loc)}
                   className={`
                     px-4 sm:px-5 py-2 sm:py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all border-2 shrink-0 snap-center
@@ -820,9 +861,13 @@ export function WaiterView({
 
           {/* ── Grid de Mesas ── */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5 pb-20">
-            {filteredTables.map((t) => {
-              const cfg = getTableConfig(t.status)
+            {filteredTables.map((t, index) => {
+              const cfg = getTableConfig((t.status || '').toLowerCase())
               const isSelected = activeTableId === t.id
+              const tableKey = t.id || (t as TableWithFallbacks)._id || index
+              const tableName = getTableDisplayName(t)
+              const tableLocation = getTableLocation(t)
+              const tableIsActive = (t as TableWithFallbacks).isActive
               // Obtener todas las reservas de esta mesa
               const tableReservations = reservations[t.id] || []
               // Mostrar la primera reserva activa, o la primera de la lista
@@ -832,7 +877,7 @@ export function WaiterView({
 
               return (
                 <div
-                  key={t.id}
+                  key={tableKey}
                   onClick={(e) => handleTableClick(e as any, t.id)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
@@ -843,9 +888,11 @@ export function WaiterView({
                   tabIndex={0}
                   role="button"
                   className={`
-                    relative p-5 rounded-[22px] flex flex-col justify-between transition-all duration-300 group overflow-hidden cursor-pointer
+                    relative min-h-[100px] min-w-[100px] bg-white p-5 rounded-[22px] border flex flex-col justify-between transition-all duration-300 group overflow-hidden cursor-pointer
                     hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-[#E57C5D]/50
                     ${isSelected ? 'ring-4 ring-[#4B2E2D] ring-offset-4 ring-offset-[#FCE4D6] shadow-2xl scale-[1.02]' : 'hover:shadow-xl'}
+                    ${tableIsActive === false ? 'opacity-70' : 'opacity-100'}
+                    ${cfg.bgClass} ${cfg.borderClass}
                   `}
                   style={cfg.cardStyle}
                 >
@@ -855,7 +902,7 @@ export function WaiterView({
                       <span
                         className={`font-black text-xl sm:text-2xl tracking-tight drop-shadow-sm leading-none mt-1 ${cfg.textClass}`}
                       >
-                        {t.name}
+                        {tableName}
                       </span>
                       {t.type === 'vip' && (
                         <Crown
@@ -865,6 +912,14 @@ export function WaiterView({
                         />
                       )}
                     </div>
+                    {tableLocation && (
+                      <div
+                        className={`absolute left-0 top-8 flex items-center gap-1 text-[11px] font-bold ${cfg.textClass} opacity-80`}
+                      >
+                        <MapPin size={11} />
+                        {tableLocation}
+                      </div>
+                    )}
                     <div className="flex items-center gap-1">
                       <div className="flex items-center gap-1 opacity-0 lg:opacity-100 group-hover:opacity-100 transition-opacity">
                         <button

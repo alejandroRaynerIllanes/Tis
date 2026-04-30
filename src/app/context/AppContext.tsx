@@ -77,8 +77,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     ;(async () => {
       try {
         const fetched = await tablesService.getAll()
+        // ✅ CORRECCIÓN: FETCH (Aplica normalizarMesa)
         if (mounted && Array.isArray(fetched)) {
-          setTables(fetched)
+          setTables(fetched.map(normalizarMesa))
         }
       } catch (err) {
         console.warn('No se pudieron cargar mesas desde backend, usando datos locales', err)
@@ -90,6 +91,27 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, [])
 
   const getTableId = (table: any) => table?.id || table?._id
+
+  // ─── Añadir después de getTableId (línea 92) ─────────────────────────────────
+  const normalizarMesa = (item: any): Table => {
+    const rawStatus = item?.status || item?.estado || 'Libre'
+    const status: TableStatus =
+      rawStatus === 'Libre' ? 'Disponible'
+      : rawStatus === 'Cuenta Solicitada' ? 'Esperando pago'
+      : rawStatus
+
+    return {
+      id: (item?.id || item?._id)?.toString(),
+      name: item?.name || item?.numero || '—',
+      capacity: item?.capacity ?? item?.capacidad ?? 2,
+      location:
+        typeof item?.ubicacion === 'object'
+          ? item?.ubicacion?.nombre || item?.ubicacion?._id?.toString() || ''
+          : item?.location || item?.ubicacion || '',
+      type: item?.type || item?.tipo || 'normal',
+      status
+    }
+  }
 
   // Socket.io: sincronizar mesas en tiempo real (solo si hay token)
   useEffect(() => {
@@ -110,7 +132,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           const existingIds = new Set(current.map((t: any) => getTableId(t)))
           const additions = items.filter((item: any) => !existingIds.has(getTableId(item)))
           if (additions.length === 0) return current
-          return [...current, ...additions.map((item: any) => ({ ...item, id: getTableId(item) }))]
+          // ✅ CORRECCIÓN: Socket mesas:created
+          return [...current, ...additions.map(normalizarMesa)]
         })
       })
 
@@ -121,10 +144,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           items.forEach((item: any) => {
             const itemId = getTableId(item)
             const index = next.findIndex((t: any) => getTableId(t) === itemId)
+            // ✅ CORRECCIÓN: Socket mesas:updated
             if (index !== -1) {
-              next[index] = { ...item, id: itemId }
+              next[index] = normalizarMesa(item)
             } else {
-              next.push({ ...item, id: itemId })
+              next.push(normalizarMesa(item))
             }
           })
           return next
@@ -157,7 +181,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (current.some((t) => getTableId(t) === newId)) {
         return current
       }
-      return [...current, { ...newTable, id: newId }]
+      return [...current, normalizarMesa(newTable)] // También aplicado aquí por precaución
     })
   }
 
@@ -165,10 +189,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const newId = getTableId(newTable)
     setTables((current) => {
       const exists = current.some((t) => getTableId(t) === newId)
+      // ✅ CORRECCIÓN: mergeTable
       if (exists) {
-        return current.map((t) => (getTableId(t) === newId ? { ...newTable, id: newId } : t))
+        return current.map((t) => (getTableId(t) === newId ? normalizarMesa(newTable) : t))
       }
-      return [...current, { ...newTable, id: newId }]
+      return [...current, normalizarMesa(newTable)]
     })
   }
 
@@ -216,7 +241,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   ) => {
     try {
       const updated = await tablesService.update(id, payload)
-      setTables((current) => current.map((t) => (t.id === id ? updated : t)))
+      // Usamos normalizarMesa para evitar problemas de compatibilidad también aquí
+      setTables((current) => current.map((t) => (t.id === id ? normalizarMesa(updated) : t)))
       return updated
     } catch (err) {
       console.error('Error actualizando mesa:', err)

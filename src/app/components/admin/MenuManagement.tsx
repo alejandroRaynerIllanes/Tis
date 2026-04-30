@@ -164,9 +164,28 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
         console.log("4. Creando nuevo plato...");
         const respuesta = await platosService.create(datosParaBackend);
         console.log("5. Respuesta del servidor:", respuesta);
+
+        // Añadir nuevo plato al estado inmediatamente para que la UI lo muestre
+        try {
+          const nuevoFormateado = {
+            id: respuesta._id,
+            name: respuesta.nombre,
+            category: typeof respuesta.categoria === 'object' ? respuesta.categoria._id : respuesta.categoria,
+            categoryName: typeof respuesta.categoria === 'object' ? respuesta.categoria.nombre : respuesta.categoria,
+            price: respuesta.precio,
+            image: respuesta.imagenUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmb29kfGVufDF8fHx8MTc3MzM3OTc2OHww&ixlib=rb-4.1.0&q=80&w=1080',
+            imagePublicId: respuesta.imagenPublicId || '',
+            description: respuesta.descripcion,
+            status: (respuesta.disponible ? 'Disponible' : 'Agotado') as 'Disponible' | 'Agotado'
+          };
+          setDishes(prev => [nuevoFormateado, ...prev]);
+        } catch (e) {
+          console.warn('No se pudo insertar localmente el plato creado:', e);
+        }
       }
 
       console.log("6. Éxito. Recargando interfaz...");
+      // Intentamos recargar completamente desde backend (si falla, al menos el nuevo plato ya está en pantalla)
       await cargarPlatos();
       setIsModalOpen(false);
       

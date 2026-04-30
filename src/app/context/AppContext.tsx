@@ -111,6 +111,50 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const idsToRemove = new Set(items.map((item: any) => getTableId(item)));
         setTables(current => current.filter((t: any) => !idsToRemove.has(getTableId(t))));
       });
+
+      // Helper para formatear el objeto Plato del backend a nuestro `Product`
+      const formatPlato = (p: any) => ({
+        id: p._id || p.id,
+        name: p.nombre,
+        price: p.precio,
+        category: typeof p.categoria === 'object' ? p.categoria._id : p.categoria,
+        description: p.descripcion,
+        status: p.disponible ? 'Disponible' : 'Agotado',
+        image: p.imagenUrl || ''
+      });
+
+      socket.on('platos:created', (payload: any) => {
+        const items = Array.isArray(payload) ? payload : [payload];
+        setProducts(current => {
+          const next = [...current];
+          items.forEach((p: any) => {
+            const formatted = formatPlato(p);
+            if (!next.some(x => x.id === formatted.id)) next.unshift(formatted);
+          });
+          return next;
+        });
+      });
+
+      socket.on('platos:updated', (payload: any) => {
+        const items = Array.isArray(payload) ? payload : [payload];
+        setProducts(current => {
+          let next = current.map(p => {
+            const match = items.find((it: any) => (it._id || it.id) === p.id);
+            return match ? formatPlato(match) : p;
+          });
+          // Añadir actualizados que no existieran
+          items.forEach((it: any) => {
+            const id = it._id || it.id;
+            if (!next.some(p => p.id === id)) next.unshift(formatPlato(it));
+          });
+          return next;
+        });
+      });
+
+      socket.on('platos:deleted', (payload: any) => {
+        const ids = Array.isArray(payload) ? payload.map((it: any) => it._id || it.id) : [payload._id || payload.id || payload];
+        setProducts(current => current.filter(p => !ids.includes(p.id)));
+      });
     } catch (err) {
       console.warn('Socket init failed', err);
     }

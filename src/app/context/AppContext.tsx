@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react'
 import { io } from 'socket.io-client'
 import { getToken } from '../services/api'
+import { toast } from 'sonner'
 import type {
   Product,
   ProductStatus,
@@ -54,6 +55,35 @@ interface AppContextType {
     payload: { name?: string; capacity?: number; location?: string; type?: string }
   ) => Promise<any>
   deleteTable: (id: string) => Promise<boolean>
+}
+
+const validarNombreMesa = (nombre: string): { valido: boolean; mensaje?: string } => {
+  if (!nombre) return { valido: false, mensaje: 'El nombre de la mesa es requerido.' }
+  const nom = nombre.toLowerCase().trim()
+
+  // 1. Caracteres especiales (solo letras, números y espacios)
+  const regexEspeciales = /^[a-záéíóúñ0-9\s]+$/i
+  if (!regexEspeciales.test(nom)) {
+    return { valido: false, mensaje: 'No se permiten símbolos especiales.' }
+  }
+  // 2. Palabra clave
+  if (!nom.includes('mesa')) {
+    return { valido: false, mensaje: 'El nombre debe incluir la palabra "mesa".' }
+  }
+  // 3. Ubicación válida
+  const ubicaciones = ['interior', 'patio', 'terraza']
+  if (!ubicaciones.some((ub) => nom.includes(ub))) {
+    return { valido: false, mensaje: 'El nombre debe incluir una ubicación válida (interior, patio, terraza).' }
+  }
+  // 4. Validación numérica (máximo 3 dígitos, no mayor a 50)
+  const numeros = nom.match(/\d+/g)
+  if (numeros) {
+    for (const numStr of numeros) {
+      if (numStr.length > 3) return { valido: false, mensaje: 'No se permiten más de 3 dígitos numéricos consecutivos.' }
+      if (parseInt(numStr, 10) > 50) return { valido: false, mensaje: 'El número de mesa no puede ser mayor a 50.' }
+    }
+  }
+  return { valido: true }
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
@@ -242,6 +272,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     location: string
     type?: string
   }) => {
+    const validacion = validarNombreMesa(payload.name)
+    if (!validacion.valido) {
+      toast.error(validacion.mensaje)
+      throw new Error(validacion.mensaje)
+    }
+
     try {
       const created = await tablesService.create({
         name: payload.name,
@@ -253,6 +289,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return created
     } catch (err) {
       console.error('Error creando mesa:', err)
+      const errMsg = (err as any)?.response?.data?.mensaje || (err as any)?.message || 'Error al crear la mesa'
+      toast.error(errMsg)
       throw err
     }
   }
@@ -261,6 +299,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     id: string,
     payload: { name?: string; capacity?: number; location?: string; type?: string }
   ) => {
+    if (payload.name) {
+      const validacion = validarNombreMesa(payload.name)
+      if (!validacion.valido) {
+        toast.error(validacion.mensaje)
+        throw new Error(validacion.mensaje)
+      }
+    }
+
     try {
       const updated = await tablesService.update(id, payload)
       // Usamos normalizarMesa para evitar problemas de compatibilidad también aquí
@@ -268,6 +314,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return updated
     } catch (err) {
       console.error('Error actualizando mesa:', err)
+      const errMsg = (err as any)?.response?.data?.mensaje || (err as any)?.message || 'Error al actualizar la mesa'
+      toast.error(errMsg)
       throw err
     }
   }

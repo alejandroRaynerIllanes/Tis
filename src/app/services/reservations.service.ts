@@ -1,4 +1,4 @@
-import api from './api';
+import { api } from './api';
 
 export interface CreateReservationPayload {
   tableId: string;
@@ -24,12 +24,10 @@ export interface ReservationResponse {
 
 export const reservationsService = {
   getAll: async (): Promise<ReservationResponse[]> => {
-    const response = await api.get('/reservas');
-    return response.data;
+    return api.get<ReservationResponse[]>('/reservas');
   },
 
   create: async (payload: CreateReservationPayload): Promise<ReservationResponse> => {
-    const response = await api.post('/reservas', payload);
-    return response.data;
+    return api.post<ReservationResponse>('/reservas', payload);
   }
 };

@@ -132,7 +132,7 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
     }
 
     try {
-      const payload = {
+      const payload: any = {
         numero: tableFormData.number,
         capacidad: Number(tableFormData.capacity),
         ubicacion: tableFormData.locationId,
@@ -453,7 +453,7 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
       {/* Modales de Confirmación de Eliminación */}
       {tableToDelete !== null && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#FCE4D6] w-full max-w-[400px] border-[4px] border-[#D0543A] rounded-3xl p-8 relative flex flex-col items-center text-center">
+          <div className="bg-[#FCE4D6] w-full max-w-[400px] border-4 border-[#D0543A] rounded-3xl p-8 relative flex flex-col items-center text-center">
             <AlertTriangle size={32} className="text-[#D0543A] mb-4" />
             <h2 className="text-2xl font-bold mb-3 text-[#4B2E2D]">¿Eliminar Mesa?</h2>
             <div className="flex gap-4 w-full mt-4">
@@ -476,7 +476,7 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
 
       {locationToDelete !== null && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#FCE4D6] w-full max-w-[400px] border-[4px] border-[#D0543A] rounded-3xl p-8 relative flex flex-col items-center text-center">
+          <div className="bg-[#FCE4D6] w-full max-w-[400px] border-4 border-[#D0543A] rounded-3xl p-8 relative flex flex-col items-center text-center">
             <AlertTriangle size={32} className="text-[#D0543A] mb-4" />
             <h2 className="text-2xl font-bold mb-3 text-[#4B2E2D]">¿Eliminar Ubicación?</h2>
             <p className="text-sm">Se borrarán las mesas asociadas.</p>

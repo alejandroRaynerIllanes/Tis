@@ -400,7 +400,7 @@ export function UserManagement() {
       {/* Modal Eliminar Usuario */}
       {userToDelete !== null && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#FCE4D6] w-full max-w-[400px] border-[4px] border-[#D0543A] rounded-3xl p-8 relative shadow-2xl animate-in fade-in zoom-in-95 duration-200 flex flex-col items-center text-center">
+          <div className="bg-[#FCE4D6] w-full max-w-[400px] border-4 border-[#D0543A] rounded-3xl p-8 relative shadow-2xl animate-in fade-in zoom-in-95 duration-200 flex flex-col items-center text-center">
             <div className="w-16 h-16 bg-[#D0543A]/10 rounded-full flex items-center justify-center mb-4">
               <AlertTriangle size={32} className="text-[#D0543A]" />
             </div>

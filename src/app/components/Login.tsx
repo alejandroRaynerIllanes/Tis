@@ -194,7 +194,7 @@ export function Login() {
               >
                 <AlertCircle
                   size={18}
-                  className="flex-shrink-0 mt-0.5"
+                  className="shrink-0 mt-0.5"
                   style={{ color: '#DC2626' }}
                 />
                 <p className="text-sm font-medium" style={{ color: '#DC2626' }}>

@@ -1041,7 +1041,7 @@ export function WaiterView({
               className={`
               relative z-10 w-full max-w-[440px] lg:max-w-[480px] bg-white shadow-2xl rounded-3xl
               flex flex-col transform transition-all duration-300 ease-out overflow-hidden max-h-[90vh]
-              animate-in zoom-in-95 duration-300
+              animate-in zoom-in-95
             `}
             >
               {/* Header del panel derecho */}
@@ -1866,7 +1866,7 @@ export function WaiterView({
           />
 
           {/* Modal Content */}
-          <div className="relative z-10 w-full max-w-[500px] bg-white shadow-2xl rounded-3xl flex flex-col transform transition-all duration-300 ease-out overflow-hidden max-h-[90vh] animate-in zoom-in-95 duration-300">
+          <div className="relative z-10 w-full max-w-[500px] bg-white shadow-2xl rounded-3xl flex flex-col transform transition-all ease-out overflow-hidden max-h-[90vh] animate-in zoom-in-95 duration-300">
             {/* Header */}
             <div className="pt-6 pb-4 px-6 bg-gradient-to-br from-[#D96C4A] to-[#C25838] text-white">
               <div className="flex items-center justify-between mb-2">

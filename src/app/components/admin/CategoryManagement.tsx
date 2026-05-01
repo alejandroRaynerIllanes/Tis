@@ -5,6 +5,11 @@ import { useAppContext } from '../../context/AppContext'
 import { categoriesService } from '../../services/categories.service'
 import { toast } from 'sonner'
 
+export interface BackendCategory {
+  _id: string;
+  nombre: string;
+}
+
 export interface UICategory {
   id: string
   label: string
@@ -29,7 +34,7 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
     const cargarCategorias = async () => {
       try {
         const data = await categoriesService.getAll()
-        setCategories(data.map((cat: any) => ({ id: cat._id, label: cat.nombre })))
+        setCategories(data.map((cat: BackendCategory) => ({ id: cat._id, label: cat.nombre })))
       } catch (error) {
         console.error('Error al cargar categorías:', error)
         toast.error('Error al cargar las categorías desde el servidor.')
@@ -230,7 +235,7 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
       {/* Modal Eliminar */}
       {categoryToDelete !== null && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#FCE4D6] w-full max-w-[400px] border-[4px] border-[#D0543A] rounded-3xl p-8 relative shadow-2xl flex flex-col items-center text-center">
+          <div className="bg-[#FCE4D6] w-full max-w-[400px] border-4 border-[#D0543A] rounded-3xl p-8 relative shadow-2xl flex flex-col items-center text-center">
             <AlertTriangle size={32} className="text-[#D0543A] mb-4" />
             <h2 className="text-2xl font-bold text-[#4B2E2D] mb-3">¿Eliminar Categoría?</h2>
             <div className="flex gap-4 w-full mt-4">

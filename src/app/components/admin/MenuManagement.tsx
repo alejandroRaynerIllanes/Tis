@@ -415,7 +415,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
                               alt={dish.name}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                             />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60"></div>
+                          <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent opacity-60"></div>
                             <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full font-bold text-[#4B2E2D] shadow-sm">
                               {dish.price} Bs.
                             </div>
@@ -616,7 +616,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
       {/* Modal Eliminar Elemento */}
       {itemToDelete !== null && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#FCE4D6] w-full max-w-[400px] border-[4px] border-[#D0543A] rounded-3xl p-8 relative shadow-2xl flex flex-col items-center text-center">
+          <div className="bg-[#FCE4D6] w-full max-w-[400px] border-4 border-[#D0543A] rounded-3xl p-8 relative shadow-2xl flex flex-col items-center text-center">
             <h2 className="text-2xl font-bold text-[#4B2E2D] mb-3">¿Eliminar del Menú?</h2>
             <div className="flex gap-4 w-full mt-4">
               <button
@@ -639,7 +639,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
       {/* Modal Eliminar Categoría */}
       {categoryToDelete !== null && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#FCE4D6] w-full max-w-[400px] border-[4px] border-[#D0543A] rounded-3xl p-8 relative shadow-2xl flex flex-col items-center text-center">
+          <div className="bg-[#FCE4D6] w-full max-w-[400px] border-4 border-[#D0543A] rounded-3xl p-8 relative shadow-2xl flex flex-col items-center text-center">
             <AlertTriangle size={32} className="text-[#D0543A] mb-4" />
             <h2 className="text-2xl font-bold text-[#4B2E2D] mb-3">¿Eliminar Categoría?</h2>
             <p className="text-sm text-[#4B2E2D]/70 mb-4">

@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   Receipt,
   MapPin,
-  Search,
   ChefHat,
   Plus,
   Trash2,
@@ -16,21 +15,17 @@ import {
   Crown,
 } from 'lucide-react'
 import { useNavigate } from 'react-router'
-// ✅ CORRECCIÓN: Añadido useMemo
-import { useState, MouseEvent, useMemo } from 'react'
-import { toast } from 'sonner'
-import { generateReservationPDF } from '../utils/pdf.utils'
+import { MouseEvent } from 'react'
 
-import { useAppContext, Product, TableStatus, Table, ReservationInfo } from '../context/AppContext'
+import { TableStatus, Table } from '../context/AppContext'
+import { useWaiterLogic, getTableDisplayName, getTableLocation, type StateFilter, type TableWithFallbacks } from '../hooks/useWaiterLogic'
 import { ReservationsListModal } from './ReservationsListModal'
 import { PaymentModal } from './PaymentModal'
-import { ReserveTableModal, type ReservationFormData } from './ReserveTableModal'
+import { ReserveTableModal } from './ReserveTableModal'
 import { CancelReservationModal } from './CancelReservationModal'
 import { TableSidePanel } from './TableSidePanel'
 
 // ─── Tipos y helpers ─────────────────────────────────────────────────────────
-
-type StateFilter = 'all' | 'Disponible' | 'Ocupada' | 'Esperando pago' | 'Reservada'
 
 interface TableConfig {
   bgClass: string
@@ -41,24 +36,6 @@ interface TableConfig {
   badgeStyle: React.CSSProperties
   statusLabel: string
   dotColor: string
-}
-
-type TableWithFallbacks = Table & {
-  _id?: string
-  nombre?: string
-  numero?: string | number
-  ubicacion?: string
-  isActive?: boolean
-}
-
-const getTableDisplayName = (table: Table) => {
-  const tableWithFallbacks = table as TableWithFallbacks
-  return tableWithFallbacks.name || tableWithFallbacks.nombre || tableWithFallbacks.numero
-}
-
-const getTableLocation = (table: Table) => {
-  const tableWithFallbacks = table as TableWithFallbacks
-  return tableWithFallbacks.location || tableWithFallbacks.ubicacion || ''
 }
 
 function getTableConfig(state: string): TableConfig {
@@ -198,57 +175,45 @@ export function WaiterView({
   onEditTable?: (table: Table) => void
   onDeleteTable?: (tableId: string) => void
 } = {}) {
-  console.log('[WaiterView] Rendering...')
-
-  const {
-    products,
-    tables,
-    orders,
-    reservations,
-    addOrderItem,
-    removeOrderItem,
-    clearOrder,
-    updateOrderItemNote,
-    confirmOrder,
-    requestBill,
-    closeTable,
-    reserveTable,
-    cancelReservation,
-    getActiveReservation,
-    updateTableStatus,
-    resetTableOrder
-  } = useAppContext()
-
-  console.log('[WaiterView] Context OK - tables:', tables.length)
-
   const navigate = useNavigate()
 
-  // ✅ CORRECCIÓN: LOCATIONS derivado dinámicamente
-  const LOCATIONS = useMemo(
-    () => ['Todas', ...Array.from(new Set(tables.map(getTableLocation).filter(Boolean))).sort()],
-    [tables]
-  )
-
-  const [activeLocation, setActiveLocation] = useState(LOCATIONS[0])
-  const [stateFilter, setStateFilter] = useState<StateFilter>('all')
-  const [menuPanelOpen, setMenuPanelOpen] = useState(false)
-
-  const [activeTableId, setActiveTableId] = useState<string | null>(null)
-
-  // ── Estado del modal de reserva ──
-  const [reservingTableId, setReservingTableId] = useState<string | null>(null)
-
-  // ── Estado del modal de lista de reservas ──
-  const [viewingReservationsTableId, setViewingReservationsTableId] = useState<string | null>(null)
-
-  // ── Estado del modal de cancelación de reserva ──
-  const [cancelingReservationTableId, setCancelingReservationTableId] = useState<string | null>(
-    null
-  )
-  const [cancelingReservationId, setCancelingReservationId] = useState<string | null>(null)
-
-  // ── Estado del modal de pago ──
-  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const waiterLogic = useWaiterLogic()
+  const {
+    tables,
+    reservations,
+    LOCATIONS,
+    activeLocation,
+    setActiveLocation,
+    stateFilter,
+    setStateFilter,
+    menuPanelOpen,
+    activeTableId,
+    reservingTableId,
+    viewingReservationsTableId,
+    cancelingReservationTableId,
+    cancelingReservationId,
+    showPaymentModal,
+    filteredTables,
+    tableCounts,
+    totalInLocation,
+    activeTable,
+    activeOrder,
+    orderTotal,
+    handleTableClick,
+    openReserveModal,
+    closeReserveModal,
+    handleConfirmReservation,
+    openReservationsListModal,
+    closeReservationsListModal,
+    openCancelReservationModal,
+    closeCancelReservationModal,
+    handleConfirmCancelReservation,
+    openPaymentModal,
+    closePaymentModal,
+    handleProcessPayment,
+    handleCloseModal,
+    getActiveReservation
+  } = waiterLogic
 
   const role = localStorage.getItem('userRole')
   const isAdmin = role === 'admin' || role === 'administrador'
@@ -257,185 +222,6 @@ export function WaiterView({
     localStorage.clear()
     navigate('/', { replace: true })
   }
-
-  // ✅ CORRECCIÓN: filtro null-safe para las ubicaciones dinámicas
-  const filteredTables = tables.filter((t) => {
-    const tableLoc = getTableLocation(t).toLowerCase()
-    const locationMatch = activeLocation === 'Todas' || tableLoc === activeLocation.toLowerCase()
-    return locationMatch && (stateFilter === 'all' || t.status === stateFilter)
-  })
-
-  const handleTableClick = (e: MouseEvent<HTMLButtonElement>, id: string) => {
-    e.stopPropagation()
-    const clickedTable = tables.find((t) => t.id === id)
-
-    // Si la mesa está Disponible: cambiar a Reservada y limpiar datos residuales
-    if (clickedTable && clickedTable.status === 'Disponible') {
-      resetTableOrder(id) // Eliminar cualquier pedido residual sin tocar el estado
-      updateTableStatus(id, 'Reservada') // La mesa pasa a "siendo atendida"
-    }
-
-    setActiveTableId(id)
-    setMenuPanelOpen(true)
-  }
-
-  // Conteos para los badges de filtro (Añadido `?? ''` por seguridad preventiva)
-  const locationTables =
-    activeLocation === 'Todas'
-      ? tables
-      : tables.filter((t) => getTableLocation(t).toLowerCase() === activeLocation.toLowerCase())
-  const tableCounts = locationTables.reduce(
-    (acc, t) => {
-      acc[t.status] = (acc[t.status] ?? 0) + 1
-      return acc
-    },
-    {} as Record<string, number>
-  )
-  const totalInLocation = locationTables.length
-
-  const activeTable = tables.find((t) => t.id === activeTableId)
-  const activeOrder = activeTableId ? orders[activeTableId] || [] : []
-  const orderTotal = activeOrder.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
-
-  // ── Manejadores de reserva ──
-  const openReserveModal = (e: MouseEvent<HTMLButtonElement>, tableId: string) => {
-    e.stopPropagation()
-    setReservingTableId(tableId)
-  }
-
-  const closeReserveModal = () => {
-    setReservingTableId(null)
-  }
-
-  const handleConfirmReservation = async (formData: ReservationFormData) => {
-    if (!reservingTableId) return
-
-    try {
-      const reservingTable = tables.find((t) => t.id === reservingTableId)
-      const tableName = reservingTable?.name || 'Mesa'
-
-      // 🚀 CONEXIÓN AL BACKEND: Nuevo formato de Payload para la Base de Datos
-      await reserveTable(reservingTableId, {
-        clientName: formData.clientName,
-        guestCount: formData.guestCount,
-        date: formData.date,
-        time: formData.time,
-        vip: reservingTable?.type === 'vip' || false
-      } as any)
-
-      // Generar PDF automáticamente
-      generateReservationPDF(
-        tableName,
-        formData.clientName,
-        formData.guestCount,
-        formData.date,
-        formData.time
-      )
-
-      // Cerrar modal solo si la reserva fue exitosa
-      setReservingTableId(null)
-
-      // Mostrar notificación de éxito
-      toast.success('Reserva creada exitosamente. PDF descargado.')
-    } catch (error) {
-      // Mostrar error al usuario
-      toast.error(error instanceof Error ? error.message : 'Error al crear la reserva')
-    }
-  }
-
-  // ── Manejadores de lista de reservas ──
-  const openReservationsListModal = (
-    e: MouseEvent<HTMLButtonElement | HTMLDivElement>,
-    tableId: string
-  ) => {
-    e.stopPropagation()
-    setViewingReservationsTableId(tableId)
-  }
-
-  const closeReservationsListModal = () => {
-    setViewingReservationsTableId(null)
-  }
-
-  // ── Manejadores de cancelación de reserva ──
-  const openCancelReservationModal = (
-    e: MouseEvent<HTMLButtonElement>,
-    tableId: string,
-    reservationId: string
-  ) => {
-    e.stopPropagation()
-    setCancelingReservationTableId(tableId)
-    setCancelingReservationId(reservationId)
-  }
-
-  const closeCancelReservationModal = () => {
-    setCancelingReservationTableId(null)
-    setCancelingReservationId(null)
-  }
-
-  const handleConfirmCancelReservation = () => {
-    if (!cancelingReservationTableId || !cancelingReservationId) return
-
-    cancelReservation(cancelingReservationTableId, cancelingReservationId)
-
-    setCancelingReservationTableId(null)
-    setCancelingReservationId(null)
-    setViewingReservationsTableId(null) // Cerrar también el modal de lista
-
-    toast.success('Reserva cancelada correctamente', {
-      description: 'La reserva ha sido eliminada.',
-      duration: 3500
-    })
-  }
-
-  // ── Manejadores de pago ──
-  const openPaymentModal = () => {
-    setShowPaymentModal(true)
-  }
-
-  const closePaymentModal = () => {
-    setShowPaymentModal(false)
-  }
-
-  const handleProcessPayment = (method: string) => {
-    if (!activeTableId) return
-
-    closeTable(activeTableId)
-    setActiveTableId(null)
-    setMenuPanelOpen(false)
-    setShowPaymentModal(false)
-
-    toast.success('Pago procesado correctamente', {
-      description: `La mesa ha sido liberada. Método: ${method}`,
-      duration: 4000
-    })
-  }
-
-  const handleCloseTable = () => {
-    if (activeTableId) {
-      closeTable(activeTableId)
-      setActiveTableId(null)
-      setMenuPanelOpen(false)
-    }
-  }
-
-  // Cierra el modal de forma inteligente:
-  // Si la mesa está "Reservada" por click (sin pedido y sin reserva formal) → vuelve a Disponible
-  const handleCloseModal = () => {
-    if (activeTableId && activeTable) {
-      const hasNoOrder = !activeOrder || activeOrder.length === 0
-      const tableReservations = reservations[activeTableId]
-      const hasFormalReservation = !!(tableReservations && tableReservations.length > 0)
-      if (activeTable.status === 'Reservada' && hasNoOrder && !hasFormalReservation) {
-        updateTableStatus(activeTableId, 'Disponible')
-        resetTableOrder(activeTableId)
-      }
-    }
-    setMenuPanelOpen(false)
-    setActiveTableId(null)
-  }
-
-  console.log('DEPURACIÓN - Totales:', tables?.length, 'Filtradas:', filteredTables?.length)
-  console.log('[WaiterView] About to return JSX...')
 
   return (
     <div

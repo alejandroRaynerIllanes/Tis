@@ -127,7 +127,7 @@ export function TableSidePanel({
       />
 
       {/* Contenedor del Modal */}
-      <div className="relative z-10 w-full max-w-[440px] lg:max-w-[480px] bg-white shadow-2xl rounded-3xl flex flex-col transform transition-all duration-300 ease-out overflow-hidden max-h-[90vh] animate-in zoom-in-95">
+      <div className="relative z-10 w-[95vw] sm:w-full max-w-[440px] lg:max-w-[480px] bg-white shadow-2xl rounded-3xl flex flex-col transform transition-all duration-300 ease-out overflow-hidden max-h-[95vh] sm:max-h-[90vh] animate-in zoom-in-95">
         
         {/* Header del panel */}
         <div
@@ -230,7 +230,7 @@ export function TableSidePanel({
             <div className="p-4 space-y-4 pb-8">
               <div className="relative group mb-4">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#4B2E2D]/40 group-focus-within:text-[#E57C5D] transition-colors" size={18} strokeWidth={2.5} />
-                <input type="text" placeholder="Buscar platillo..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white border border-[#FCE4D6] rounded-xl text-sm font-semibold text-[#4B2E2D] placeholder:text-[#4B2E2D]/40 focus:outline-none focus:border-[#E57C5D] transition-all shadow-sm" />
+                <input type="text" placeholder="Buscar platillo..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white border border-[#FCE4D6] rounded-xl text-base sm:text-sm font-semibold text-[#4B2E2D] placeholder:text-[#4B2E2D]/40 focus:outline-none focus:border-[#E57C5D] transition-all shadow-sm" />
               </div>
               <div className="space-y-3">
                 {filteredDishes.map((dish) => {
@@ -313,7 +313,7 @@ export function TableSidePanel({
                         </div>
                         {isEditingNote ? (
                           <div className="flex gap-2 mt-1">
-                            <input type="text" value={editingNote.text} onChange={(e) => setEditingNote({ ...editingNote, text: e.target.value })} placeholder="Ej: Sin tomate..." className="flex-1 text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#D0543A]" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { updateOrderItemNote(activeTable.id, item.product.id, editingNote.text); setEditingNote(null) } }} />
+                            <input type="text" value={editingNote.text} onChange={(e) => setEditingNote({ ...editingNote, text: e.target.value })} placeholder="Ej: Sin tomate..." className="flex-1 text-base sm:text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#D0543A]" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { updateOrderItemNote(activeTable.id, item.product.id, editingNote.text); setEditingNote(null) } }} />
                             <button onClick={() => { updateOrderItemNote(activeTable.id, item.product.id, editingNote.text); setEditingNote(null) }} className="px-3 py-1.5 bg-[#4B2E2D] text-white text-xs font-bold rounded-lg">OK</button>
                           </div>
                         ) : (

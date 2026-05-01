@@ -128,7 +128,7 @@ export function ReserveTableModal({
                 placeholder="Ej: María González"
                 value={reservationForm.clientName}
                 onChange={(e) => setReservationForm((f) => ({ ...f, clientName: e.target.value }))}
-                className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm font-semibold text-[#4B2E2D] placeholder:text-gray-400 focus:outline-none transition-all ${reservationErrors.clientName ? 'border-red-400 bg-red-50 focus:border-red-500' : 'border-gray-200 bg-gray-50 focus:border-[#D96C4A] focus:bg-white'}`}
+                className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-base sm:text-sm font-semibold text-[#4B2E2D] placeholder:text-gray-400 focus:outline-none transition-all ${reservationErrors.clientName ? 'border-red-400 bg-red-50 focus:border-red-500' : 'border-gray-200 bg-gray-50 focus:border-[#D96C4A] focus:bg-white'}`}
               />
             </div>
             {reservationErrors.clientName && (
@@ -152,7 +152,7 @@ export function ReserveTableModal({
                 placeholder="Ej: 4"
                 value={reservationForm.guestCount || ''}
                 onChange={(e) => setReservationForm((f) => ({ ...f, guestCount: parseInt(e.target.value) || 0 }))}
-                className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm font-semibold text-[#4B2E2D] placeholder:text-gray-400 focus:outline-none transition-all ${reservationErrors.guestCount ? 'border-red-400 bg-red-50 focus:border-red-500' : 'border-gray-200 bg-gray-50 focus:border-[#D96C4A] focus:bg-white'}`}
+                className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-base sm:text-sm font-semibold text-[#4B2E2D] placeholder:text-gray-400 focus:outline-none transition-all ${reservationErrors.guestCount ? 'border-red-400 bg-red-50 focus:border-red-500' : 'border-gray-200 bg-gray-50 focus:border-[#D96C4A] focus:bg-white'}`}
               />
             </div>
             {reservationErrors.guestCount && (
@@ -166,19 +166,19 @@ export function ReserveTableModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-black text-[#4B2E2D] uppercase tracking-wider mb-1.5">Fecha <span className="text-[#DC2626]">*</span></label>
-              <input type="date" value={reservationForm.date} onChange={(e) => setReservationForm((f) => ({ ...f, date: e.target.value }))} className={`w-full px-3 py-2.5 rounded-xl border text-sm font-semibold text-[#4B2E2D] focus:outline-none transition-all ${reservationErrors.date ? 'border-red-400 bg-red-50 focus:border-red-500' : 'border-gray-200 bg-gray-50 focus:border-[#D96C4A] focus:bg-white'}`} />
+              <input type="date" value={reservationForm.date} onChange={(e) => setReservationForm((f) => ({ ...f, date: e.target.value }))} className={`w-full px-3 py-2.5 rounded-xl border text-base sm:text-sm font-semibold text-[#4B2E2D] focus:outline-none transition-all ${reservationErrors.date ? 'border-red-400 bg-red-50 focus:border-red-500' : 'border-gray-200 bg-gray-50 focus:border-[#D96C4A] focus:bg-white'}`} />
               {reservationErrors.date && <p className="text-red-500 text-[11px] font-semibold mt-1">{reservationErrors.date}</p>}
             </div>
             <div>
               <label className="block text-xs font-black text-[#4B2E2D] uppercase tracking-wider mb-1.5">Hora <span className="text-[#DC2626]">*</span></label>
-              <input type="time" value={reservationForm.time} onChange={(e) => setReservationForm((f) => ({ ...f, time: e.target.value }))} className={`w-full px-3 py-2.5 rounded-xl border text-sm font-semibold text-[#4B2E2D] focus:outline-none transition-all ${reservationErrors.time ? 'border-red-400 bg-red-50 focus:border-red-500' : 'border-gray-200 bg-gray-50 focus:border-[#D96C4A] focus:bg-white'}`} />
+              <input type="time" value={reservationForm.time} onChange={(e) => setReservationForm((f) => ({ ...f, time: e.target.value }))} className={`w-full px-3 py-2.5 rounded-xl border text-base sm:text-sm font-semibold text-[#4B2E2D] focus:outline-none transition-all ${reservationErrors.time ? 'border-red-400 bg-red-50 focus:border-red-500' : 'border-gray-200 bg-gray-50 focus:border-[#D96C4A] focus:bg-white'}`} />
               {reservationErrors.time && <p className="text-red-500 text-[11px] font-semibold mt-1">{reservationErrors.time}</p>}
             </div>
           </div>
         </div>
 
         {/* Footer con botones */}
-        <div className="px-6 pb-6 flex gap-3">
+        <div className="px-6 pb-6 flex flex-col-reverse sm:flex-row gap-3">
           <button onClick={onClose} className="flex-1 py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-black text-sm hover:bg-gray-50 hover:border-gray-300 transition-all">
             Cancelar
           </button>

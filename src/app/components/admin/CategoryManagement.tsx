@@ -233,7 +233,7 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
                   required
                   value={categoryFormData.label}
                   onChange={handleNameChange}
-                  className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none ${categoryError ? 'border-red-500 focus:border-red-600 bg-red-50 text-red-900' : 'border-[#E57C5D] focus:border-[#D0543A] text-[#4B2E2D]'}`}
+                  className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none text-base sm:text-sm ${categoryError ? 'border-red-500 focus:border-red-600 bg-red-50 text-red-900' : 'border-[#E57C5D] focus:border-[#D0543A] text-[#4B2E2D]'}`}
                   placeholder="Ej: Platos Especiales"
                 />
                 {categoryError ? (
@@ -244,18 +244,18 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
                   </p>
                 )}
               </div>
-              <div className="flex justify-end gap-4">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 sm:gap-4 w-full">
                 <button
                   type="button"
                   onClick={() => setIsCategoryModalOpen(false)}
-                  className="px-6 py-3 font-bold text-[#4B2E2D]/60"
+                  className="w-full sm:w-auto px-6 py-3 font-bold text-[#4B2E2D]/60 bg-gray-100 sm:bg-transparent rounded-xl hover:bg-gray-200 transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isLoading || !!categoryError || !categoryFormData.label.trim()}
-                  className={`px-8 py-3 text-white font-bold rounded-xl shadow-lg transition-all ${isLoading || !!categoryError || !categoryFormData.label.trim() ? 'bg-gray-400 cursor-not-allowed shadow-none' : 'bg-[#D0543A] hover:bg-[#b5462f]'}`}
+                  className={`w-full sm:w-auto px-8 py-3 text-white font-bold rounded-xl shadow-lg transition-all ${isLoading || !!categoryError || !categoryFormData.label.trim() ? 'bg-gray-400 cursor-not-allowed shadow-none' : 'bg-[#D0543A] hover:bg-[#b5462f]'}`}
                 >
                   Guardar
                 </button>
@@ -271,7 +271,7 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
           <div className="bg-[#FCE4D6] w-full max-w-[400px] border-4 border-[#D0543A] rounded-3xl p-8 relative shadow-2xl flex flex-col items-center text-center">
             <AlertTriangle size={32} className="text-[#D0543A] mb-4" />
             <h2 className="text-2xl font-bold text-[#4B2E2D] mb-3">¿Eliminar Categoría?</h2>
-            <div className="flex gap-4 w-full mt-4">
+            <div className="flex flex-col-reverse sm:flex-row gap-3 w-full mt-4">
               <button
                 onClick={() => setCategoryToDelete(null)}
                 disabled={isDeleting}

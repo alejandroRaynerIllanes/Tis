@@ -91,7 +91,7 @@ export function CancelReservationModal({
         </div>
 
         {/* Footer con botones */}
-        <div className="px-6 pb-6 flex gap-3">
+        <div className="px-6 pb-6 flex flex-col-reverse sm:flex-row gap-3">
           <button
             onClick={onClose}
             className="flex-1 py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-black text-sm hover:bg-gray-50 hover:border-gray-300 transition-all"

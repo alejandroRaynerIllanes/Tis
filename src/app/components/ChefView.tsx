@@ -182,7 +182,7 @@ export function ChefView() {
             <ChefHat size={26} />
           </div>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-black text-[#4B2E2D]">Cocina (KDS)</h1>
+            <h1 className="text-xl sm:text-3xl font-black text-[#4B2E2D]">Cocina (KDS)</h1>
             <p className="text-[#4B2E2D]/70 font-medium text-sm">
               Panel de control de comandas en tiempo real
             </p>
@@ -201,7 +201,7 @@ export function ChefView() {
       {/* Tablero Kanban */}
       <div className="flex-1 p-6 sm:p-10 grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8 items-start">
         {/* Columna 1: Pendientes */}
-        <div className="flex flex-col gap-4 bg-white/50 p-4 rounded-3xl border-2 border-yellow-200/50 min-h-[500px]">
+        <div className="flex flex-col gap-4 bg-white/50 p-4 rounded-3xl border-2 border-yellow-200/50 min-h-[250px] lg:min-h-[500px]">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-xl font-black text-[#4B2E2D] flex items-center gap-2">
               <Clock className="text-yellow-500" /> Por hacer
@@ -221,7 +221,7 @@ export function ChefView() {
         </div>
 
         {/* Columna 2: En Preparación */}
-        <div className="flex flex-col gap-4 bg-[#FCE4D6]/40 p-4 rounded-3xl border-2 border-[#D0543A]/20 min-h-[500px]">
+        <div className="flex flex-col gap-4 bg-[#FCE4D6]/40 p-4 rounded-3xl border-2 border-[#D0543A]/20 min-h-[250px] lg:min-h-[500px]">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-xl font-black text-[#4B2E2D] flex items-center gap-2">
               <Flame className="text-[#D0543A]" /> Cocinando
@@ -241,7 +241,7 @@ export function ChefView() {
         </div>
 
         {/* Columna 3: Listos */}
-        <div className="flex flex-col gap-4 bg-emerald-50/50 p-4 rounded-3xl border-2 border-emerald-200/50 min-h-[500px]">
+        <div className="flex flex-col gap-4 bg-emerald-50/50 p-4 rounded-3xl border-2 border-emerald-200/50 min-h-[250px] lg:min-h-[500px]">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-xl font-black text-[#4B2E2D] flex items-center gap-2">
               <CheckCircle2 className="text-emerald-500" /> Listos

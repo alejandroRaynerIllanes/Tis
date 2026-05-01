@@ -199,7 +199,7 @@ export function PaymentModal({
         </div>
 
         {/* Footer */}
-        <div className="p-6 bg-white border-t border-gray-200 flex gap-3">
+        <div className="p-6 bg-white border-t border-gray-200 flex flex-col-reverse sm:flex-row gap-3">
           <button onClick={handleClose} disabled={paymentProcessing} className="flex-1 py-3.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold transition-all disabled:opacity-50">Cancelar</button>
           <button onClick={handleProcess} disabled={!selectedPaymentMethod || paymentProcessing} className="flex-1 py-3.5 rounded-xl bg-[#D96C4A] hover:bg-[#C25838] text-white font-black shadow-lg shadow-[#D96C4A]/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
             {paymentProcessing ? (

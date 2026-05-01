@@ -7,28 +7,13 @@ import {
   Receipt,
   MapPin,
   Search,
-  X,
   ChefHat,
   Plus,
-  UtensilsCrossed,
   Trash2,
-  ShoppingBag,
-  CreditCard,
   Edit2,
-  MessageSquare,
   CalendarDays,
   UserCheck,
-  Ban,
-  XCircle,
-  AlertTriangle,
-  Banknote,
-  QrCode,
-  Wallet,
-  Smartphone,
-  Percent,
-  Printer,
   Crown,
-  Zap
 } from 'lucide-react'
 import { useNavigate } from 'react-router'
 // ✅ CORRECCIÓN: Añadido useMemo
@@ -322,7 +307,7 @@ export function WaiterView({
     setReservingTableId(null)
   }
 
-  const handleConfirmReservation = (formData: ReservationFormData) => {
+  const handleConfirmReservation = async (formData: ReservationFormData) => {
     if (!reservingTableId) return
 
     try {
@@ -330,7 +315,7 @@ export function WaiterView({
       const tableName = reservingTable?.name || 'Mesa'
 
       // 🚀 CONEXIÓN AL BACKEND: Nuevo formato de Payload para la Base de Datos
-      reserveTable(reservingTableId, {
+      await reserveTable(reservingTableId, {
         clientName: formData.clientName,
         guestCount: formData.guestCount,
         date: formData.date,

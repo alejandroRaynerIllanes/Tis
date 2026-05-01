@@ -523,13 +523,14 @@ export function WaiterView({
       const reservingTable = tables.find((t) => t.id === reservingTableId)
       const tableName = reservingTable?.name || 'Mesa'
 
-      // Mapear datos del formulario al formato ReservationInfo (time -> startTime)
+      // 🚀 CONEXIÓN AL BACKEND: Nuevo formato de Payload para la Base de Datos
       reserveTable(reservingTableId, {
         clientName: reservationForm.clientName,
         guestCount: reservationForm.guestCount,
         date: reservationForm.date,
-        startTime: reservationForm.time // Mapear 'time' a 'startTime'
-      })
+        time: reservationForm.time,
+        vip: reservingTable?.type === 'vip' || false
+      } as any)
 
       // Generar PDF automáticamente
       generateReservationPDF(

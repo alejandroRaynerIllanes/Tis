@@ -113,10 +113,10 @@ export function UserManagement() {
       }
 
       setIsUserModalOpen(false)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error al guardar usuario en BD:', error)
-      toast.error('Hubo un error al guardar.', {
-        description: 'Verifica la consola para más detalles.'
+      toast.error(error.message || 'Hubo un error al guardar.', {
+        description: 'Por favor, verifica los datos ingresados e intenta de nuevo.'
       })
     }
   }

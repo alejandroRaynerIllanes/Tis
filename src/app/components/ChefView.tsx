@@ -100,8 +100,13 @@ export function ChefView() {
       {/* Cabecera de la tarjeta */}
       <div className="flex justify-between items-start border-b border-[#FCE4D6] pb-3">
         <div>
-          <div className="flex items-center gap-2">
-            <h3 className="font-black text-lg text-[#4B2E2D]">{order.id}</h3>
+          <p className="text-[10px] font-bold text-[#4B2E2D]/50 uppercase tracking-widest mb-1">
+            Identificador
+          </p>
+          <div className="flex items-center gap-2 mb-1.5">
+            <h3 className="font-black text-2xl sm:text-3xl text-[#D0543A] leading-none tracking-tight">
+              {order.id}
+            </h3>
             {order.isVip && (
               <span className="bg-amber-100 text-amber-700 text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 border border-amber-200">
                 ★ VIP

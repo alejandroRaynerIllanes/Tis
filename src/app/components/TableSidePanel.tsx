@@ -48,6 +48,7 @@ export function TableSidePanel({
   const [showSummary, setShowSummary] = useState(false)
   const [editingNote, setEditingNote] = useState<{ productId: string; text: string } | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Resetear estados locales cada vez que se abre una mesa nueva
   useEffect(() => {
@@ -85,19 +86,26 @@ export function TableSidePanel({
   )
 
   // Handlers
-  const handleConfirmOrder = () => {
-    confirmOrder(tableId)
-    setViewingMenu(false)
-    setShowSummary(false)
-    toast.success(
-      isVipOrder ? '⚡ Pedido VIP enviado con prioridad' : '¡Pedido enviado a cocina!',
-      {
-        description: isVipOrder
-          ? `${activeTable?.name} — ${activeOrder.length} plato(s) · Prioridad máxima en cocina.`
-          : `${activeTable?.name} — ${activeOrder.length} plato(s) en preparación.`,
-        duration: 3500
-      }
-    )
+  const handleConfirmOrder = async () => {
+    setIsSubmitting(true)
+    try {
+      await confirmOrder(tableId)
+      setViewingMenu(false)
+      setShowSummary(false)
+      toast.success(
+        isVipOrder ? '⚡ Pedido VIP enviado con prioridad' : '¡Pedido enviado a cocina!',
+        {
+          description: isVipOrder
+            ? `${activeTable?.name} — ${activeOrder.length} plato(s) · Prioridad máxima en cocina.`
+            : `${activeTable?.name} — ${activeOrder.length} plato(s) en preparación.`,
+          duration: 3500
+        }
+      )
+    } catch (error: any) {
+      toast.error(error.message || 'Error al enviar el pedido a la cocina.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleClearOrder = () => {
@@ -348,7 +356,13 @@ export function TableSidePanel({
               {viewingMenu ? (
                 <button onClick={() => setViewingMenu(false)} className="w-full py-4 rounded-2xl bg-[#F5E6D3] border-2 border-[#6B3E2E] text-[#2C2C2C] font-black shadow-sm transition-all text-[15px] flex items-center justify-center gap-2 hover:bg-[#E8D4BE]"><ShoppingBag size={20} /> Ver Pedido Actual</button>
               ) : showSummary ? (
-                <button onClick={handleConfirmOrder} className="w-full py-4 rounded-2xl bg-[#D96C4A] hover:bg-[#C25838] text-white font-black shadow-lg shadow-[#D96C4A]/20 transition-all text-[15px] flex items-center justify-center gap-2"><CheckCircle2 size={20} /> Confirmar y Enviar a Cocina</button>
+                <button 
+                  onClick={handleConfirmOrder} 
+                  disabled={isSubmitting} 
+                  className={`w-full py-4 rounded-2xl text-white font-black shadow-lg shadow-[#D96C4A]/20 transition-all text-[15px] flex items-center justify-center gap-2 ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#D96C4A] hover:bg-[#C25838]'}`}
+                >
+                  {isSubmitting ? 'Enviando a cocina...' : <><CheckCircle2 size={20} /> Confirmar y Enviar a Cocina</>}
+                </button>
               ) : activeTable.status === 'Reservada' ? (
                 <button onClick={() => setShowSummary(true)} className="w-full py-4 rounded-2xl bg-[#D96C4A] hover:bg-[#C25838] text-white font-black shadow-lg shadow-[#D96C4A]/20 transition-all text-[15px] flex items-center justify-center gap-2"><CheckCircle2 size={20} /> Ver Resumen de Orden</button>
               ) : (

@@ -13,6 +13,7 @@ import type {
 import { defaultProducts, defaultTables } from '../data/mock-data'
 import { tablesService } from '../services/tables.service'
 import { reservationsService } from '../services/reservations.service'
+import { ordersService } from '../services/orders.service'
 import { VIP_CLIENT_NAMES } from '../data/constants'
 import {
   calculateReservationDuration,
@@ -36,7 +37,7 @@ interface AppContextType {
   clearOrder: (tableId: string) => void
   resetTableOrder: (tableId: string) => void
   updateOrderItemNote: (tableId: string, productId: string, note: string) => void
-  confirmOrder: (tableId: string) => void
+  confirmOrder: (tableId: string) => Promise<void>
   requestBill: (tableId: string) => void
   closeTable: (tableId: string) => void
   reserveTable: (tableId: string, info: Omit<ReservationInfo, 'id' | 'endTime'>) => void
@@ -430,10 +431,44 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     })
   }
 
-  const confirmOrder = (tableId: string) => {
+  const confirmOrder = async (tableId: string) => {
     const tableOrder = orders[tableId]
     if (tableOrder && tableOrder.length > 0) {
-      updateTableStatus(tableId, 'Ocupada')
+      try {
+        // 1. Obtener usuario creador del pedido
+        const storedUserStr = localStorage.getItem('user')
+        let userId = ''
+        if (storedUserStr) {
+          const storedUser = JSON.parse(storedUserStr)
+          userId = storedUser.id || storedUser._id || ''
+        }
+
+        if (!userId) {
+          throw new Error('No se pudo identificar al usuario para registrar el pedido.')
+        }
+
+        // 2. Formatear payload según modelo IPedido / IDetallePedido
+        const total = tableOrder.reduce((sum, item) => sum + (item.product.price * item.quantity), 0)
+        const payload = {
+          mesa: tableId,
+          usuario: userId,
+          total: total,
+          detalles: tableOrder.map((item) => ({
+            plato: item.product.id,
+            cantidad: item.quantity,
+            precioUnitario: item.product.price,
+            subtotal: item.product.price * item.quantity,
+            observacion: item.note || ''
+          }))
+        }
+
+        // 3. Enviar a BD y actualizar UI
+        await ordersService.create(payload)
+        updateTableStatus(tableId, 'Ocupada')
+      } catch (error) {
+        console.error('Error al confirmar pedido:', error)
+        throw error
+      }
     }
   }
 

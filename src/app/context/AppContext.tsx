@@ -11,6 +11,7 @@ import type {
 } from '../types'
 import { defaultProducts, defaultTables } from '../data/mock-data'
 import { tablesService } from '../services/tables.service'
+import { reservationsService } from '../services/reservations.service'
 import { VIP_CLIENT_NAMES } from '../data/constants'
 import {
   calculateReservationDuration,
@@ -92,6 +93,27 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const getTableId = (table: any) => table?.id || table?._id
 
+  const normalizarReserva = (r: any) => {
+    const tId = r.mesa?._id || r.mesa?.id || r.mesa || ''
+    let dateStr = ''
+    if (r.date) dateStr = r.date.split('T')[0]
+    else if (r.fecha) dateStr = new Date(r.fecha).toISOString().split('T')[0]
+
+    const duration = calculateReservationDuration(r.guestCount || r.cantidadPersonas || 1)
+    const startTime = r.time || r.hora || '00:00'
+
+    const resInfo: ReservationInfo = {
+      id: (r.id || r._id)?.toString() || '',
+      clientName: r.clientName || r.clienteNombre || 'Sin nombre',
+      guestCount: r.guestCount || r.cantidadPersonas || 1,
+      date: dateStr,
+      startTime,
+      endTime: calculateEndTime(startTime, duration),
+      vip: Boolean(r.vip)
+    }
+    return { tableId: tId.toString(), resInfo }
+  }
+
   // ─── Añadir después de getTableId (línea 92) ─────────────────────────────────
   const normalizarMesa = (item: any): Table => {
     const rawStatus = item?.status || item?.estado || 'Libre'
@@ -118,7 +140,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const token = getToken()
     if (!token) return
 
-    const baseApi = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
+    const baseApi = (import.meta as any).env.VITE_API_URL || 'http://localhost:3000/api'
     const socketUrl = baseApi.replace(/\/api\/?$/, '')
     let socket: any = null
 
@@ -380,7 +402,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     })
   }
 
-  const reserveTable = (tableId: string, info: Omit<ReservationInfo, 'id' | 'endTime' | 'vip'>) => {
+  const reserveTable = async (tableId: string, info: Omit<ReservationInfo, 'id' | 'endTime' | 'vip'>) => {
     const isVipClient = VIP_CLIENT_NAMES.includes(info.clientName.toLowerCase().trim())
 
     const table = tables.find((t) => t.id === tableId)
@@ -396,17 +418,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     const duration = calculateReservationDuration(info.guestCount)
     const endTime = calculateEndTime(info.startTime, duration)
-    const reservationId = `${tableId}-${Date.now()}`
-
-    const newReservation: ReservationInfo = {
-      id: reservationId,
-      clientName: info.clientName,
-      guestCount: info.guestCount,
-      date: info.date,
-      startTime: info.startTime,
-      endTime,
-      vip: isVipClient
-    }
 
     const existingReservations = reservations[tableId] || []
     const hasOverlap = existingReservations.some((existing) => {
@@ -418,9 +429,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       throw new Error('Ya existe una reserva en este horario')
     }
 
+    const payload = {
+      tableId,
+      clientName: info.clientName,
+      guestCount: info.guestCount,
+      date: info.date,
+      time: info.startTime,
+      vip: isVipClient
+    }
+
+    const created = await reservationsService.create(payload)
+    const { resInfo } = normalizarReserva(created)
+
     setReservations((prev) => ({
       ...prev,
-      [tableId]: [...(prev[tableId] || []), newReservation]
+      [tableId]: [...(prev[tableId] || []), resInfo]
     }))
 
     setTables((current) =>

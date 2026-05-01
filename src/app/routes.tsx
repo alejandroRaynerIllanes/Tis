@@ -1,14 +1,14 @@
-import { createBrowserRouter, Outlet } from "react-router";
-import { Login } from "./components/Login";
-import { Catalog } from "./components/Catalog";
-import { WaiterView } from "./components/WaiterView";
-import { NotFound } from "./components/NotFound";
-import { UserManagement } from "./components/UserManagement";
-import { ChefView } from "./components/ChefView";
-import { UnderConstruction } from "./components/UnderConstruction";
-import { ProtectedRoute } from "./components/ProtectedRoute";
-import { AppProvider } from "./context/AppContext";
-import { Toaster } from "sonner";
+import { createBrowserRouter, Outlet } from 'react-router'
+import { Login } from './components/Login'
+import { Catalog } from './components/Catalog'
+import { WaiterView } from './components/WaiterView'
+import { NotFound } from './components/NotFound'
+import { UserManagement } from './components/UserManagement'
+import { ChefView } from './components/ChefView'
+import { UnderConstruction } from './components/UnderConstruction'
+import { ProtectedRoute } from './components/ProtectedRoute'
+import { AppProvider } from './context/AppContext'
+import { Toaster } from 'sonner'
 
 function RootLayout() {
   return (
@@ -16,12 +16,12 @@ function RootLayout() {
       <Outlet />
       <Toaster position="bottom-right" richColors />
     </AppProvider>
-  );
+  )
 }
 
 export const router = createBrowserRouter([
   {
-    path: "/",
+    path: '/',
     element: <RootLayout />,
     errorElement: (
       <AppProvider>
@@ -32,48 +32,48 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <Login />,
+        element: <Login />
       },
       {
-        path: "catalog",
+        path: 'catalog',
         element: (
           <ProtectedRoute>
             <Catalog />
           </ProtectedRoute>
-        ),
+        )
       },
       {
-        path: "waiter-view",
+        path: 'waiter-view',
         element: (
           <ProtectedRoute>
             <WaiterView />
           </ProtectedRoute>
-        ),
+        )
       },
       {
-        path: "chef-view",
+        path: 'chef-view',
         element: (
           <ProtectedRoute>
             <ChefView />
           </ProtectedRoute>
-        ),
+        )
       },
       {
-        path: "user-management",
+        path: 'user-management',
         element: (
           <ProtectedRoute requireAdmin>
             <UserManagement />
           </ProtectedRoute>
-        ),
+        )
       },
       {
-        path: "en-construccion",
-        element: <UnderConstruction />,
+        path: 'en-construccion',
+        element: <UnderConstruction />
       },
       {
-        path: "*",
-        element: <NotFound />,
-      },
-    ],
-  },
-]);
+        path: '*',
+        element: <NotFound />
+      }
+    ]
+  }
+])

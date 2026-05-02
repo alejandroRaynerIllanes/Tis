@@ -105,7 +105,7 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
     setIsTableModalOpen(true)
   }
 
-  const validateTable = (name: string) => {
+  const validateTable = (name: string, currentEditingId: string | null) => {
     const nom = name.toLowerCase().trim()
     if (!nom) return 'El identificador es requerido. Ejemplo: "Mesa Interior 1"'
     if (!/^[a-záéíóúñ0-9\s]+$/i.test(nom)) return 'No se permiten símbolos especiales.'
@@ -119,12 +119,21 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
         if (parseInt(n, 10) > 50) return 'El número no puede ser mayor a 50.'
       }
     }
+
+    const isDuplicate = tables.some(
+      (t) =>
+        !isDeletedTable(t as any) &&
+        String(getTableDisplayName(t as any)).toLowerCase().trim() === nom &&
+        t.id !== currentEditingId && (t as any)._id !== currentEditingId
+    )
+    if (isDuplicate) return 'El nombre de la mesa ya está en uso. Intenta con otro nombre.'
+
     return null
   }
 
   const handleSaveTable = async (e: React.FormEvent) => {
     e.preventDefault()
-    const err = validateTable(tableFormData.number)
+    const err = validateTable(tableFormData.number, tableEditingId)
     if (err) {
       setTableError(err)
       return
@@ -280,7 +289,7 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
                   value={tableFormData.number}
                   onChange={(e) => {
                     setTableFormData({ ...tableFormData, number: e.target.value })
-                    setTableError(validateTable(e.target.value))
+                    setTableError(validateTable(e.target.value, tableEditingId))
                   }}
                   className={`w-full px-4 py-3 rounded-xl border-2 focus:outline-none transition-all ${tableError ? 'border-red-500 focus:border-red-600 bg-red-50' : 'border-[#E57C5D] focus:border-[#D0543A]'}`}
                   placeholder="Ej: Mesa Interior 1"
@@ -358,8 +367,9 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
                   Cancelar
                 </button>
                 <button
+                  disabled={!!tableError || !tableFormData.number.trim()}
                   type="submit"
-                  className="px-8 py-3 bg-[#D0543A] text-white font-bold rounded-xl"
+                  className={`px-8 py-3 text-white font-bold rounded-xl transition-all ${!!tableError || !tableFormData.number.trim() ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#D0543A] hover:bg-[#b5462f]'}`}
                 >
                   Guardar
                 </button>

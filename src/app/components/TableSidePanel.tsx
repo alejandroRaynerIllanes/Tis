@@ -363,7 +363,7 @@ export function TableSidePanel({
                 >
                   {isSubmitting ? 'Enviando a cocina...' : <><CheckCircle2 size={20} /> Confirmar y Enviar a Cocina</>}
                 </button>
-              ) : activeTable.status === 'Reservada' ? (
+              ) : (activeTable.status === 'Disponible' || activeTable.status === 'Reservada') ? (
                 <button onClick={() => setShowSummary(true)} className="w-full py-4 rounded-2xl bg-[#D96C4A] hover:bg-[#C25838] text-white font-black shadow-lg shadow-[#D96C4A]/20 transition-all text-[15px] flex items-center justify-center gap-2"><CheckCircle2 size={20} /> Ver Resumen de Orden</button>
               ) : (
                 <button onClick={() => setViewingMenu(true)} className="w-full py-4 rounded-2xl bg-[#F5E6D3] border-2 border-[#6B3E2E] text-[#2C2C2C] font-black shadow-sm transition-all text-[15px] flex items-center justify-center gap-2 hover:bg-[#E8D4BE]"><Plus size={20} /> Añadir Más Platos</button>

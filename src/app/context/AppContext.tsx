@@ -385,11 +385,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             const hasReservations =
               currentReservations[tableId] && currentReservations[tableId].length > 0
 
-            if (!hasReservations) {
               setTables((current) =>
-                current.map((t) => (t.id === tableId ? { ...t, status: 'Disponible' } : t))
+                current.map((t) => (t.id === tableId ? { ...t, status: hasReservations ? 'Reservada' : 'Disponible' } : t))
               )
-            }
 
             return currentReservations
           })
@@ -415,11 +413,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const hasReservations =
           currentReservations[tableId] && currentReservations[tableId].length > 0
 
-        if (!hasReservations) {
           setTables((current) =>
-            current.map((t) => (t.id === tableId ? { ...t, status: 'Disponible' } : t))
+                current.map((t) => (t.id === tableId ? { ...t, status: hasReservations ? 'Reservada' : 'Disponible' } : t))
           )
-        }
 
         return currentReservations
       })
@@ -451,11 +447,28 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (tableOrder && tableOrder.length > 0) {
       try {
         // 1. Obtener usuario creador del pedido
-        const storedUserStr = localStorage.getItem('user')
         let userId = ''
-        if (storedUserStr) {
-          const storedUser = JSON.parse(storedUserStr)
-          userId = storedUser.id || storedUser._id || ''
+
+        // Intento 1: Extraer ID directamente del token JWT (Método más seguro)
+        const token = getToken()
+        if (token) {
+          try {
+            const payload = JSON.parse(atob(token.split('.')[1]))
+            userId = payload.id || payload._id || payload.usuarioId || ''
+          } catch (e) {
+            console.warn('No se pudo decodificar el token:', e)
+          }
+        }
+
+        // Intento 2: Fallback a localStorage por si el token no se pudo leer
+        if (!userId) {
+          const storedUserStr = localStorage.getItem('user') || localStorage.getItem('usuario')
+          if (storedUserStr) {
+            try {
+              const storedUser = JSON.parse(storedUserStr)
+              userId = storedUser.id || storedUser._id || ''
+            } catch (e) {}
+          }
         }
 
         if (!userId) {
@@ -492,7 +505,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const closeTable = (tableId: string) => {
-    updateTableStatus(tableId, 'Disponible')
+    const tableReservations = reservations[tableId] || []
+    updateTableStatus(tableId, tableReservations.length > 0 ? 'Reservada' : 'Disponible')
     setOrders((prev) => {
       const newOrders = { ...prev }
       delete newOrders[tableId]

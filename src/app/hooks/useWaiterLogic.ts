@@ -99,7 +99,6 @@ export function useWaiterLogic() {
     const clickedTable = tables.find((t) => t.id === id)
     if (clickedTable && clickedTable.status === 'Disponible') {
       resetTableOrder(id)
-      updateTableStatus(id, 'Reservada')
     }
     setActiveTableId(id)
     setMenuPanelOpen(true)
@@ -188,15 +187,6 @@ export function useWaiterLogic() {
   }
 
   const handleCloseModal = () => {
-    if (activeTableId && activeTable) {
-      const hasNoOrder = !activeOrder || activeOrder.length === 0
-      const tableReservations = reservations[activeTableId]
-      const hasFormalReservation = !!(tableReservations && tableReservations.length > 0)
-      if (activeTable.status === 'Reservada' && hasNoOrder && !hasFormalReservation) {
-        updateTableStatus(activeTableId, 'Disponible')
-        resetTableOrder(activeTableId)
-      }
-    }
     setMenuPanelOpen(false)
     setActiveTableId(null)
   }

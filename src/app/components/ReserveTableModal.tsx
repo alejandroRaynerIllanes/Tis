@@ -46,9 +46,19 @@ export function ReserveTableModal({
 
   const validateReservation = (): boolean => {
     const errs: Partial<Record<keyof ReservationFormData, string>> = {}
-    if (!reservationForm.clientName.trim()) errs.clientName = 'El nombre es obligatorio.'
-    if (!reservationForm.guestCount || reservationForm.guestCount < 1)
-      errs.guestCount = 'Mínimo 1 persona.'
+
+    const nombreLimpio = reservationForm.clientName.trim()
+    if (!nombreLimpio) {
+      errs.clientName = 'El nombre es obligatorio.'
+    } else if (!/^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s]+$/.test(nombreLimpio)) {
+      errs.clientName = 'Solo se permiten letras y espacios. Ejemplo: "Maria Lopez"'
+    }
+
+    const count = reservationForm.guestCount
+    if (!count || count < 1 || count > 20) {
+      errs.guestCount = 'El número de personas debe estar entre 1 y 20.'
+    }
+
     if (!reservationForm.date) errs.date = 'Selecciona una fecha.'
     if (!reservationForm.time) errs.time = 'Selecciona una hora.'
     setReservationErrors(errs)
@@ -148,7 +158,7 @@ export function ReserveTableModal({
               <input
                 type="number"
                 min={1}
-                max={table.capacity ?? 20}
+                max={20}
                 placeholder="Ej: 4"
                 value={reservationForm.guestCount || ''}
                 onChange={(e) => setReservationForm((f) => ({ ...f, guestCount: parseInt(e.target.value) || 0 }))}

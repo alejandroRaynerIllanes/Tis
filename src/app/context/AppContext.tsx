@@ -127,8 +127,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const normalizarReserva = (r: any) => {
     const tId = r.mesa?._id || r.mesa?.id || r.mesa || ''
     let dateStr = ''
-    if (r.date) dateStr = r.date.split('T')[0]
-    else if (r.fecha) dateStr = new Date(r.fecha).toISOString().split('T')[0]
+    try {
+      if (r.date && typeof r.date === 'string') dateStr = r.date.split('T')[0]
+      else if (r.fecha) dateStr = new Date(r.fecha).toISOString().split('T')[0]
+    } catch (e) {
+      dateStr = new Date().toISOString().split('T')[0] // Fallback seguro
+    }
 
     const duration = calculateReservationDuration(r.guestCount || r.cantidadPersonas || 1)
     const startTime = r.time || r.hora || '00:00'
@@ -162,8 +166,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           ? item?.ubicacion?.nombre || item?.ubicacion?._id?.toString() || ''
           : item?.location || item?.ubicacion || '',
       type: item?.type || item?.tipo || 'normal',
-      status
-    }
+      status,
+      locationId: item?.locationId || (typeof item?.ubicacion === 'object' ? item?.ubicacion?._id?.toString() : item?.ubicacion) || item?.location
+    } as any
   }
 
   // Socket.io: sincronizar mesas en tiempo real (solo si hay token)
@@ -199,7 +204,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             const index = next.findIndex((t: any) => getTableId(t) === itemId)
             // ✅ CORRECCIÓN: Socket mesas:updated
             if (index !== -1) {
-              next[index] = normalizarMesa(item)
+              const existing = next[index]
+              // Hacemos un merge inteligente para no borrar datos si el backend envía una actualización parcial
+              next[index] = {
+                ...existing,
+                status: item.status || item.estado || existing.status,
+                name: item.name || item.numero || existing.name,
+                capacity: item.capacity || item.capacidad || existing.capacity,
+                location: item.location || (typeof item.ubicacion === 'object' ? item.ubicacion?.nombre : item.ubicacion) || existing.location,
+                type: item.type || item.tipo || existing.type,
+                locationId: item.locationId || (typeof item.ubicacion === 'object' ? item.ubicacion?._id?.toString() : item.ubicacion) || item.location || (existing as any).locationId
+              } as any
             } else {
               next.push(normalizarMesa(item))
             }
@@ -490,6 +505,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     const table = tables.find((t) => t.id === tableId)
     const tableType = table?.type || 'normal'
+
+    if (!info.startTime) throw new Error('Falta la hora de la reserva (startTime).')
+    if (!info.date) throw new Error('Falta la fecha de la reserva.')
 
     if (tableType === 'vip' && !isVipClient) {
       const isVipZone = table?.location === 'zona-vip'

@@ -132,6 +132,9 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
         toast.success('Categoría creada con éxito.')
       }
       setIsCategoryModalOpen(false)
+      setCategoryEditingId(null)
+      setCategoryFormData({ label: '' })
+      setCategoryError(null)
     } catch (error) {
       console.error('Error al guardar categoría:', error)
       toast.error('Hubo un error al conectar con el servidor.')
@@ -218,7 +221,12 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white w-full max-w-[400px] border-[6px] border-[#4B2E2D] rounded-3xl p-8 relative my-8 shadow-2xl">
             <button
-              onClick={() => setIsCategoryModalOpen(false)}
+              onClick={() => {
+                setIsCategoryModalOpen(false)
+                setCategoryEditingId(null)
+                setCategoryFormData({ label: '' })
+                setCategoryError(null)
+              }}
               className="absolute top-4 right-4 text-[#4B2E2D]/50 hover:text-[#D0543A]"
             >
               <X size={24} />
@@ -247,7 +255,12 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
               <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 sm:gap-4 w-full">
                 <button
                   type="button"
-                  onClick={() => setIsCategoryModalOpen(false)}
+                  onClick={() => {
+                    setIsCategoryModalOpen(false)
+                    setCategoryEditingId(null)
+                    setCategoryFormData({ label: '' })
+                    setCategoryError(null)
+                  }}
                   className="w-full sm:w-auto px-6 py-3 font-bold text-[#4B2E2D]/60 bg-gray-100 sm:bg-transparent rounded-xl hover:bg-gray-200 transition-colors"
                 >
                   Cancelar

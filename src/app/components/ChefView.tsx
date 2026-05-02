@@ -1,7 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ChefHat, Clock, Play, CheckCircle2, Flame, AlertCircle, LogOut } from 'lucide-react'
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router'
+import { io } from 'socket.io-client'
+import { getToken } from '../services/api'
+import { ordersService } from '../services/orders.service'
 
 type OrderStatus = 'Pendiente' | 'En preparación' | 'Listo'
 
@@ -19,64 +22,71 @@ interface Order {
   status: OrderStatus
   isVip?: boolean
   items: OrderItem[]
+  rawId?: string
 }
 
-// Datos simulados (Mock Data)
-const INITIAL_ORDERS: Order[] = [
-  {
-    id: 'ORD-001',
-    table: 'Mesa 4',
-    time: '14:30',
-    status: 'Pendiente',
-    items: [
-      { id: 'i1', name: 'Lomo Saltado', quantity: 2, notes: 'Sin cebolla' },
-      { id: 'i2', name: 'Ceviche Clásico', quantity: 1 }
-    ]
-  },
-  {
-    id: 'ORD-002',
-    table: 'VIP 1',
-    time: '14:35',
-    status: 'Pendiente',
-    isVip: true,
-    items: [
-      { id: 'i3', name: 'Risotto de Hongos', quantity: 1, notes: 'Extra queso parmesano' },
-      { id: 'i4', name: 'Vino Tinto Copa', quantity: 2 }
-    ]
-  },
-  {
-    id: 'ORD-003',
-    table: 'Mesa 12',
-    time: '14:15',
-    status: 'En preparación',
-    items: [
-      { id: 'i5', name: 'Hamburguesa Doble', quantity: 3 },
-      { id: 'i6', name: 'Papas Fritas', quantity: 2, notes: 'Bien crujientes' }
-    ]
-  },
-  {
-    id: 'ORD-004',
-    table: 'Terraza 2',
-    time: '14:05',
-    status: 'Listo',
-    items: [{ id: 'i7', name: 'Ensalada César', quantity: 1 }]
-  }
-]
-
 export function ChefView() {
-  const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS)
+  const [orders, setOrders] = useState<Order[]>([])
   const navigate = useNavigate()
 
-  // Función para cambiar el estado del pedido
-  const updateOrderStatus = (orderId: string, newStatus: OrderStatus) => {
-    setOrders((prevOrders) =>
-      prevOrders.map((order) => (order.id === orderId ? { ...order, status: newStatus } : order))
-    )
+  useEffect(() => {
+    const formatOrder = (o: any): Order => ({
+      id: o.codigo || o._id,
+      rawId: o._id,
+      table: o.mesa?.numero || 'Mesa ?',
+      time: new Date(o.fechaHora || o.createdAt || Date.now()).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+      status: o.estado === 'ABIERTO' ? 'Pendiente' : o.estado === 'EN_PREPARACION' ? 'En preparación' : 'Listo',
+      isVip: o.mesa?.tipo === 'vip',
+      items: (o.detalles || []).map((d: any, idx: number) => ({
+        id: d.plato?._id || String(idx),
+        name: d.plato?.nombre || 'Plato',
+        quantity: d.cantidad,
+        notes: d.observacion
+      }))
+    })
 
-    if (newStatus === 'En preparación') {
-      toast.success(`Pedido ${orderId} en preparación 🔥`)
-    } else if (newStatus === 'Listo') {
-      toast.success(`¡Pedido ${orderId} listo para entregar! ✅`)
+    const fetchOrders = async () => {
+      try {
+        const data = await ordersService.getAll()
+        const activeOrders = data.filter((o: any) => o.estado !== 'CANCELADO' && o.estado !== 'CERRADO')
+        setOrders(activeOrders.map(formatOrder))
+      } catch (err) {
+        console.error('Error fetching orders', err)
+      }
+    }
+    fetchOrders()
+
+    const token = getToken()
+    if (!token) return
+    const baseApi = (import.meta as any).env.VITE_API_URL || 'http://localhost:3000/api'
+    const socketUrl = baseApi.replace(/\/api\/?$/, '')
+    const socket = io(socketUrl, { auth: { token } })
+
+    socket.on('nuevo_pedido', (o: any) => {
+      setOrders(prev => [formatOrder(o), ...prev])
+      toast.info(`🔔 ¡Nuevo pedido recibido! (${o.codigo || 'Mesa'})`)
+    })
+
+    socket.on('pedido_actualizado', (o: any) => {
+      setOrders(prev => prev.map(ord => ord.rawId === o._id ? formatOrder(o) : ord))
+    })
+
+    return () => { socket.disconnect() }
+  }, [])
+
+  // Función para cambiar el estado del pedido
+  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+    const order = orders.find(o => o.id === orderId)
+    if (!order || !order.rawId) return
+    const backendStatus = newStatus === 'Pendiente' ? 'ABIERTO' : newStatus === 'En preparación' ? 'EN_PREPARACION' : 'ENTREGADO'
+    
+    try {
+      await ordersService.updateStatus(order.rawId, backendStatus)
+      setOrders((prevOrders) => prevOrders.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)))
+      if (newStatus === 'En preparación') toast.success(`Pedido ${orderId} en preparación 🔥`)
+      else if (newStatus === 'Listo') toast.success(`¡Pedido ${orderId} listo para entregar! ✅`)
+    } catch (e) {
+      toast.error('Error al actualizar el estado en el servidor.')
     }
   }
 

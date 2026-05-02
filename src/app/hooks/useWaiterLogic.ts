@@ -1,9 +1,10 @@
-import { useState, useMemo, MouseEvent } from 'react'
+import { useState, useMemo, MouseEvent, useEffect } from 'react'
 import { toast } from 'sonner'
 import { generateReservationPDF } from '../utils/pdf.utils'
 import { useAppContext } from '../context/AppContext'
 import type { ReservationFormData } from '../components/ReserveTableModal'
 import type { Table } from '../context/AppContext'
+import { locationsService } from '../services/locations.service'
 
 export type StateFilter = 'all' | 'Disponible' | 'Ocupada' | 'Esperando pago' | 'Reservada'
 
@@ -39,9 +40,24 @@ export function useWaiterLogic() {
     resetTableOrder
   } = context
 
+  const [dbLocations, setDbLocations] = useState<string[]>([])
+  useEffect(() => {
+    const fetchLocations = () => {
+      locationsService.getAll()
+        .then(data => {
+          const validNames = data.map((l: any) => (l.nombre || l.name || '').trim()).filter(Boolean)
+          setDbLocations(validNames)
+        })
+        .catch(() => {})
+    }
+    fetchLocations()
+    window.addEventListener('locations_updated', fetchLocations)
+    return () => window.removeEventListener('locations_updated', fetchLocations)
+  }, [])
+
   const LOCATIONS = useMemo(
-    () => ['Todas', ...Array.from(new Set(tables.map(getTableLocation).filter(Boolean))).sort()],
-    [tables]
+    () => ['Todas', ...Array.from(new Set(dbLocations)).sort()],
+    [tables, dbLocations]
   )
 
   const [activeLocation, setActiveLocation] = useState(LOCATIONS[0] || 'Todas')
@@ -107,7 +123,7 @@ export function useWaiterLogic() {
         clientName: formData.clientName,
         guestCount: formData.guestCount,
         date: formData.date,
-        time: formData.time,
+        startTime: formData.time, // Soluciona el error de "split" al coincidir con ReservationInfo
         vip: reservingTable?.type === 'vip' || false
       } as any)
 

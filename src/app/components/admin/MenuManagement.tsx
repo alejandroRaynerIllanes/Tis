@@ -126,6 +126,8 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
 
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
   const [categoryFormData, setCategoryFormData] = useState({ label: '' })
+  const [categoryEditingId, setCategoryEditingId] = useState<string | null>(null)
+  const [categoryError, setCategoryError] = useState<string | null>(null)
 
   const toggleStatus = (id: string) => {
     const dish = dishes.find((d) => d.id === id)
@@ -285,38 +287,44 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
     }
   }
 
+  const validateCategoryName = (name: string, currentEditingId: string | null) => {
+    const trimmed = name.trim()
+    if (!trimmed) return 'El nombre de la categoría es requerido. Ejemplo: "Bebidas"'
+    if (trimmed.length < 3 || /^(.)\1+$/.test(trimmed)) return 'Ingresa un nombre válido de al menos 3 caracteres.'
+    if (!/^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s]+$/.test(trimmed)) return 'El nombre solo debe contener letras y espacios. Ejemplo: "Postres"'
+    const isDuplicate = categories.some((cat) => cat.label.toLowerCase() === trimmed.toLowerCase() && cat.id !== currentEditingId)
+    if (isDuplicate) return 'Ya existe una categoría con ese nombre. Por favor, elige otro.'
+    return null
+  }
+
   const handleSaveCategory = async (e: React.FormEvent) => {
     e.preventDefault()
 
     const nombreLimpio = categoryFormData.label.trim()
-    if (!nombreLimpio) {
-      toast.warning('El nombre de la categoría no puede estar vacío.')
-      return
-    }
-
-    if (nombreLimpio.length < 3 || /^(.)\1+$/.test(nombreLimpio)) {
-      toast.warning('Ingresa un nombre de categoría válido (mínimo 3 caracteres).')
-      return
-    }
-
-    const isDuplicate = categories.some(
-      (cat) => cat.label.toLowerCase() === nombreLimpio.toLowerCase()
-    )
-    if (isDuplicate) {
-      toast.warning('Ya existe una categoría con este nombre.')
+    const error = validateCategoryName(nombreLimpio, categoryEditingId)
+    if (error) {
+      setCategoryError(error)
       return
     }
 
     try {
-      const created = await categoriesService.create(nombreLimpio)
-      setCategories([...categories, { id: created._id, label: created.nombre }])
+      if (categoryEditingId) {
+        const updated = await categoriesService.update(categoryEditingId, nombreLimpio)
+        setCategories(categories.map((c) => c.id === categoryEditingId ? { ...c, label: updated.nombre } : c))
+        toast.success('Categoría actualizada exitosamente.')
+      } else {
+        const created = await categoriesService.create(nombreLimpio)
+        setCategories([...categories, { id: created._id, label: created.nombre }])
+        toast.success('Categoría creada exitosamente.')
+      }
       setMenuFilter('all')
       setIsCategoryModalOpen(false)
       setCategoryFormData({ label: '' })
-      toast.success('Categoría creada exitosamente.')
+      setCategoryEditingId(null)
+      setCategoryError(null)
     } catch (error) {
       console.error(error)
-      toast.error('Error al crear categoría rápida.')
+      toast.error('Error al guardar categoría.')
     }
   }
 
@@ -332,7 +340,12 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
           </p>
         </div>
         <button
-          onClick={() => setIsCategoryModalOpen(true)}
+          onClick={() => {
+            setCategoryEditingId(null)
+            setCategoryFormData({ label: '' })
+            setCategoryError(null)
+            setIsCategoryModalOpen(true)
+          }}
           className="flex items-center gap-2 bg-[#D0543A] text-white px-4 sm:px-6 py-2.5 sm:py-3.5 rounded-xl font-bold shadow-lg shadow-[#D0543A]/30 hover:bg-[#b5462f] hover:shadow-xl hover:-translate-y-0.5 transition-all active:scale-[0.98] text-sm sm:text-base whitespace-nowrap"
         >
           <Plus size={18} strokeWidth={3} /> Añadir Categoría
@@ -389,6 +402,18 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
                   <h2 className="text-xl sm:text-2xl font-bold text-[#4B2E2D] shrink-0">
                     {category.label}
                   </h2>
+                  <button
+                    onClick={() => {
+                      setCategoryEditingId(category.id)
+                      setCategoryFormData({ label: category.label })
+                      setCategoryError(null)
+                      setIsCategoryModalOpen(true)
+                    }}
+                    className="p-1.5 text-[#4B2E2D]/40 hover:text-[#D0543A] hover:bg-[#D0543A]/10 rounded-lg transition-all"
+                    aria-label="Editar categoría"
+                  >
+                    <Edit2 size={20} />
+                  </button>
                   <button
                     onClick={() => setCategoryToDelete(category.id)}
                     className="p-1.5 text-[#4B2E2D]/40 hover:text-[#D0543A] hover:bg-[#D0543A]/10 rounded-lg transition-all"
@@ -668,29 +693,37 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white w-full max-w-[400px] border-[6px] border-[#4B2E2D] rounded-3xl p-8 relative shadow-2xl">
             <button
-              onClick={() => setIsCategoryModalOpen(false)}
+              onClick={() => {
+                setIsCategoryModalOpen(false)
+                setCategoryEditingId(null)
+                setCategoryFormData({ label: '' })
+                setCategoryError(null)
+              }}
               className="absolute top-4 right-4 text-[#4B2E2D]/50 hover:text-[#D0543A]"
             >
               <X size={24} />
             </button>
-            <h2 className="text-3xl font-bold text-[#4B2E2D] mb-6">Nueva Categoría</h2>
+            <h2 className="text-3xl font-bold text-[#4B2E2D] mb-6">
+              {categoryEditingId ? 'Editar Categoría' : 'Nueva Categoría'}
+            </h2>
             <form onSubmit={handleSaveCategory}>
               <input
                 type="text"
                 required
                 value={categoryFormData.label}
-                onChange={(e) =>
-                  setCategoryFormData({
-                    label: e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s]/g, '')
-                  })
-                }
-                className="w-full px-4 py-3 rounded-xl border-2 border-[#E57C5D] text-[#4B2E2D] mb-6"
+                onChange={(e) => {
+                  setCategoryFormData({ label: e.target.value })
+                  setCategoryError(validateCategoryName(e.target.value, categoryEditingId))
+                }}
+                className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none mb-2 ${categoryError ? 'border-red-500 focus:border-red-600 bg-red-50 text-red-900' : 'border-[#E57C5D] focus:border-[#D0543A] text-[#4B2E2D]'}`}
                 placeholder="Ej: Platos Especiales"
               />
+              {categoryError && <p className="text-red-500 text-xs font-bold mb-4 leading-tight">{categoryError}</p>}
               <div className="flex justify-end gap-4">
                 <button
+                  disabled={!!categoryError || !categoryFormData.label.trim()}
                   type="submit"
-                  className="px-8 py-3 bg-[#D0543A] text-white font-bold rounded-xl"
+                  className={`px-8 py-3 text-white font-bold rounded-xl transition-all ${!!categoryError || !categoryFormData.label.trim() ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#D0543A] hover:bg-[#b5462f]'}`}
                 >
                   Guardar
                 </button>

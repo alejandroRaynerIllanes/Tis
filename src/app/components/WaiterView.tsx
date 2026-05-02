@@ -446,34 +446,38 @@ export function WaiterView({
                   style={cfg.cardStyle}
                 >
                   {/* Fila superior: Nombre e Ícono */}
-                  <div className="flex justify-between items-start w-full mb-6 relative z-10">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`font-black text-xl sm:text-2xl tracking-tight drop-shadow-sm leading-none mt-1 ${cfg.textClass}`}
-                      >
-                        {tableName}
-                      </span>
-                      {t.type === 'vip' && (
-                        <Crown
-                          size={16}
-                          className="text-yellow-300 drop-shadow-sm shrink-0 mt-1"
-                          strokeWidth={2.5}
-                        />
+                  <div className="flex justify-between items-start w-full mb-4 relative z-10">
+                    <div className="flex flex-col gap-1 max-w-[70%]">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`font-black text-xl sm:text-2xl tracking-tight drop-shadow-sm leading-none mt-1 truncate block ${cfg.textClass}`}
+                          title={String(tableName)}
+                        >
+                          {tableName}
+                        </span>
+                        {t.type === 'vip' && (
+                          <Crown
+                            size={16}
+                            className="text-yellow-300 drop-shadow-sm shrink-0 mt-1"
+                            strokeWidth={2.5}
+                          />
+                        )}
+                      </div>
+                      {tableLocation && (
+                        <div
+                          className={`flex items-center gap-1 text-[11px] font-bold ${cfg.textClass} opacity-80 truncate`}
+                          title={tableLocation}
+                        >
+                          <MapPin size={11} className="shrink-0" />
+                          <span className="truncate">{tableLocation}</span>
+                        </div>
                       )}
                     </div>
-                    {tableLocation && (
-                      <div
-                        className={`absolute left-0 top-8 flex items-center gap-1 text-[11px] font-bold ${cfg.textClass} opacity-80`}
-                      >
-                        <MapPin size={11} />
-                        {tableLocation}
-                      </div>
-                    )}
                     <div className="flex items-center gap-1">
                       <div className="flex items-center gap-1 opacity-0 lg:opacity-100 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={(e) => openReserveModal(e, t.id)}
-                          className="p-2 rounded-xl text-blue-600/60 hover:text-blue-700 hover:bg-blue-500/10 transition-all bg-black/5"
+                          className={`p-2 rounded-xl transition-all bg-black/5 ${t.status === 'Reservada' || t.status === 'Ocupada' ? 'text-white/80 hover:text-white hover:bg-white/20' : 'text-blue-600/60 hover:text-blue-700 hover:bg-blue-500/10'}`}
                           aria-label="Reservar mesa"
                           title="Reservar mesa"
                         >
@@ -486,7 +490,7 @@ export function WaiterView({
                                 e.stopPropagation()
                                 onEditTable?.(t)
                               }}
-                              className="p-2 rounded-xl text-[#4B2E2D]/50 hover:text-[#D0543A] hover:bg-white/40 transition-all bg-black/5"
+                              className={`p-2 rounded-xl transition-all bg-black/5 ${t.status === 'Reservada' || t.status === 'Ocupada' ? 'text-white/80 hover:text-white hover:bg-white/20' : 'text-[#4B2E2D]/50 hover:text-[#D0543A] hover:bg-white/40'}`}
                               aria-label="Editar"
                             >
                               <Edit2 size={16} />
@@ -496,7 +500,7 @@ export function WaiterView({
                                 e.stopPropagation()
                                 onDeleteTable?.(t.id)
                               }}
-                              className="p-2 rounded-xl text-[#4B2E2D]/50 hover:text-red-600 hover:bg-red-500/10 transition-all bg-black/5"
+                              className={`p-2 rounded-xl transition-all bg-black/5 ${t.status === 'Reservada' || t.status === 'Ocupada' ? 'text-white/80 hover:text-red-300 hover:bg-red-500/20' : 'text-[#4B2E2D]/50 hover:text-red-600 hover:bg-red-500/10'}`}
                               aria-label="Eliminar"
                             >
                               <Trash2 size={16} />

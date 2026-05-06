@@ -10,7 +10,7 @@ import type {
   OrderItem,
   ReservationInfo
 } from '../types'
-import { defaultProducts, defaultTables } from '../data/mock-data'
+import { defaultProducts } from '../data/mock-data'
 import { tablesService } from '../services/tables.service'
 import { reservationsService } from '../services/reservations.service'
 import { ordersService } from '../services/orders.service'
@@ -91,7 +91,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined)
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [products, setProducts] = useState<Product[]>(defaultProducts)
-  const [tables, setTables] = useState<Table[]>(defaultTables)
+  const [tables, setTables] = useState<Table[]>([])
   const [orders, setOrders] = useState<Record<string, OrderItem[]>>({})
   const [reservations, setReservations] = useState<Record<string, ReservationInfo[]>>({})
 

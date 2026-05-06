@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react'
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react'
 import { io } from 'socket.io-client'
 import { getToken } from '../services/api'
 import { toast } from 'sonner'
@@ -10,9 +10,9 @@ import type {
   OrderItem,
   ReservationInfo
 } from '../types'
-import { defaultProducts } from '../data/mock-data'
 import { tablesService } from '../services/tables.service'
 import { reservationsService } from '../services/reservations.service'
+import { platosService } from '../services/platos.service'
 import { ordersService } from '../services/orders.service'
 import { VIP_CLIENT_NAMES } from '../data/constants'
 import {
@@ -56,6 +56,7 @@ interface AppContextType {
     payload: { name?: string; capacity?: number; location?: string; type?: string }
   ) => Promise<any>
   deleteTable: (id: string) => Promise<boolean>
+  loadInitialData: () => Promise<void>
 }
 
 const validarNombreMesa = (nombre: string): { valido: boolean; mensaje?: string } => {
@@ -90,37 +91,47 @@ const validarNombreMesa = (nombre: string): { valido: boolean; mensaje?: string 
 const AppContext = createContext<AppContextType | undefined>(undefined)
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
-  const [products, setProducts] = useState<Product[]>(defaultProducts)
+  const [products, setProducts] = useState<Product[]>([])
   const [tables, setTables] = useState<Table[]>([])
   const [orders, setOrders] = useState<Record<string, OrderItem[]>>({})
   const [reservations, setReservations] = useState<Record<string, ReservationInfo[]>>({})
 
-  // Cargar mesas desde backend al montar (solo si hay token)
-  useEffect(() => {
-    let mounted = true
+  // Cargador maestro sincronizado
+  const loadInitialData = useCallback(async () => {
     const token = getToken()
-    if (!token) {
-      // Evitar peticiones que devuelvan 401 cuando no esté autenticado
-      return () => {
-        mounted = false
-      }
-    }
+    if (!token) return
 
-    ;(async () => {
-      try {
-        const fetched = await tablesService.getAll()
-        // ✅ CORRECCIÓN: FETCH (Aplica normalizarMesa)
-        if (mounted && Array.isArray(fetched)) {
-          setTables(fetched.map(normalizarMesa))
-        }
-      } catch (err) {
-        console.warn('No se pudieron cargar mesas desde backend, usando datos locales', err)
+    try {
+      const [fetchedTables, fetchedProducts] = await Promise.all([
+        tablesService.getAll(),
+        platosService.getAll()
+      ])
+
+      if (Array.isArray(fetchedTables)) {
+        setTables(fetchedTables.map(normalizarMesa))
       }
-    })()
-    return () => {
-      mounted = false
+
+      if (Array.isArray(fetchedProducts)) {
+        const formattedProducts = fetchedProducts.map((p: any) => ({
+          id: p._id || p.id,
+          name: p.nombre || p.name || 'Plato',
+          description: p.descripcion || p.description || '',
+          price: p.precio || p.price || 0,
+          image: p.imagenUrl || p.imagen || p.image || '',
+          category: typeof p.categoria === 'object' && p.categoria !== null ? p.categoria.nombre || p.categoria._id : p.categoria || 'General',
+          status: ((p.disponible === false || p.estado === false || p.estado === 'Inactivo') ? 'Agotado' : 'Disponible') as ProductStatus
+        }))
+        setProducts(formattedProducts)
+      }
+    } catch (err) {
+      console.warn('Error cargando datos iniciales:', err)
     }
   }, [])
+
+  // Cargar mesas desde backend al montar (solo si hay token)
+  useEffect(() => {
+    loadInitialData()
+  }, [loadInitialData])
 
   const getTableId = (table: any) => table?.id || table?._id
 
@@ -305,7 +316,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return created
     } catch (err) {
       console.error('Error creando mesa:', err)
-      const errMsg = (err as any)?.response?.data?.mensaje || (err as any)?.message || 'Error al crear la mesa'
+      // Limpiamos el prefijo "Error: " si viene desde el interceptor de la API
+      const errMsg = ((err as any)?.response?.data?.mensaje || (err as any)?.message || 'Error al crear la mesa').replace(/^Error:\s*/, '')
       toast.error(errMsg)
       throw err
     }
@@ -330,7 +342,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return updated
     } catch (err) {
       console.error('Error actualizando mesa:', err)
-      const errMsg = (err as any)?.response?.data?.mensaje || (err as any)?.message || 'Error al actualizar la mesa'
+      // Limpiamos el prefijo "Error: "
+      const errMsg = ((err as any)?.response?.data?.mensaje || (err as any)?.message || 'Error al actualizar la mesa').replace(/^Error:\s*/, '')
       toast.error(errMsg)
       throw err
     }
@@ -629,7 +642,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setTables,
     createTable,
     updateTable,
-    deleteTable
+    deleteTable,
+    loadInitialData
   }
 
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>

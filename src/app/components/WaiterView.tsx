@@ -15,9 +15,9 @@ import {
   Crown,
 } from 'lucide-react'
 import { useNavigate } from 'react-router'
-import { MouseEvent } from 'react'
+import { MouseEvent, useEffect } from 'react'
 
-import { TableStatus, Table } from '../context/AppContext'
+import { TableStatus, Table, useAppContext } from '../context/AppContext'
 import { useWaiterLogic, getTableDisplayName, getTableLocation, type StateFilter, type TableWithFallbacks } from '../hooks/useWaiterLogic'
 import { ReservationsListModal } from './ReservationsListModal'
 import { PaymentModal } from './PaymentModal'
@@ -214,6 +214,12 @@ export function WaiterView({
     handleCloseModal,
     getActiveReservation
   } = waiterLogic
+
+  const { loadInitialData } = useAppContext()
+
+  useEffect(() => {
+    loadInitialData()
+  }, [loadInitialData])
 
   const role = localStorage.getItem('userRole')
   const isAdmin = role === 'admin' || role === 'administrador'

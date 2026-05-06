@@ -66,7 +66,7 @@ export function TableSidePanel({
   useEffect(() => {
     if (products && products.length > 0) {
       setLocalProducts(products)
-    } else if (isOpen && viewingMenu) {
+    } else if (isOpen) {
       const fetchProducts = async () => {
         try {
           const data = await platosService.getAll()
@@ -86,7 +86,7 @@ export function TableSidePanel({
       }
       fetchProducts()
     }
-  }, [products, isOpen, viewingMenu])
+  }, [products, isOpen])
 
   if (!isOpen || !tableId) return null
 

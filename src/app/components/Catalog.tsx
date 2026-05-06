@@ -13,11 +13,14 @@ import { TableManagement } from './admin/TableManagement'
 import { UserManagement } from './admin/UserManagement'
 import { ReportsSection } from './admin/ReportsSection'
 import { VIPClients } from './VIPClients'
+import { useAppContext } from '../context/AppContext'
 
 export function Catalog() {
   const navigate = useNavigate()
   const [activeView, setActiveView] = useState<AdminView | 'categories' | 'locations'>('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  const { loadInitialData } = useAppContext()
 
   // Estado compartido
   const [categories, setCategories] = useState<any[]>([])
@@ -25,6 +28,8 @@ export function Catalog() {
 
   // 🔧 Cargar categorías y ubicaciones desde backend
   useEffect(() => {
+    loadInitialData()
+
     const cargarDatos = async () => {
       try {
         const dataCat = await categoriesService.getAll()

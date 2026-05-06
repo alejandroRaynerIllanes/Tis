@@ -102,9 +102,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (!token) return
 
     try {
-      const [fetchedTables, fetchedProducts] = await Promise.all([
+      const [fetchedTables, fetchedProducts, fetchedOrders, fetchedReservations] = await Promise.all([
         tablesService.getAll(),
-        platosService.getAll()
+        platosService.getAll(),
+        ordersService.getAll().catch(() => []), // Evita fallos si no hay ordenes
+        reservationsService.getAll().catch(() => [])
       ])
 
       if (Array.isArray(fetchedTables)) {
@@ -122,6 +124,44 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           status: ((p.disponible === false || p.estado === false || p.estado === 'Inactivo') ? 'Agotado' : 'Disponible') as ProductStatus
         }))
         setProducts(formattedProducts)
+      }
+
+      // Sincronizar órdenes activas desde el backend
+      if (Array.isArray(fetchedOrders)) {
+        const activeOrders = fetchedOrders.filter((o: any) => o.estado === 'ABIERTO' || o.estado === 'EN_PREPARACION' || o.estado === 'ENTREGADO')
+        const ordersMap: Record<string, OrderItem[]> = {}
+        
+        activeOrders.forEach((o: any) => {
+          const tId = o.mesa?._id || o.mesa?.id || o.mesa
+          if (!tId) return
+          if (!ordersMap[tId]) ordersMap[tId] = []
+          
+          o.detalles?.forEach((d: any) => {
+            const product: Product = {
+              id: d.plato?._id || d.plato || 'unknown',
+              name: d.plato?.nombre || 'Plato',
+              description: d.plato?.descripcion || '',
+              price: d.precioUnitario || d.plato?.precio || 0,
+              image: d.plato?.imagenUrl || d.plato?.imagen || '',
+              category: d.plato?.categoria?.nombre || 'General',
+              status: 'Disponible'
+            }
+            ordersMap[tId].push({ product, quantity: d.cantidad || 1, note: d.observacion || '' })
+          })
+        })
+        setOrders(ordersMap)
+      }
+
+      // Sincronizar reservas activas desde el backend
+      if (Array.isArray(fetchedReservations)) {
+        const resMap: Record<string, ReservationInfo[]> = {}
+        fetchedReservations.forEach((r: any) => {
+          const { tableId, resInfo } = normalizarReserva(r)
+          if (!tableId) return
+          if (!resMap[tableId]) resMap[tableId] = []
+          resMap[tableId].push(resInfo)
+        })
+        setReservations(resMap)
       }
     } catch (err) {
       console.warn('Error cargando datos iniciales:', err)
@@ -395,12 +435,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (updatedOrder.length === 0) {
         setTimeout(() => {
           setReservations((currentReservations) => {
-            const hasReservations =
-              currentReservations[tableId] && currentReservations[tableId].length > 0
-
-              setTables((current) =>
-                current.map((t) => (t.id === tableId ? { ...t, status: hasReservations ? 'Reservada' : 'Disponible' } : t))
-              )
+            // GUARDAR EN LA BASE DE DATOS
+            updateTableStatus(tableId, 'Disponible')
 
             return currentReservations
           })
@@ -423,12 +459,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     setTimeout(() => {
       setReservations((currentReservations) => {
-        const hasReservations =
-          currentReservations[tableId] && currentReservations[tableId].length > 0
-
-          setTables((current) =>
-                current.map((t) => (t.id === tableId ? { ...t, status: hasReservations ? 'Reservada' : 'Disponible' } : t))
-          )
+        // GUARDAR EN LA BASE DE DATOS
+        updateTableStatus(tableId, 'Disponible')
 
         return currentReservations
       })
@@ -518,8 +550,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const closeTable = (tableId: string) => {
-    const tableReservations = reservations[tableId] || []
-    updateTableStatus(tableId, tableReservations.length > 0 ? 'Reservada' : 'Disponible')
+    updateTableStatus(tableId, 'Disponible')
     setOrders((prev) => {
       const newOrders = { ...prev }
       delete newOrders[tableId]
@@ -606,9 +637,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         delete next[tableId]
         return next
       })
-      setTables((current) =>
-        current.map((t) => (t.id === tableId ? { ...t, status: 'Disponible' } : t))
-      )
+      // GUARDAR EN LA BASE DE DATOS
+      updateTableStatus(tableId, 'Disponible')
     }
   }
 

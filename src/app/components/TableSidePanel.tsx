@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAppContext } from '../context/AppContext'
+import { platosService } from '../services/platos.service'
 
 interface TableSidePanelProps {
   isOpen: boolean
@@ -49,6 +50,7 @@ export function TableSidePanel({
   const [editingNote, setEditingNote] = useState<{ productId: string; text: string } | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [localProducts, setLocalProducts] = useState<any[]>([])
 
   // Resetear estados locales cada vez que se abre una mesa nueva
   useEffect(() => {
@@ -59,6 +61,32 @@ export function TableSidePanel({
       setSearchQuery('')
     }
   }, [isOpen, tableId])
+
+  // CARGA INICIAL INDEPENDIENTE: Garantiza que el menú cargue al abrir la mesa sin depender de otra vista
+  useEffect(() => {
+    if (products && products.length > 0) {
+      setLocalProducts(products)
+    } else if (isOpen && viewingMenu) {
+      const fetchProducts = async () => {
+        try {
+          const data = await platosService.getAll()
+          const formattedData = data.map((p: any) => ({
+            id: p._id || p.id,
+            name: p.nombre || p.name || 'Plato',
+            description: p.descripcion || p.description || '',
+            price: p.precio || p.price || 0,
+            image: p.imagen || p.image || '',
+            category: p.categoria?.nombre || p.categoria || 'General',
+            status: p.estado === false || p.estado === 'Inactivo' ? 'Agotado' : 'Disponible'
+          }))
+          setLocalProducts(formattedData)
+        } catch (error) {
+          console.error('Error al cargar el menú dinámicamente:', error)
+        }
+      }
+      fetchProducts()
+    }
+  }, [products, isOpen, viewingMenu])
 
   if (!isOpen || !tableId) return null
 
@@ -77,7 +105,7 @@ export function TableSidePanel({
     : undefined
 
   // Filtrar platillos
-  const filteredDishes = products.filter(
+  const filteredDishes = localProducts.filter(
     (d) =>
       d.image &&
       d.image.trim() !== '' &&

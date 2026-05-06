@@ -2,7 +2,6 @@ import { useNavigate } from 'react-router'
 import { useState, useEffect } from 'react'
 import { categoriesService } from '../services/categories.service'
 import { locationsService } from '../services/locations.service'
-import { INITIAL_CATEGORIES, INITIAL_LOCATIONS } from '../data/constants'
 import type { AdminView } from './layout/Sidebar'
 import { Sidebar } from './layout/Sidebar'
 
@@ -21,8 +20,8 @@ export function Catalog() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   // Estado compartido
-  const [categories, setCategories] = useState(INITIAL_CATEGORIES)
-  const [locations, setLocations] = useState(INITIAL_LOCATIONS)
+  const [categories, setCategories] = useState<any[]>([])
+  const [locations, setLocations] = useState<any[]>([])
 
   // 🔧 Cargar categorías y ubicaciones desde backend
   useEffect(() => {

@@ -160,13 +160,13 @@ export function UserManagement() {
     try {
       if (editingUser) {
         // PUT /usuarios/:id
-        await usersService.update(editingUser.id, {
+        await usersService.update(editingUser._id, {
           nombre: formData.firstName,
           apellido: formData.lastName,
           ci: formData.ci,
           email: formData.email,
           rol: ROLE_TO_BACKEND[formData.role],
-          ...(formData.password ? { contraseña: formData.password } : {})
+          ...(formData.password ? { password: formData.password } : {})
         })
         toast.success('Usuario actualizado correctamente')
       } else {
@@ -181,7 +181,7 @@ export function UserManagement() {
           apellido: formData.lastName,
           ci: formData.ci,
           email: formData.email,
-          contraseña: formData.password,
+          password: formData.password,
           rol: ROLE_TO_BACKEND[formData.role]
         })
         toast.success('Usuario creado correctamente')
@@ -198,10 +198,10 @@ export function UserManagement() {
 
   // PATCH /usuarios/:id/estado
   const handleToggleStatus = async (user: DisplayUser) => {
-    setActionLoading(user.id)
+    setActionLoading(user._id)
     try {
-      await usersService.toggleStatus(user.id)
       const newEstado = !user.estado
+      await usersService.toggleStatus(user._id, newEstado)
       toast.success(`${user.displayName} ahora está ${newEstado ? 'activo' : 'inactivo'}`)
       await fetchUsers()
     } catch (err) {
@@ -214,9 +214,9 @@ export function UserManagement() {
 
   // DELETE /usuarios/:id
   const handleDelete = async (user: DisplayUser) => {
-    setActionLoading(user.id)
+    setActionLoading(user._id)
     try {
-      await usersService.remove(user.id)
+      await usersService.remove(user._id)
       toast.success(`${user.displayName} eliminado correctamente`)
       setDeleteConfirm(null)
       await fetchUsers()
@@ -293,7 +293,7 @@ export function UserManagement() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-w-[1600px] mx-auto">
             {filteredUsers.map((user) => (
               <div
-                key={user.id}
+                key={user._id}
                 className={`bg-white/95 backdrop-blur-xl rounded-[24px] p-6 shadow-xl border border-white/50 flex flex-col transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 relative overflow-hidden ${!user.estado ? 'opacity-75 grayscale-[50%]' : ''}`}
               >
                 <div className="absolute top-0 left-0 right-0 h-24 bg-gradient-to-b from-[#F5E6D3] to-transparent z-0 opacity-50" />
@@ -333,14 +333,14 @@ export function UserManagement() {
                 <div className="relative z-10 grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-gray-100">
                   <button
                     onClick={() => handleToggleStatus(user)}
-                    disabled={actionLoading === user.id}
+                    disabled={actionLoading === user._id}
                     className={`flex items-center justify-center gap-1 py-2 rounded-xl font-semibold text-xs transition-colors border disabled:opacity-50 ${
                       user.estado
                         ? 'bg-red-50 text-red-600 border-red-100 hover:bg-red-100'
                         : 'bg-green-50 text-green-600 border-green-100 hover:bg-green-100'
                     }`}
                   >
-                    {actionLoading === user.id ? (
+                    {actionLoading === user._id ? (
                       <Loader2 size={14} className="animate-spin" />
                     ) : user.estado ? (
                       <Ban size={14} />
@@ -569,10 +569,10 @@ export function UserManagement() {
               </button>
               <button
                 onClick={() => handleDelete(deleteConfirm)}
-                disabled={actionLoading === deleteConfirm.id}
+                disabled={actionLoading === deleteConfirm._id}
                 className="flex-1 py-3 rounded-2xl font-bold bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
               >
-                {actionLoading === deleteConfirm.id ? (
+                {actionLoading === deleteConfirm._id ? (
                   <Loader2 size={16} className="animate-spin" />
                 ) : (
                   <Trash2 size={16} />

@@ -6,6 +6,7 @@ import { api } from './api'
 // Tipo del usuario como viene del backend
 export interface BackendUser {
   _id: string // <-- CORRECCIÓN: _id como string (MongoDB)
+  id?: string // <-- Añadido para que React (UserManagement) no marque error al buscar .id
   nombre: string
   apellido: string
   ci: string

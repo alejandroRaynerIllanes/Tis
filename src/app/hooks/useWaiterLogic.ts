@@ -70,24 +70,26 @@ export function useWaiterLogic() {
   const [cancelingReservationId, setCancelingReservationId] = useState<string | null>(null)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
 
-  const filteredTables = tables.filter((t) => {
-    const tableLoc = getTableLocation(t).toLowerCase()
-    const locationMatch = activeLocation === 'Todas' || tableLoc === activeLocation.toLowerCase()
-    return locationMatch && (stateFilter === 'all' || t.status === stateFilter)
-  })
+  const filteredTables = useMemo(() => {
+    return tables.filter((t) => {
+      const tableLoc = getTableLocation(t).toLowerCase()
+      const locationMatch = activeLocation === 'Todas' || tableLoc === activeLocation.toLowerCase()
+      return locationMatch && (stateFilter === 'all' || t.status === stateFilter)
+    })
+  }, [tables, activeLocation, stateFilter])
 
-  const locationTables =
-    activeLocation === 'Todas'
+  const locationTables = useMemo(() => {
+    return activeLocation === 'Todas'
       ? tables
       : tables.filter((t) => getTableLocation(t).toLowerCase() === activeLocation.toLowerCase())
+  }, [tables, activeLocation])
 
-  const tableCounts = locationTables.reduce(
-    (acc, t) => {
+  const tableCounts = useMemo(() => {
+    return locationTables.reduce((acc, t) => {
       acc[t.status] = (acc[t.status] ?? 0) + 1
       return acc
-    },
-    {} as Record<string, number>
-  )
+    }, {} as Record<string, number>)
+  }, [locationTables])
 
   const totalInLocation = locationTables.length
   const activeTable = tables.find((t) => t.id === activeTableId)

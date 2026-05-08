@@ -5,6 +5,7 @@ import { useAppContext } from '../context/AppContext'
 import type { ReservationFormData } from '../components/ReserveTableModal'
 import type { Table } from '../context/AppContext'
 import { locationsService } from '../services/locations.service'
+import { getStoredUser } from '../services'
 
 export type StateFilter = 'all' | 'Disponible' | 'Ocupada' | 'Esperando pago' | 'Reservada'
 
@@ -56,7 +57,14 @@ export function useWaiterLogic() {
   }, [])
 
   const LOCATIONS = useMemo(
-    () => ['Todas', ...Array.from(new Set(dbLocations)).sort()],
+    () => {
+      const hasVipTables = tables.some(t => t.type === 'vip')
+      const baseLocations = ['Todas', ...Array.from(new Set(dbLocations)).sort()]
+      if (hasVipTables && !baseLocations.includes('Zona VIP')) {
+        baseLocations.push('Zona VIP')
+      }
+      return baseLocations
+    },
     [tables, dbLocations]
   )
 
@@ -72,8 +80,10 @@ export function useWaiterLogic() {
 
   const filteredTables = useMemo(() => {
     return tables.filter((t) => {
+      const isVIPLocation = activeLocation.toLowerCase().includes('vip')
       const tableLoc = getTableLocation(t).toLowerCase()
-      const locationMatch = activeLocation === 'Todas' || tableLoc === activeLocation.toLowerCase()
+      const locationMatch = activeLocation === 'Todas' || 
+        (isVIPLocation ? t.type === 'vip' : tableLoc === activeLocation.toLowerCase() && t.type !== 'vip')
       return locationMatch && (stateFilter === 'all' || t.status === stateFilter)
     })
   }, [tables, activeLocation, stateFilter])
@@ -81,7 +91,7 @@ export function useWaiterLogic() {
   const locationTables = useMemo(() => {
     return activeLocation === 'Todas'
       ? tables
-      : tables.filter((t) => getTableLocation(t).toLowerCase() === activeLocation.toLowerCase())
+      : tables.filter((t) => activeLocation.toLowerCase().includes('vip') ? t.type === 'vip' : getTableLocation(t).toLowerCase() === activeLocation.toLowerCase() && t.type !== 'vip')
   }, [tables, activeLocation])
 
   const tableCounts = useMemo(() => {
@@ -120,7 +130,8 @@ export function useWaiterLogic() {
       const reservingTable = tables.find((t) => t.id === reservingTableId)
       const tableName = reservingTable?.name || 'Mesa'
       
-      await reserveTable(reservingTableId, {
+      const result: any = await reserveTable(reservingTableId, {
+        location: formData.location,
         clientName: formData.clientName,
         guestCount: formData.guestCount,
         date: formData.date,
@@ -128,12 +139,19 @@ export function useWaiterLogic() {
         vip: reservingTable?.type === 'vip' || false
       } as any)
 
+      const currentUser = getStoredUser()
+      const userName = currentUser ? `${currentUser.nombre} ${currentUser.apellido}` : 'Usuario'
+      const resCode = result?.codigo || `RES-${Math.floor(1000 + Math.random() * 9000)}`
+
       generateReservationPDF(
+        resCode,
         tableName,
+        formData.location,
         formData.clientName,
         formData.guestCount,
         formData.date,
-        formData.time
+        formData.time,
+        userName
       )
 
       setReservingTableId(null)

@@ -6,10 +6,11 @@ import {
   BarChart2,
   Crown,
   LogOut,
-  X
+  X,
+  UserCheck
 } from 'lucide-react'
 
-export type AdminView = 'dashboard' | 'tables' | 'menu' | 'users' | 'reports' | 'vip-clients'
+export type AdminView = 'dashboard' | 'tables' | 'menu' | 'users' | 'reports' | 'vip-clients' | 'waiters'
 
 interface SidebarProps {
   activeView: AdminView
@@ -24,6 +25,7 @@ const NAV_ITEMS: { view: AdminView; icon: React.ReactNode; label: string }[] = [
   { view: 'tables', icon: <UtensilsCrossed size={20} />, label: 'Mesas' },
   { view: 'menu', icon: <ChefHat size={20} />, label: 'Menú' },
   { view: 'users', icon: <Users size={20} />, label: 'Usuarios' },
+  { view: 'waiters', icon: <UserCheck size={20} />, label: 'Meseros Activos' },
   { view: 'reports', icon: <BarChart2 size={20} />, label: 'Reportes' },
   { view: 'vip-clients', icon: <Crown size={20} />, label: 'Clientes VIP' }
 ]

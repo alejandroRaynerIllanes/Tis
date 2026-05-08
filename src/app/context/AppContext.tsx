@@ -248,6 +248,19 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
       socket.on('mesas:updated', (payload: any) => {
         const items = Array.isArray(payload) ? payload : [payload]
+        
+        // 🛎️ FASE 4: Alerta de Cuenta Solicitada
+        items.forEach((item: any) => {
+          const newStatus = item.status || item.estado
+          if (newStatus === 'Cuenta Solicitada' || newStatus === 'Esperando pago') {
+            toast.info('¡Atención: Cuenta Solicitada!', {
+              description: `La ${item.name || item.numero || 'Mesa'} está esperando para pagar.`,
+              duration: 8000,
+              icon: '💳'
+            })
+          }
+        })
+
         setTables((current) => {
           const next = [...current]
           items.forEach((item: any) => {
@@ -278,6 +291,34 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const items = Array.isArray(payload) ? payload : [payload]
         const idsToRemove = new Set(items.map((item: any) => getTableId(item)))
         setTables((current) => current.filter((t: any) => !idsToRemove.has(getTableId(t))))
+      })
+
+      // 🛎️ FASE 4: Alerta de Pedido Listo (Cocina -> Mesero)
+      socket.on('mesas:alerta_listo', (payload: any) => {
+        toast.success('¡Pedido Listo para Recoger!', {
+          description: `El plato para la Mesa ${payload.mesaNombre || '?'} ya está terminado en cocina.`,
+          duration: 8000,
+          icon: '🔔'
+        })
+      })
+
+      // 🔄 Sincronización de Reservas entre múltiples meseros
+      socket.on('nueva_reserva', (r: any) => {
+        const { tableId, resInfo } = normalizarReserva(r)
+        setReservations((prev) => ({
+          ...prev,
+          [tableId]: [...(prev[tableId] || []), resInfo]
+        }))
+      })
+
+      socket.on('reserva_eliminada', (payload: { id: string, tableId: string }) => {
+        setReservations((prev) => {
+          const currentTableRes = prev[payload.tableId] || []
+          return {
+            ...prev,
+            [payload.tableId]: currentTableRes.filter(r => r.id !== payload.id)
+          }
+        })
       })
     } catch (err) {
       console.warn('Socket init failed', err)

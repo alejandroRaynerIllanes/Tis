@@ -13,9 +13,11 @@ import {
   CalendarDays,
   UserCheck,
   Crown,
+  Bell,
+  History
 } from 'lucide-react'
 import { useNavigate } from 'react-router'
-import { MouseEvent, useEffect } from 'react'
+import { MouseEvent, useEffect, useState } from 'react'
 
 import { TableStatus, Table, useAppContext } from '../context/AppContext'
 import { useWaiterLogic, getTableDisplayName, getTableLocation, type StateFilter, type TableWithFallbacks } from '../hooks/useWaiterLogic'
@@ -24,6 +26,8 @@ import { PaymentModal } from './PaymentModal'
 import { ReserveTableModal } from './ReserveTableModal'
 import { CancelReservationModal } from './CancelReservationModal'
 import { TableSidePanel } from './TableSidePanel'
+import { getStoredUser } from '../services/api'
+import { WaiterHistoryModal } from './WaiterHistoryModal'
 
 // ─── Tipos y helpers ─────────────────────────────────────────────────────────
 
@@ -224,6 +228,12 @@ export function WaiterView({
   const role = localStorage.getItem('userRole')
   const isAdmin = role === 'admin' || role === 'administrador'
 
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+
+  // Extraer el nombre real del mesero autenticado
+  const currentUser = getStoredUser()
+  const waiterName = currentUser ? `${currentUser.nombre} ${currentUser.apellido || ''}`.trim() : 'Mesero'
+
   const handleLogout = () => {
     localStorage.clear()
     navigate('/', { replace: true })
@@ -292,16 +302,26 @@ export function WaiterView({
               <ChefHat size={18} strokeWidth={2.5} className="text-white" />
             </div>
             <div className="flex flex-col items-start gap-0 leading-none">
-              <span className="font-black text-sm sm:text-[15px] tracking-wide text-white whitespace-nowrap">
-                Sabor &amp; Gestión
+            <span className="font-black text-sm sm:text-[16px] tracking-wide text-white whitespace-nowrap">
+              {waiterName}
               </span>
               <span className="text-[10px] sm:text-[11px] text-white/60 font-semibold uppercase tracking-widest mt-[3px] whitespace-nowrap">
-                Vista de Mesero
+              Sabor &amp; Gestión
               </span>
             </div>
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2">
+          {/* 🔔 Campana de Notificaciones */}
+          <button className="relative p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors text-white/80 hover:text-white mr-1 sm:mr-2">
+            <Bell size={18} />
+            <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 border-2 border-[#4B2E2D] rounded-full animate-pulse"></span>
+          </button>
+
+          <button onClick={() => setIsHistoryOpen(true)} className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors text-white/80 hover:text-white mr-1 sm:mr-2" title="Historial Diario">
+            <History size={18} />
+          </button>
+
             {isAdmin && (
               <button
                 onClick={() => navigate('/catalog')}
@@ -634,6 +654,11 @@ export function WaiterView({
         reservations={reservations}
         onClose={closeReservationsListModal}
         onCancelReservation={openCancelReservationModal}
+      />
+
+      <WaiterHistoryModal 
+        isOpen={isHistoryOpen} 
+        onClose={() => setIsHistoryOpen(false)} 
       />
     </div>
   )

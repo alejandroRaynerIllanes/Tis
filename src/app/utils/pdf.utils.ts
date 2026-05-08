@@ -1,11 +1,14 @@
 import jsPDF from 'jspdf'
 
 export const generateReservationPDF = (
+  reservationId: string,
   tableName: string,
+  location: string,
   clientName: string,
   guestCount: number,
   date: string,
-  time: string
+  time: string,
+  userName: string
 ) => {
   const doc = new jsPDF()
   const pageWidth = doc.internal.pageSize.getWidth()
@@ -49,6 +52,12 @@ export const generateReservationPDF = (
   doc.setFont('Helvetica', 'normal')
   doc.setFontSize(10)
 
+  doc.text(`ID Reserva: ${reservationId}`, leftMargin, yPosition)
+  yPosition += lineHeight
+
+  doc.text(`Ubicación: ${location}`, leftMargin, yPosition)
+  yPosition += lineHeight
+
   doc.text(`Mesa: ${tableName}`, leftMargin, yPosition)
   yPosition += lineHeight
 
@@ -66,7 +75,10 @@ export const generateReservationPDF = (
   yPosition += lineHeight
 
   doc.text(`Hora: ${time}`, leftMargin, yPosition)
-  yPosition += lineHeight + 5
+  yPosition += lineHeight
+
+  doc.text(`Registrado por: ${userName}`, leftMargin, yPosition)
+  yPosition += lineHeight + 4
 
   // Línea divisora
   doc.setDrawColor(220, 220, 220)
@@ -86,12 +98,10 @@ export const generateReservationPDF = (
   const time_now = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
   doc.text(`Emitido: ${today} a las ${time_now}`, leftMargin, yPosition)
 
-  // Número de confirmación (número aleatorio de 6 dígitos)
-  const confirmationNumber = Math.floor(100000 + Math.random() * 900000)
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2])
   doc.setFont('Helvetica', 'bold')
   doc.setFontSize(12)
-  doc.text(`Confirmación: #${confirmationNumber}`, pageWidth / 2, pageHeight - 20, {
+  doc.text(`Confirmación: ${reservationId}`, pageWidth / 2, pageHeight - 20, {
     align: 'center'
   })
 

@@ -99,7 +99,7 @@ export function TableSidePanel({
   // Lógica VIP
   const activeTableResArr = reservations[tableId] || []
   const hasVipReservation = activeTableResArr.some((r) => r.vip)
-  const isVipOrder = activeTable.type === 'vip' || hasVipReservation
+  const isVipOrder = activeTable.type === 'vip' // PUNTO 10: Separación estricta. Solo mesas de tipo VIP abren panel VIP.
   const vipClientNameGlobal = hasVipReservation
     ? activeTableResArr.find((r) => r.vip)?.clientName
     : undefined

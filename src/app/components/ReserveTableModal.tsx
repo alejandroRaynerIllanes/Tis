@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react'
-import { CalendarDays, Crown, UserCheck, Users, X } from 'lucide-react'
+import { CalendarDays, Crown, UserCheck, Users, X, MapPin, Clock } from 'lucide-react'
 import { Table } from '../context/AppContext'
+import { locationsService } from '../services/locations.service'
 
 export interface ReservationFormData {
+  location: string
   clientName: string
   guestCount: number
   date: string
@@ -22,30 +24,57 @@ export function ReserveTableModal({
   onClose,
   onConfirm
 }: ReserveTableModalProps) {
+  const [dbLocations, setDbLocations] = useState<{ id: string; name: string }[]>([])
+  
   const [reservationForm, setReservationForm] = useState<ReservationFormData>({
+    location: '',
     clientName: '',
     guestCount: 1,
     date: '',
     time: ''
   })
   
+  const [timeData, setTimeData] = useState({
+    hour: '07',
+    minute: '30',
+    ampm: 'PM'
+  })
+  
   const [reservationErrors, setReservationErrors] = useState<
     Partial<Record<keyof ReservationFormData, string>>
   >({})
+
+  // Cargar ubicaciones desde la base de datos
+  useEffect(() => {
+    locationsService.getAll().then(data => {
+      setDbLocations(data.map((l: any) => ({ id: l._id || l.id, name: l.nombre || l.name })))
+    }).catch(console.error)
+  }, [])
 
   // Reiniciar el formulario automáticamente al abrir el modal
   useEffect(() => {
     if (isOpen) {
       const today = new Date().toISOString().split('T')[0]
-      setReservationForm({ clientName: '', guestCount: 1, date: today, time: '' })
+      setReservationForm({ 
+        location: table?.location || '', 
+        clientName: '', 
+        guestCount: 1, 
+        date: today, 
+        time: '' 
+      })
+      setTimeData({ hour: '07', minute: '30', ampm: 'PM' })
       setReservationErrors({})
     }
-  }, [isOpen])
+  }, [isOpen, table])
 
   if (!isOpen || !table) return null
 
   const validateReservation = (): boolean => {
     const errs: Partial<Record<keyof ReservationFormData, string>> = {}
+
+    if (!reservationForm.location) {
+      errs.location = 'La ubicación es obligatoria.'
+    }
 
     const nombreLimpio = reservationForm.clientName.trim()
     if (!nombreLimpio) {
@@ -60,14 +89,14 @@ export function ReserveTableModal({
     }
 
     if (!reservationForm.date) errs.date = 'Selecciona una fecha.'
-    if (!reservationForm.time) errs.time = 'Selecciona una hora.'
     setReservationErrors(errs)
     return Object.keys(errs).length === 0
   }
 
   const handleConfirm = () => {
     if (validateReservation()) {
-      onConfirm(reservationForm)
+      const finalTime = `${timeData.hour}:${timeData.minute} ${timeData.ampm}`
+      onConfirm({ ...reservationForm, time: finalTime })
     }
   }
 
@@ -126,6 +155,32 @@ export function ReserveTableModal({
             </div>
           )}
 
+          {/* Ubicación */}
+          <div>
+            <label className="block text-xs font-black text-[#4B2E2D] uppercase tracking-wider mb-1.5">
+              Ubicación <span className="text-[#DC2626]">*</span>
+            </label>
+            <div className="relative">
+              <MapPin size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#D96C4A]" />
+              <select
+                value={reservationForm.location}
+                onChange={(e) => setReservationForm((f) => ({ ...f, location: e.target.value }))}
+                className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-base sm:text-sm font-semibold text-[#4B2E2D] focus:outline-none transition-all appearance-none bg-no-repeat ${reservationErrors.location ? 'border-red-400 bg-red-50 focus:border-red-500' : 'border-gray-200 bg-gray-50 focus:border-[#D96C4A] focus:bg-white'}`}
+                style={{ backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%234B2E2D%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
+              >
+                <option value="" disabled>Selecciona una ubicación</option>
+                {dbLocations.map(loc => (
+                  <option key={loc.id} value={loc.name}>{loc.name}</option>
+                ))}
+              </select>
+            </div>
+            {reservationErrors.location && (
+              <p className="text-red-500 text-[11px] font-semibold mt-1">
+                {reservationErrors.location}
+              </p>
+            )}
+          </div>
+
           {/* Nombre del cliente */}
           <div>
             <label className="block text-xs font-black text-[#4B2E2D] uppercase tracking-wider mb-1.5">
@@ -181,8 +236,37 @@ export function ReserveTableModal({
             </div>
             <div>
               <label className="block text-xs font-black text-[#4B2E2D] uppercase tracking-wider mb-1.5">Hora <span className="text-[#DC2626]">*</span></label>
-              <input type="time" value={reservationForm.time} onChange={(e) => setReservationForm((f) => ({ ...f, time: e.target.value }))} className={`w-full px-3 py-2.5 rounded-xl border text-base sm:text-sm font-semibold text-[#4B2E2D] focus:outline-none transition-all ${reservationErrors.time ? 'border-red-400 bg-red-50 focus:border-red-500' : 'border-gray-200 bg-gray-50 focus:border-[#D96C4A] focus:bg-white'}`} />
-              {reservationErrors.time && <p className="text-red-500 text-[11px] font-semibold mt-1">{reservationErrors.time}</p>}
+              <div className={`flex items-center w-full px-2 py-2 rounded-xl border text-base sm:text-sm font-semibold text-[#4B2E2D] transition-all bg-gray-50 focus-within:border-[#D96C4A] focus-within:bg-white`}>
+                <Clock size={16} className="text-[#D96C4A] shrink-0 ml-1 mr-1" />
+                <select 
+                  value={timeData.hour} 
+                  onChange={(e) => setTimeData(prev => ({...prev, hour: e.target.value}))}
+                  className="bg-transparent focus:outline-none appearance-none cursor-pointer p-0.5 text-center"
+                >
+                  {Array.from({length: 12}, (_, i) => {
+                    const h = String(i + 1).padStart(2, '0')
+                    return <option key={h} value={h}>{h}</option>
+                  })}
+                </select>
+                <span className="font-bold mx-0.5">:</span>
+                <select 
+                  value={timeData.minute} 
+                  onChange={(e) => setTimeData(prev => ({...prev, minute: e.target.value}))}
+                  className="bg-transparent focus:outline-none appearance-none cursor-pointer p-0.5 text-center"
+                >
+                  {['00', '15', '30', '45'].map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+                <select 
+                  value={timeData.ampm} 
+                  onChange={(e) => setTimeData(prev => ({...prev, ampm: e.target.value}))}
+                  className="ml-auto bg-transparent focus:outline-none appearance-none cursor-pointer font-black text-[#D96C4A] p-0.5 text-right"
+                >
+                  <option value="AM">AM</option>
+                  <option value="PM">PM</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>

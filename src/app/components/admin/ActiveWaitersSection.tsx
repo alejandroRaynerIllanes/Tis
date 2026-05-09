@@ -21,7 +21,7 @@ export function ActiveWaitersSection() {
         const enrichedWaiters = waiters.map((waiter: any) => {
           const myOrders = todaysOrders.filter((o: any) => o.usuario?._id === waiter._id || o.usuario === waiter._id)
           
-          const activeOrders = myOrders.filter((o: any) => ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO'].includes(o.estado))
+          const activeOrders = myOrders.filter((o: any) => ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO', 'SERVIDO'].includes(o.estado))
           const closedOrders = myOrders.filter((o: any) => o.estado === 'CERRADO')
           
           const totalSold = closedOrders.reduce((sum: number, o: any) => sum + (o.total || 0), 0)

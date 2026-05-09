@@ -33,7 +33,7 @@ export function VIPManagement() {
       try {
         const ordersData = await ordersService.getAll()
         const activeOrders = ordersData
-          .filter((o: any) => o.estado !== 'CANCELADO' && o.estado !== 'CERRADO')
+          .filter((o: any) => ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO'].includes(o.estado))
           .map((o: any) => ({
             id: o.codigo || o._id,
             tableId: o.mesa?._id || '?',

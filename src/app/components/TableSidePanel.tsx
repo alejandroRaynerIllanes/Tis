@@ -64,7 +64,7 @@ export function TableSidePanel({
       
       // Buscar si la mesa tiene un pedido en estado "Listo/ENTREGADO" en la cocina
       ordersService.getAll().then((all: any[]) => {
-        const active = all.find((o: any) => (o.mesa?._id === tableId || o.mesa === tableId) && ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO'].includes(o.estado))
+        const active = all.find((o: any) => (o.mesa?._id === tableId || o.mesa === tableId) && ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO', 'SERVIDO'].includes(o.estado))
         setBackendOrder(active)
       }).catch(() => {})
     }
@@ -377,20 +377,6 @@ export function TableSidePanel({
         {/* FOOTER (Acciones) */}
         {activeTable.status !== 'Esperando pago' && activeOrder.length > 0 && (
           <div className="p-5 sm:p-6 bg-white border-t border-[#FCE4D6]/60 shadow-[0_-8px_20px_-10px_rgba(0,0,0,0.1)] shrink-0 flex flex-col gap-3">
-            
-            {/* 🔴 NUEVO: Botón para Recoger Pedido y limpiar cocina */}
-            {backendOrder?.estado === 'ENTREGADO' && (
-              <button
-                onClick={async () => {
-                  await ordersService.updateStatus(backendOrder._id || backendOrder.id, 'SERVIDO');
-                  setBackendOrder({...backendOrder, estado: 'SERVIDO'});
-                  toast.success('Pedido recogido y entregado al cliente', { description: 'La cocina ha sido notificada.' });
-                }}
-                className="w-full mb-2 py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black shadow-lg shadow-emerald-500/20 transition-all text-[15px] flex items-center justify-center gap-2"
-              >
-                <CheckCircle2 size={20} /> Recoger Pedido Listo
-              </button>
-            )}
 
             {isVipOrder && (
               <div className="flex items-center gap-2.5 bg-gradient-to-r from-[#2C1A0E] to-[#4B2E2D] rounded-xl px-3.5 py-2.5 -mt-1">
@@ -423,7 +409,16 @@ export function TableSidePanel({
               {!viewingMenu && !showSummary && activeTable.status === 'Ocupada' && (
                 <>
                   <button onClick={handlePrintOrder} className="w-full py-3 rounded-2xl bg-white border-2 border-[#6B3E2E] text-[#4B2E2D] hover:bg-[#F5E6D3] font-bold transition-all text-[14px] flex items-center justify-center gap-2"><Printer size={18} /> Imprimir Pedido</button>
-                  <button onClick={() => requestBill(tableId)} className="w-full py-4 rounded-2xl bg-[#D96C4A] hover:bg-[#C25838] text-white font-black shadow-lg shadow-[#D96C4A]/20 transition-all text-[15px] flex items-center justify-center gap-2"><Receipt size={20} /> Pedir Cuenta</button>
+                  {backendOrder?.estado === 'ENTREGADO' && (
+                    <button onClick={async () => {
+                      await ordersService.updateStatus(backendOrder._id || backendOrder.id, 'SERVIDO');
+                      setBackendOrder({...backendOrder, estado: 'SERVIDO'});
+                      toast.success('Pedido entregado al cliente', { description: 'Ya puedes pedir la cuenta.' });
+                    }} className="w-full py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black shadow-lg shadow-emerald-500/20 transition-all text-[15px] flex items-center justify-center gap-2"><CheckCircle2 size={20} /> Confirmar Entrega (Respaldo)</button>
+                  )}
+                  {backendOrder?.estado === 'SERVIDO' && (
+                    <button onClick={() => requestBill(tableId)} className="w-full py-4 rounded-2xl bg-[#D96C4A] hover:bg-[#C25838] text-white font-black shadow-lg shadow-[#D96C4A]/20 transition-all text-[15px] flex items-center justify-center gap-2"><Receipt size={20} /> Pedir Cuenta</button>
+                  )}
                   <button onClick={handleClearOrder} className="w-full py-3.5 rounded-2xl bg-[#FEF2F2] border border-[#FECACA] text-[#DC2626] hover:bg-[#FEE2E2] hover:text-[#B91C1C] font-bold transition-all text-[15px] flex items-center justify-center gap-2 mt-1"><Trash2 size={18} /> Cancelar Pedido Completo</button>
                 </>
               )}

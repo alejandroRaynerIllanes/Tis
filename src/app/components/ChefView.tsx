@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
-import { ChefHat, Clock, Play, CheckCircle2, Flame, AlertCircle, LogOut, User } from 'lucide-react'
+import { ChefHat, Clock, Play, CheckCircle2, Flame, AlertCircle, LogOut, User, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router'
 import { io } from 'socket.io-client'
-import { getToken, getStoredUser } from '../services/api'
+import { getToken, getStoredUser, api } from '../services/api'
 import { ordersService } from '../services/orders.service'
 
 type OrderStatus = 'Pendiente' | 'En preparación' | 'Listo'
@@ -112,6 +112,28 @@ export function ChefView() {
     navigate('/', { replace: true })
   }
 
+  // 🧹 Botón temporal para limpiar los pedidos específicos que quedaron atascados
+  const cleanStuckOrders = async () => {
+    const codesToClean = ['PED-CFC9', 'PED-D2E8', 'PED-7BB0', 'PED-7BAD']
+    let count = 0;
+    for (const order of orders) {
+      if (codesToClean.includes(order.id) && order.rawId) {
+        try {
+          await api.patch(`/pedidos/${order.rawId}/cancel`)
+          setOrders((prev) => prev.filter(o => o.rawId !== order.rawId))
+          count++;
+        } catch (e) {
+          toast.error(`Error al eliminar ${order.id}`)
+        }
+      }
+    }
+    if (count > 0) {
+      toast.success(`${count} pedidos atascados eliminados y mesas liberadas.`)
+    } else {
+      toast.info('Esos pedidos ya no están activos o ya fueron eliminados.')
+    }
+  }
+
   // Componente interno para renderizar cada Tarjeta de Pedido
   const OrderCard = ({ order }: { order: Order }) => (
     <div
@@ -218,13 +240,22 @@ export function ChefView() {
           </div>
         </div>
 
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-2 px-4 py-2.5 bg-white/50 hover:bg-red-50 text-red-600 hover:text-red-700 rounded-xl font-bold transition-colors shadow-sm border border-red-100"
-        >
-          <LogOut size={18} />
-          <span className="hidden sm:inline">Salir</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={cleanStuckOrders}
+            className="flex items-center justify-center p-2.5 bg-white/50 hover:bg-orange-50 text-orange-600 hover:text-orange-700 rounded-xl transition-colors shadow-sm border border-orange-100"
+            title="Limpiar pedidos atascados (PED-CFC9, etc.)"
+          >
+            <Trash2 size={18} />
+          </button>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white/50 hover:bg-red-50 text-red-600 hover:text-red-700 rounded-xl font-bold transition-colors shadow-sm border border-red-100"
+          >
+            <LogOut size={18} />
+            <span className="hidden sm:inline">Salir</span>
+          </button>
+        </div>
       </header>
 
       {/* Tablero Kanban */}

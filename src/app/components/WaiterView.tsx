@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { MouseEvent, useEffect, useState } from 'react'
+import { toast } from 'sonner'
 
 import { TableStatus, Table, useAppContext } from '../context/AppContext'
 import { useWaiterLogic, getTableDisplayName, getTableLocation, type StateFilter, type TableWithFallbacks } from '../hooks/useWaiterLogic'
@@ -250,6 +251,7 @@ export function WaiterView({
     if (n.meta?.actionType === 'deliver_order' && n.meta?.pedidoId) {
       try {
         await ordersService.updateStatus(n.meta.pedidoId, 'SERVIDO')
+        toast.success('Pedido entregado al cliente', { description: 'Ya puedes solicitar la cuenta desde la mesa.' })
       } catch (err) {
         console.error(err)
       }

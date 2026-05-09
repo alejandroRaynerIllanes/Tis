@@ -120,17 +120,32 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   // 🚀 REPARACIÓN CRÍTICA: Función para inicializar Sockets SOLO cuando ya hay sesión
   const initSocket = useCallback(() => {
-    if (socketRef.current) return // Si ya está conectado, no hace nada
     const token = getToken()
     if (!token) return // Si no hay token, aborta
+
+    if (socketRef.current) {
+      // Actualizamos el token en la instancia existente por si el usuario cambió de sesión
+      socketRef.current.auth = { token }
+      if (!socketRef.current.connected) {
+        console.log('🔄 Forzando reconexión del socket...');
+        socketRef.current.connect()
+      }
+      return
+    }
 
     const baseApi = (import.meta as any).env.VITE_API_URL || 'http://localhost:3000/api'
     const socketUrl = baseApi.replace(/\/api\/?$/, '')
 
     try {
-      const socket = io(socketUrl, { auth: { token } })
+      const socket = io(socketUrl, { 
+        auth: { token },
+        reconnection: true,
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 2000
+      })
       socketRef.current = socket
-      socket.on('connect', () => console.log('Socket conectado correctamente:', socket.id))
+      socket.on('connect', () => console.log('🟢 Socket conectado correctamente:', socket.id))
+      socket.on('disconnect', (reason) => console.warn('🔴 Socket desconectado:', reason))
 
       socket.on('mesas:created', (payload: any) => {
         setTables((current) => {
@@ -198,28 +213,37 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       })
 
       socket.on('mesas:alerta_listo', (payload: any) => {
+        console.log('🔔 [WEBSOCKET] Alerta de pedido listo recibida en frontend:', payload);
         toast.success('¡Pedido Listo para Recoger!', {
           description: `El plato para la Mesa ${payload.mesaNombre || '?'} ya está terminado en cocina.`,
           duration: 15000,
           icon: '🔔',
           action: {
             label: '✔ Entregado',
-            onClick: () => { ordersService.updateStatus(payload.pedidoId, 'SERVIDO').catch(console.error) }
+            onClick: () => { 
+              ordersService.updateStatus(payload.pedidoId, 'SERVIDO')
+                .then(() => toast.success('Pedido entregado', { description: 'Ya puedes cobrar la cuenta.' }))
+                .catch(console.error) 
+            }
           }
         })
-        setNotifications((prev) => [{
-          id: Date.now().toString() + Math.random(),
-          title: 'Pedido Listo',
-          message: `El plato de la Mesa ${payload.mesaNombre || '?'} ya está terminado en cocina.`,
-          time: new Date(),
-          read: false,
-          type: 'success',
-          meta: {
-            pedidoId: payload.pedidoId,
-            tableId: payload.mesaId,
-            actionType: 'deliver_order'
-          }
-        }, ...prev])
+        setNotifications((prev) => {
+          // Evitar duplicar notificaciones idénticas si el socket dispara dos veces rápido
+          if (prev.some(n => n.meta?.pedidoId === payload.pedidoId && n.title === 'Pedido Listo')) return prev;
+          return [{
+            id: Date.now().toString() + Math.random(),
+            title: 'Pedido Listo',
+            message: `El plato de la Mesa ${payload.mesaNombre || '?'} ya está terminado en cocina.`,
+            time: new Date(),
+            read: false,
+            type: 'success',
+            meta: {
+              pedidoId: payload.pedidoId,
+              tableId: payload.mesaId,
+              actionType: 'deliver_order'
+            }
+          }, ...prev]
+        })
       })
 
       socket.on('nueva_reserva', (r: any) => {
@@ -275,7 +299,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
       // Sincronizar órdenes activas desde el backend
       if (Array.isArray(fetchedOrders)) {
-        const activeOrders = fetchedOrders.filter((o: any) => o.estado === 'ABIERTO' || o.estado === 'EN_PREPARACION' || o.estado === 'ENTREGADO')
+        const activeOrders = fetchedOrders.filter((o: any) => o.estado === 'ABIERTO' || o.estado === 'EN_PREPARACION' || o.estado === 'ENTREGADO' || o.estado === 'SERVIDO')
         const ordersMap: Record<string, OrderItem[]> = {}
         
         activeOrders.forEach((o: any) => {
@@ -555,7 +579,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const clearOrder = async (tableId: string) => {
     try {
       const allOrders = await ordersService.getAll()
-      const tableOrder = allOrders.find((o: any) => (o.mesa?._id === tableId || o.mesa === tableId) && ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO'].includes(o.estado))
+      const tableOrder = allOrders.find((o: any) => (o.mesa?._id === tableId || o.mesa === tableId) && ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO', 'SERVIDO'].includes(o.estado))
       if (tableOrder) {
         await ordersService.updateStatus(tableOrder._id || tableOrder.id, 'CANCELADO')
       }
@@ -649,7 +673,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const allOrders = await ordersService.getAll()
         const existingOrder = allOrders.find((o: any) => 
           (o.mesa?._id === tableId || o.mesa === tableId) && 
-          ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO'].includes(o.estado)
+          ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO', 'SERVIDO'].includes(o.estado)
         )
 
         if (existingOrder) {

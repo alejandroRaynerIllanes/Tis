@@ -6,6 +6,8 @@ import type { ReservationFormData } from '../components/ReserveTableModal'
 import type { Table } from '../context/AppContext'
 import { locationsService } from '../services/locations.service'
 import { getStoredUser } from '../services'
+import { api } from '../services/api'
+import { ordersService } from '../services/orders.service'
 
 export type StateFilter = 'all' | 'Disponible' | 'Ocupada' | 'Esperando pago' | 'Reservada'
 
@@ -60,10 +62,12 @@ export function useWaiterLogic() {
     () => {
       const hasVipTables = tables.some(t => t.type === 'vip')
       const baseLocations = ['Todas', ...Array.from(new Set(dbLocations)).sort()]
-      if (hasVipTables && !baseLocations.includes('Zona VIP')) {
-        baseLocations.push('Zona VIP')
+      // Eliminamos cualquier 'Zona VIP' repetida y unificamos bajo 'VIP'
+      const cleanedLocations = baseLocations.filter(loc => loc.toLowerCase() !== 'zona vip' && loc.toLowerCase() !== 'vip')
+      if (hasVipTables) {
+        cleanedLocations.push('VIP')
       }
-      return baseLocations
+      return cleanedLocations
     },
     [tables, dbLocations]
   )
@@ -80,10 +84,10 @@ export function useWaiterLogic() {
 
   const filteredTables = useMemo(() => {
     return tables.filter((t) => {
-      const isVIPLocation = activeLocation.toLowerCase().includes('vip')
+      const isVIPLocation = activeLocation.toLowerCase() === 'vip'
       const tableLoc = getTableLocation(t).toLowerCase()
       const locationMatch = activeLocation === 'Todas' || 
-        (isVIPLocation ? t.type === 'vip' : tableLoc === activeLocation.toLowerCase() && t.type !== 'vip')
+        (isVIPLocation ? t.type === 'vip' : tableLoc === activeLocation.toLowerCase())
       return locationMatch && (stateFilter === 'all' || t.status === stateFilter)
     })
   }, [tables, activeLocation, stateFilter])
@@ -91,7 +95,7 @@ export function useWaiterLogic() {
   const locationTables = useMemo(() => {
     return activeLocation === 'Todas'
       ? tables
-      : tables.filter((t) => activeLocation.toLowerCase().includes('vip') ? t.type === 'vip' : getTableLocation(t).toLowerCase() === activeLocation.toLowerCase() && t.type !== 'vip')
+      : tables.filter((t) => activeLocation.toLowerCase() === 'vip' ? t.type === 'vip' : getTableLocation(t).toLowerCase() === activeLocation.toLowerCase())
   }, [tables, activeLocation])
 
   const tableCounts = useMemo(() => {
@@ -194,8 +198,21 @@ export function useWaiterLogic() {
   const openPaymentModal = () => setShowPaymentModal(true)
   const closePaymentModal = () => setShowPaymentModal(false)
 
-  const handleProcessPayment = (method: string) => {
+  const handleProcessPayment = async (method: string, discountPercent: number, tipPercent: number) => {
     if (!activeTableId) return
+
+    try {
+      const allOrders = await ordersService.getAll()
+      const tableOrder = allOrders.find((o: any) => (o.mesa?._id === activeTableId || o.mesa === activeTableId) && ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO', 'SERVIDO'].includes(o.estado))
+      if (tableOrder) {
+        await api.post(`/pagos/procesar-final/${tableOrder._id || tableOrder.id}`, {
+          metodoPago: method,
+          porcentajeDescuento: discountPercent,
+          porcentajePropina: tipPercent
+        })
+      }
+    } catch (e) { console.error('Error al procesar pago en BD', e) }
+
     closeTable(activeTableId)
     setActiveTableId(null)
     setMenuPanelOpen(false)

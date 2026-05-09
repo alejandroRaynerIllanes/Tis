@@ -54,7 +54,8 @@ export function ChefView() {
     const fetchOrders = async () => {
       try {
         const data = await ordersService.getAll()
-        const activeOrders = data.filter((o: any) => o.estado !== 'CANCELADO' && o.estado !== 'CERRADO')
+        // SOLO se muestran pedidos activos reales
+        const activeOrders = data.filter((o: any) => ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO'].includes(o.estado))
         setOrders(activeOrders.map(formatOrder))
       } catch (err) {
         console.error('Error fetching orders', err)
@@ -74,7 +75,16 @@ export function ChefView() {
     })
 
     socket.on('cocina:actualizar_tablero', (o: any) => {
-      setOrders(prev => prev.map(ord => ord.rawId === o._id ? formatOrder(o) : ord))
+      // Si el pedido fue cancelado, cobrado o entregado al cliente, desaparece de la vista
+      if (['CANCELADO', 'CERRADO', 'SERVIDO'].includes(o.estado)) {
+        setOrders(prev => prev.filter(ord => ord.rawId !== o._id))
+      } else {
+        setOrders(prev => {
+          const exists = prev.find(ord => ord.rawId === o._id)
+          if (exists) return prev.map(ord => ord.rawId === o._id ? formatOrder(o) : ord)
+          return [formatOrder(o), ...prev]
+        })
+      }
     })
 
     return () => { socket.disconnect() }
@@ -195,15 +205,15 @@ export function ChefView() {
   return (
     <div className="h-[100dvh] bg-[#FCE4D6]/30 flex flex-col overflow-hidden">
       {/* Cabecera */}
-      <header className="px-6 sm:px-10 py-4 sm:py-6 shrink-0 bg-[#FCE4D6]/90 backdrop-blur-md z-10 border-b border-[#E57C5D]/20 flex items-center justify-between shadow-sm">
+      <header className="px-6 sm:px-10 py-6 shrink-0 bg-[#FCE4D6]/90 backdrop-blur-md z-10 border-b border-[#E57C5D]/20 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-[#D0543A] rounded-2xl flex items-center justify-center text-white shadow-lg shadow-[#D0543A]/30 shrink-0">
             <ChefHat size={26} />
           </div>
           <div>
             <h1 className="text-xl sm:text-3xl font-black text-[#4B2E2D]">Cocina (KDS)</h1>
-            <p className="text-[#4B2E2D]/70 font-medium text-sm">
-              Panel de control • Chef: {chefName}
+            <p className="text-[#4B2E2D]/70 font-medium text-sm mt-1">
+              <span className="bg-white px-3 py-1 rounded-lg border border-[#E57C5D]/30 shadow-sm font-black text-[#D0543A]">👨‍🍳 Chef: {chefName}</span>
             </p>
           </div>
         </div>
@@ -218,7 +228,7 @@ export function ChefView() {
       </header>
 
       {/* Tablero Kanban */}
-      <div className="flex-1 p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 overflow-y-auto lg:overflow-hidden min-h-0">
+      <div className="flex-1 p-6 sm:p-10 grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8 overflow-y-auto lg:overflow-hidden min-h-0">
         {/* Columna 1: Pendientes */}
         <div className="flex flex-col bg-white/50 rounded-3xl border-2 border-yellow-200/50 h-[500px] lg:h-full overflow-hidden shadow-sm">
           <div className="flex items-center justify-between p-4 sm:p-5 border-b border-yellow-200/50 shrink-0 bg-white/40">

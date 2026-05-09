@@ -24,7 +24,7 @@ interface PaymentItem {
 interface PaymentModalProps {
   isOpen: boolean
   onClose: () => void
-  onProcessPayment: (method: string) => void
+  onProcessPayment: (method: string, discountPercent: number, tipPercent: number) => void
   tableName: string
   activeOrder: PaymentItem[]
   orderTotal: number
@@ -67,7 +67,7 @@ export function PaymentModal({
       setSelectedPaymentMethod(null)
       setDiscountPercent(0)
       setTipPercent(0)
-      onProcessPayment(selectedPaymentMethod)
+      onProcessPayment(selectedPaymentMethod, discountPercent, tipPercent)
     }, 1500)
   }
 

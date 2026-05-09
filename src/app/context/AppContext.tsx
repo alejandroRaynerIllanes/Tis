@@ -25,11 +25,21 @@ import {
 // Re-export types for backward compatibility
 export type { Product, ProductStatus, Table, TableStatus, OrderItem, ReservationInfo }
 
+export interface AppNotification {
+  id: string
+  title: string
+  message: string
+  time: Date
+  read: boolean
+  type: 'success' | 'warning'
+}
+
 interface AppContextType {
   products: Product[]
   tables: Table[]
   orders: Record<string, OrderItem[]>
   reservations: Record<string, ReservationInfo[]>
+  notifications: AppNotification[]
   updateProductStatus: (id: string, status: ProductStatus) => void
   updateTableStatus: (id: string, status: TableStatus) => void
   addOrderItem: (tableId: string, product: Product) => void
@@ -43,6 +53,8 @@ interface AppContextType {
   reserveTable: (tableId: string, info: Omit<ReservationInfo, 'id' | 'endTime'>) => void
   cancelReservation: (tableId: string, reservationId: string) => void
   getActiveReservation: (tableId: string) => ReservationInfo | null
+  markNotificationAsRead: (id: string) => void
+  clearNotifications: () => void
   setProducts: React.Dispatch<React.SetStateAction<Product[]>>
   setTables: React.Dispatch<React.SetStateAction<Table[]>>
   createTable: (payload: {
@@ -95,6 +107,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [tables, setTables] = useState<Table[]>([])
   const [orders, setOrders] = useState<Record<string, OrderItem[]>>({})
   const [reservations, setReservations] = useState<Record<string, ReservationInfo[]>>({})
+  const [notifications, setNotifications] = useState<AppNotification[]>([])
 
   // Cargador maestro sincronizado
   const loadInitialData = useCallback(async () => {
@@ -258,6 +271,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
               duration: 8000,
               icon: '💳'
             })
+            
+            setNotifications((prev) => [{
+              id: Date.now().toString() + Math.random(),
+              title: 'Cuenta Solicitada',
+              message: `La ${item.name || item.numero || 'Mesa'} está esperando para pagar.`,
+              time: new Date(),
+              read: false,
+              type: 'warning'
+            }, ...prev])
           }
         })
 
@@ -297,9 +319,25 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       socket.on('mesas:alerta_listo', (payload: any) => {
         toast.success('¡Pedido Listo para Recoger!', {
           description: `El plato para la Mesa ${payload.mesaNombre || '?'} ya está terminado en cocina.`,
-          duration: 8000,
-          icon: '🔔'
+          duration: 15000,
+          icon: '🔔',
+          action: {
+            label: '✔ Entregado',
+            onClick: () => {
+              // Cambia el estado a SERVIDO, lo que lo borra de la cocina automáticamente
+              ordersService.updateStatus(payload.pedidoId, 'SERVIDO').catch(console.error)
+            }
+          }
         })
+        
+        setNotifications((prev) => [{
+          id: Date.now().toString() + Math.random(),
+          title: 'Pedido Listo',
+          message: `El plato de la Mesa ${payload.mesaNombre || '?'} ya está terminado en cocina.`,
+          time: new Date(),
+          read: false,
+          type: 'success'
+        }, ...prev])
       })
 
       // 🔄 Sincronización de Reservas entre múltiples meseros
@@ -330,6 +368,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       } catch (e) {}
     }
   }, [])
+
+  const markNotificationAsRead = (id: string) => {
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)))
+  }
+
+  const clearNotifications = () => {
+    setNotifications([])
+  }
 
   const updateProductStatus = (id: string, status: ProductStatus) => {
     setProducts(products.map((p) => (p.id === id ? { ...p, status } : p)))
@@ -491,7 +537,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     })
   }
 
-  const clearOrder = (tableId: string) => {
+  const clearOrder = async (tableId: string) => {
+    try {
+      const allOrders = await ordersService.getAll()
+      const tableOrder = allOrders.find((o: any) => (o.mesa?._id === tableId || o.mesa === tableId) && ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO'].includes(o.estado))
+      if (tableOrder) {
+        await ordersService.updateStatus(tableOrder._id || tableOrder.id, 'CANCELADO')
+      }
+    } catch (e) { console.error('Error al cancelar pedido en BD', e) }
+
     setOrders((prev) => {
       const newOrders = { ...prev }
       delete newOrders[tableId]
@@ -696,6 +750,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     tables,
     orders,
     reservations,
+    notifications,
     updateProductStatus,
     updateTableStatus,
     addOrderItem,
@@ -709,6 +764,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     reserveTable,
     cancelReservation,
     getActiveReservation,
+    markNotificationAsRead,
+    clearNotifications,
     setProducts,
     setTables,
     createTable,

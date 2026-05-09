@@ -1,5 +1,11 @@
 import { Download, FileText } from 'lucide-react'
-import { REPORTS_LIST } from '../../data/mock-data'
+
+const REPORTS_LIST = [
+  { id: 1, name: 'Reporte Diario de Ventas', description: 'Resumen de todas las ventas, propinas y descuentos del día.', icon: FileText },
+  { id: 2, name: 'Rendimiento de Meseros', description: 'Estadísticas de mesas atendidas y ventas por personal.', icon: FileText },
+  { id: 3, name: 'Platos Más Vendidos', description: 'Ranking del menú con cantidades y categorías.', icon: FileText },
+  { id: 4, name: 'Reporte de Clientes VIP', description: 'Historial de visitas y consumo de clientes preferenciales.', icon: FileText }
+]
 
 export function ReportsSection() {
   return (

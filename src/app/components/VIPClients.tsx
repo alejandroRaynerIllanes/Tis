@@ -13,45 +13,12 @@ import {
   Shield,
   Settings
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { toast } from 'sonner'
 import { useAppContext } from '../context/AppContext'
 import { VIPManagement } from './VIPManagement'
 
 // ─── Mock data ───────────────────────────────────────────────────────────────
-
-const VIP_CLIENTS_LIST = [
-  {
-    id: 1,
-    name: 'Alex Martínez',
-    email: 'alex@email.com',
-    plan: 'VIP Anual',
-    since: '2024-01-15',
-    orders: 47,
-    totalSpent: 'Bs. 3,420',
-    status: 'Activo'
-  },
-  {
-    id: 2,
-    name: 'Axel Rodríguez',
-    email: 'axel@email.com',
-    plan: 'VIP Mensual',
-    since: '2024-08-03',
-    orders: 19,
-    totalSpent: 'Bs. 1,180',
-    status: 'Activo'
-  },
-  {
-    id: 3,
-    name: 'Pedro Gómez',
-    email: 'pedro@email.com',
-    plan: 'VIP Anual',
-    since: '2023-11-20',
-    orders: 63,
-    totalSpent: 'Bs. 5,105',
-    status: 'Activo'
-  }
-]
 
 const PLANS = [
   {
@@ -220,8 +187,28 @@ function PriorityIndicator() {
 // ─── Main component ──────────────────────────────────────────────────────────
 
 export function VIPClients() {
-  const { tables } = useAppContext()
+  const { tables, reservations } = useAppContext()
   const vipTablesCount = tables.filter((t) => t.type === 'vip').length
+
+  // Extraer clientes VIP directamente de las reservas activas (100% real)
+  const dynamicVipClients = useMemo(() => {
+    const map = new Map();
+    Object.values(reservations).flat().forEach((r, idx) => {
+      if (r.vip && !map.has(r.clientName.toLowerCase())) {
+        map.set(r.clientName.toLowerCase(), {
+          id: r.id || idx,
+          name: r.clientName,
+          email: 'cliente@vip.com',
+          plan: 'VIP',
+          since: new Date().toISOString().split('T')[0],
+          orders: 1,
+          totalSpent: 'Bs. ---',
+          status: 'Activo'
+        })
+      }
+    });
+    return Array.from(map.values());
+  }, [reservations]);
 
   const [activeTab, setActiveTab] = useState<
     'subscription' | 'clients' | 'priority' | 'management'
@@ -257,7 +244,7 @@ export function VIPClients() {
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-2 bg-white rounded-xl px-4 py-2.5 shadow-sm border border-[#E0D0C5]">
               <Crown size={14} className="text-amber-500" />
-              <span className="text-sm font-black text-[#4B2E2D]">{VIP_CLIENTS_LIST.length}</span>
+              <span className="text-sm font-black text-[#4B2E2D]">{dynamicVipClients.length}</span>
               <span className="text-xs font-medium text-[#4B2E2D]/55">VIPs activos</span>
             </div>
             <div className="flex items-center gap-2 bg-white rounded-xl px-4 py-2.5 shadow-sm border border-[#E0D0C5]">
@@ -501,19 +488,19 @@ export function VIPClients() {
               {[
                 {
                   label: 'Clientes VIP',
-                  value: VIP_CLIENTS_LIST.length,
+                  value: dynamicVipClients.length,
                   icon: <Crown size={16} className="text-amber-500" />,
                   color: 'bg-amber-50 border-amber-200'
                 },
                 {
                   label: 'Órdenes totales',
-                  value: VIP_CLIENTS_LIST.reduce((a, c) => a + c.orders, 0),
+                  value: dynamicVipClients.reduce((a, c) => a + c.orders, 0),
                   icon: <ChefHat size={16} className="text-[#D96C4A]" />,
                   color: 'bg-[#FCE4D6] border-[#E0D0C5]'
                 },
                 {
                   label: 'Plan mensual',
-                  value: VIP_CLIENTS_LIST.filter((c) => c.plan === 'VIP Mensual').length,
+                  value: dynamicVipClients.filter((c) => c.plan === 'VIP Mensual').length,
                   icon: <Star size={16} className="text-[#4B2E2D]" />,
                   color: 'bg-white border-[#E0D0C5]'
                 }
@@ -538,11 +525,11 @@ export function VIPClients() {
               <div className="px-5 py-4 border-b border-[#FCE4D6] flex items-center justify-between">
                 <h3 className="font-black text-[#4B2E2D] text-base">Clientes VIP Activos</h3>
                 <span className="bg-[#FCE4D6] text-[#4B2E2D] text-xs font-black px-3 py-1 rounded-full">
-                  {VIP_CLIENTS_LIST.length} registros
+                  {dynamicVipClients.length} registros
                 </span>
               </div>
               <div className="divide-y divide-[#FCE4D6]">
-                {VIP_CLIENTS_LIST.map((client) => (
+                {dynamicVipClients.map((client) => (
                   <div
                     key={client.id}
                     className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4 hover:bg-[#FCE4D6]/30 transition-colors"
@@ -597,6 +584,11 @@ export function VIPClients() {
                     </div>
                   </div>
                 ))}
+                {dynamicVipClients.length === 0 && (
+                  <div className="p-8 text-center text-[#4B2E2D]/50 font-bold">
+                    Aún no hay clientes VIP con reservas activas.
+                  </div>
+                )}
               </div>
             </div>
 

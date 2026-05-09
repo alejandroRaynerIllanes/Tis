@@ -10,21 +10,22 @@ interface WaiterHistoryModalProps {
 export function WaiterHistoryModal({ isOpen, onClose }: WaiterHistoryModalProps) {
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
 
   useEffect(() => {
     if (isOpen) {
       fetchHistory()
     }
-  }, [isOpen])
+  }, [isOpen, selectedDate])
 
   const fetchHistory = async () => {
     setLoading(true)
     try {
-      // Optimización: Solo trae de la red los pedidos de hoy, reduciendo carga útil
-      const todaysOrders = await api.get<any[]>('/pedidos?hoy=true')
+      // Filtra por la fecha seleccionada en el calendario
+      const selectedOrders = await api.get<any[]>(`/pedidos?fecha=${selectedDate}`)
       const currentUser = getStoredUser()
       
-      const history = todaysOrders.filter((o: any) => {
+      const history = selectedOrders.filter((o: any) => {
         const isMyOrder = o.usuario?._id === currentUser?.id || o.usuario === currentUser?.id
         const isCompleted = o.estado === 'CERRADO' || o.estado === 'ENTREGADO'
         return isMyOrder && isCompleted
@@ -50,7 +51,7 @@ export function WaiterHistoryModal({ isOpen, onClose }: WaiterHistoryModalProps)
         <div className="bg-gradient-to-r from-[#6B3E2E] to-[#4B2E2D] px-6 py-5 flex items-center justify-between text-white">
           <div>
             <h2 className="text-xl font-black">Mi Historial Diario</h2>
-            <p className="text-white/70 text-xs font-semibold">{new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="mt-1 bg-white/20 border border-white/30 text-white rounded-lg px-2 py-1 text-sm font-semibold focus:outline-none" />
           </div>
           <button onClick={onClose} className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors"><X size={20} /></button>
         </div>
@@ -63,7 +64,7 @@ export function WaiterHistoryModal({ isOpen, onClose }: WaiterHistoryModalProps)
           {loading ? (
             <p className="text-center py-8 text-gray-500">Cargando historial...</p>
           ) : orders.length === 0 ? (
-            <div className="text-center py-10 flex flex-col items-center"><ChefHat size={40} className="text-gray-300 mb-3" /><p className="font-bold text-gray-500">Aún no has cerrado pedidos hoy.</p></div>
+            <div className="text-center py-10 flex flex-col items-center"><ChefHat size={40} className="text-gray-300 mb-3" /><p className="font-bold text-gray-500">No hay registros en esta fecha.</p></div>
           ) : (
             <div className="space-y-3">
               {orders.map((o, i) => (

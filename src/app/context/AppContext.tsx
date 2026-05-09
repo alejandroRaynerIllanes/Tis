@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react'
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useRef } from 'react'
 import { io } from 'socket.io-client'
 import { getToken, api } from '../services/api'
 import { toast } from 'sonner'
@@ -14,7 +14,6 @@ import { tablesService } from '../services/tables.service'
 import { reservationsService } from '../services/reservations.service'
 import { platosService } from '../services/platos.service'
 import { ordersService } from '../services/orders.service'
-import { VIP_CLIENT_NAMES } from '../data/constants'
 import {
   calculateReservationDuration,
   calculateEndTime,
@@ -32,6 +31,11 @@ export interface AppNotification {
   time: Date
   read: boolean
   type: 'success' | 'warning'
+  meta?: {
+    pedidoId?: string
+    tableId?: string
+    actionType?: 'deliver_order' | 'process_payment'
+  }
 }
 
 interface AppContextType {
@@ -112,11 +116,137 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [orders, setOrders] = useState<Record<string, OrderItem[]>>({})
   const [reservations, setReservations] = useState<Record<string, ReservationInfo[]>>({})
   const [notifications, setNotifications] = useState<AppNotification[]>([])
+  const socketRef = useRef<any>(null)
+
+  // 🚀 REPARACIÓN CRÍTICA: Función para inicializar Sockets SOLO cuando ya hay sesión
+  const initSocket = useCallback(() => {
+    if (socketRef.current) return // Si ya está conectado, no hace nada
+    const token = getToken()
+    if (!token) return // Si no hay token, aborta
+
+    const baseApi = (import.meta as any).env.VITE_API_URL || 'http://localhost:3000/api'
+    const socketUrl = baseApi.replace(/\/api\/?$/, '')
+
+    try {
+      const socket = io(socketUrl, { auth: { token } })
+      socketRef.current = socket
+      socket.on('connect', () => console.log('Socket conectado correctamente:', socket.id))
+
+      socket.on('mesas:created', (payload: any) => {
+        setTables((current) => {
+          const items = Array.isArray(payload) ? payload : [payload]
+          const existingIds = new Set(current.map((t: any) => getTableId(t)))
+          const additions = items.filter((item: any) => !existingIds.has(getTableId(item)))
+          if (additions.length === 0) return current
+          return [...current, ...additions.map(normalizarMesa)]
+        })
+      })
+
+      socket.on('mesas:updated', (payload: any) => {
+        const items = Array.isArray(payload) ? payload : [payload]
+        items.forEach((item: any) => {
+          const newStatus = item.status || item.estado
+          if (newStatus === 'Cuenta Solicitada' || newStatus === 'Esperando pago') {
+            toast.info('¡Atención: Cuenta Solicitada!', {
+              description: `La ${item.name || item.numero || 'Mesa'} está esperando para pagar.`,
+              duration: 8000,
+              icon: '💳'
+            })
+            setNotifications((prev) => [{
+              id: Date.now().toString() + Math.random(),
+              title: 'Cuenta Solicitada',
+              message: `La ${item.name || item.numero || 'Mesa'} está esperando para pagar.`,
+              time: new Date(),
+              read: false,
+              type: 'warning',
+              meta: {
+                tableId: item.id || item._id || item.numero,
+                actionType: 'process_payment'
+              }
+            }, ...prev])
+          }
+        })
+
+        setTables((current) => {
+          const next = [...current]
+          items.forEach((item: any) => {
+            const itemId = getTableId(item)
+            const index = next.findIndex((t: any) => getTableId(t) === itemId)
+            if (index !== -1) {
+              const existing = next[index]
+              next[index] = {
+                ...existing,
+                status: item.status || item.estado || existing.status,
+                name: item.name || item.numero || existing.name,
+                capacity: item.capacity || item.capacidad || existing.capacity,
+                location: item.location || (typeof item.ubicacion === 'object' ? item.ubicacion?.nombre : item.ubicacion) || existing.location,
+                type: item.type || item.tipo || existing.type,
+                locationId: item.locationId || (typeof item.ubicacion === 'object' ? item.ubicacion?._id?.toString() : item.ubicacion) || item.location || (existing as any).locationId
+              } as any
+            } else {
+              next.push(normalizarMesa(item))
+            }
+          })
+          return next
+        })
+      })
+
+      socket.on('mesas:deleted', (payload: any) => {
+        const items = Array.isArray(payload) ? payload : [payload]
+        const idsToRemove = new Set(items.map((item: any) => getTableId(item)))
+        setTables((current) => current.filter((t: any) => !idsToRemove.has(getTableId(t))))
+      })
+
+      socket.on('mesas:alerta_listo', (payload: any) => {
+        toast.success('¡Pedido Listo para Recoger!', {
+          description: `El plato para la Mesa ${payload.mesaNombre || '?'} ya está terminado en cocina.`,
+          duration: 15000,
+          icon: '🔔',
+          action: {
+            label: '✔ Entregado',
+            onClick: () => { ordersService.updateStatus(payload.pedidoId, 'SERVIDO').catch(console.error) }
+          }
+        })
+        setNotifications((prev) => [{
+          id: Date.now().toString() + Math.random(),
+          title: 'Pedido Listo',
+          message: `El plato de la Mesa ${payload.mesaNombre || '?'} ya está terminado en cocina.`,
+          time: new Date(),
+          read: false,
+          type: 'success',
+          meta: {
+            pedidoId: payload.pedidoId,
+            tableId: payload.mesaId,
+            actionType: 'deliver_order'
+          }
+        }, ...prev])
+      })
+
+      socket.on('nueva_reserva', (r: any) => {
+        const { tableId, resInfo } = normalizarReserva(r)
+        setReservations((prev) => ({ ...prev, [tableId]: [...(prev[tableId] || []), resInfo] }))
+        toast.success('Nueva Reserva Asignada', { description: `${resInfo.clientName} ha reservado para las ${resInfo.startTime}`, duration: 10000, icon: '📅' })
+        setNotifications((prev) => [{ id: Date.now().toString() + Math.random(), title: 'Nueva Reserva', message: `El cliente ${resInfo.clientName} tiene una reserva asignada a las ${resInfo.startTime}.`, time: new Date(), read: false, type: 'success' }, ...prev])
+      })
+
+      socket.on('reserva_eliminada', (payload: { id: string, tableId: string }) => {
+        setReservations((prev) => {
+          const currentTableRes = prev[payload.tableId] || []
+          return { ...prev, [payload.tableId]: currentTableRes.filter(r => r.id !== payload.id) }
+        })
+      })
+    } catch (err) {
+      console.warn('Socket init failed', err)
+    }
+  }, [])
 
   // Cargador maestro sincronizado
   const loadInitialData = useCallback(async () => {
     const token = getToken()
     if (!token) return
+
+    // Conectamos el socket justo cuando estamos seguros de que tenemos sesión
+    initSocket()
 
     try {
       const [fetchedTables, fetchedProducts, fetchedOrders, fetchedReservations] = await Promise.all([
@@ -248,137 +378,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     } as any
   }
 
-  // Socket.io: sincronizar mesas en tiempo real (solo si hay token)
   useEffect(() => {
-    const token = getToken()
-    if (!token) return
-
-    const baseApi = (import.meta as any).env.VITE_API_URL || 'http://localhost:3000/api'
-    const socketUrl = baseApi.replace(/\/api\/?$/, '')
-    let socket: any = null
-
-    try {
-      socket = io(socketUrl, { auth: { token } })
-      socket.on('connect', () => console.log('Socket connected', socket.id))
-
-      socket.on('mesas:created', (payload: any) => {
-        setTables((current) => {
-          const items = Array.isArray(payload) ? payload : [payload]
-          const existingIds = new Set(current.map((t: any) => getTableId(t)))
-          const additions = items.filter((item: any) => !existingIds.has(getTableId(item)))
-          if (additions.length === 0) return current
-          // ✅ CORRECCIÓN: Socket mesas:created
-          return [...current, ...additions.map(normalizarMesa)]
-        })
-      })
-
-      socket.on('mesas:updated', (payload: any) => {
-        const items = Array.isArray(payload) ? payload : [payload]
-        
-        // 🛎️ FASE 4: Alerta de Cuenta Solicitada
-        items.forEach((item: any) => {
-          const newStatus = item.status || item.estado
-          if (newStatus === 'Cuenta Solicitada' || newStatus === 'Esperando pago') {
-            toast.info('¡Atención: Cuenta Solicitada!', {
-              description: `La ${item.name || item.numero || 'Mesa'} está esperando para pagar.`,
-              duration: 8000,
-              icon: '💳'
-            })
-            
-            setNotifications((prev) => [{
-              id: Date.now().toString() + Math.random(),
-              title: 'Cuenta Solicitada',
-              message: `La ${item.name || item.numero || 'Mesa'} está esperando para pagar.`,
-              time: new Date(),
-              read: false,
-              type: 'warning'
-            }, ...prev])
-          }
-        })
-
-        setTables((current) => {
-          const next = [...current]
-          items.forEach((item: any) => {
-            const itemId = getTableId(item)
-            const index = next.findIndex((t: any) => getTableId(t) === itemId)
-            // ✅ CORRECCIÓN: Socket mesas:updated
-            if (index !== -1) {
-              const existing = next[index]
-              // Hacemos un merge inteligente para no borrar datos si el backend envía una actualización parcial
-              next[index] = {
-                ...existing,
-                status: item.status || item.estado || existing.status,
-                name: item.name || item.numero || existing.name,
-                capacity: item.capacity || item.capacidad || existing.capacity,
-                location: item.location || (typeof item.ubicacion === 'object' ? item.ubicacion?.nombre : item.ubicacion) || existing.location,
-                type: item.type || item.tipo || existing.type,
-                locationId: item.locationId || (typeof item.ubicacion === 'object' ? item.ubicacion?._id?.toString() : item.ubicacion) || item.location || (existing as any).locationId
-              } as any
-            } else {
-              next.push(normalizarMesa(item))
-            }
-          })
-          return next
-        })
-      })
-
-      socket.on('mesas:deleted', (payload: any) => {
-        const items = Array.isArray(payload) ? payload : [payload]
-        const idsToRemove = new Set(items.map((item: any) => getTableId(item)))
-        setTables((current) => current.filter((t: any) => !idsToRemove.has(getTableId(t))))
-      })
-
-      // 🛎️ FASE 4: Alerta de Pedido Listo (Cocina -> Mesero)
-      socket.on('mesas:alerta_listo', (payload: any) => {
-        toast.success('¡Pedido Listo para Recoger!', {
-          description: `El plato para la Mesa ${payload.mesaNombre || '?'} ya está terminado en cocina.`,
-          duration: 15000,
-          icon: '🔔',
-          action: {
-            label: '✔ Entregado',
-            onClick: () => {
-              // Cambia el estado a SERVIDO, lo que lo borra de la cocina automáticamente
-              ordersService.updateStatus(payload.pedidoId, 'SERVIDO').catch(console.error)
-            }
-          }
-        })
-        
-        setNotifications((prev) => [{
-          id: Date.now().toString() + Math.random(),
-          title: 'Pedido Listo',
-          message: `El plato de la Mesa ${payload.mesaNombre || '?'} ya está terminado en cocina.`,
-          time: new Date(),
-          read: false,
-          type: 'success'
-        }, ...prev])
-      })
-
-      // 🔄 Sincronización de Reservas entre múltiples meseros
-      socket.on('nueva_reserva', (r: any) => {
-        const { tableId, resInfo } = normalizarReserva(r)
-        setReservations((prev) => ({
-          ...prev,
-          [tableId]: [...(prev[tableId] || []), resInfo]
-        }))
-      })
-
-      socket.on('reserva_eliminada', (payload: { id: string, tableId: string }) => {
-        setReservations((prev) => {
-          const currentTableRes = prev[payload.tableId] || []
-          return {
-            ...prev,
-            [payload.tableId]: currentTableRes.filter(r => r.id !== payload.id)
-          }
-        })
-      })
-    } catch (err) {
-      console.warn('Socket init failed', err)
-    }
-
     return () => {
-      try {
-        socket?.disconnect()
-      } catch (e) {}
+      if (socketRef.current) socketRef.current.disconnect()
     }
   }, [])
 
@@ -651,8 +653,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         )
 
         if (existingOrder) {
-          // Si ya existe, simplemente lo actualizamos
-          await api.put(`/pedidos/${existingOrder._id || existingOrder.id}`, payload)
+          const targetId = existingOrder._id || existingOrder.id;
+          if (!targetId) {
+            throw new Error("Error de sincronización: El pedido activo no tiene ID válido.");
+          }
+          
+          // Si ya existe, lo actualizamos usando la nueva ruta
+          await api.put(`/pedidos/${targetId}`, payload)
+          // REPARACIÓN CRÍTICA: Forzar el cambio de color visual inmediatamente
+          updateTableStatus(tableId, 'Ocupada')
         } else {
           // Si es un pedido nuevo, lo creamos
           await ordersService.create(payload)
@@ -679,21 +688,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const reserveTable = async (tableId: string, info: Omit<ReservationInfo, 'id' | 'endTime' | 'vip'>) => {
-    const isVipClient = VIP_CLIENT_NAMES.includes(info.clientName.toLowerCase().trim())
-
     const table = tables.find((t) => t.id === tableId)
     const tableType = table?.type || 'normal'
+    const isVipClient = tableType === 'vip'
 
     if (!info.startTime) throw new Error('Falta la hora de la reserva (startTime).')
     if (!info.date) throw new Error('Falta la fecha de la reserva.')
-
-    if (tableType === 'vip' && !isVipClient) {
-      const isVipZone = table?.location === 'zona-vip'
-      const errorMessage = isVipZone
-        ? 'Solo clientes VIP pueden reservar en Zona VIP'
-        : 'Solo clientes VIP pueden reservar esta mesa'
-      throw new Error(errorMessage)
-    }
 
     const duration = calculateReservationDuration(info.guestCount)
     const endTime = calculateEndTime(info.startTime, duration)

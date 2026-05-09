@@ -17,7 +17,6 @@ import {
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { useAppContext } from '../context/AppContext'
-import { VIP_SUBSCRIBERS } from '../data/mock-data'
 import { useEffect } from 'react'
 import { ordersService } from '../services/orders.service'
 

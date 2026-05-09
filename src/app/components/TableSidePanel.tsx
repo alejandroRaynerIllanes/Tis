@@ -18,6 +18,7 @@ import {
 import { toast } from 'sonner'
 import { useAppContext } from '../context/AppContext'
 import { platosService } from '../services/platos.service'
+import { ordersService } from '../services/orders.service'
 
 interface TableSidePanelProps {
   isOpen: boolean
@@ -51,6 +52,7 @@ export function TableSidePanel({
   const [searchQuery, setSearchQuery] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [localProducts, setLocalProducts] = useState<any[]>([])
+  const [backendOrder, setBackendOrder] = useState<any>(null)
 
   // Resetear estados locales cada vez que se abre una mesa nueva
   useEffect(() => {
@@ -59,6 +61,12 @@ export function TableSidePanel({
       setShowSummary(false)
       setEditingNote(null)
       setSearchQuery('')
+      
+      // Buscar si la mesa tiene un pedido en estado "Listo/ENTREGADO" en la cocina
+      ordersService.getAll().then((all: any[]) => {
+        const active = all.find((o: any) => (o.mesa?._id === tableId || o.mesa === tableId) && ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO'].includes(o.estado))
+        setBackendOrder(active)
+      }).catch(() => {})
     }
   }, [isOpen, tableId])
 
@@ -369,6 +377,21 @@ export function TableSidePanel({
         {/* FOOTER (Acciones) */}
         {activeTable.status !== 'Esperando pago' && activeOrder.length > 0 && (
           <div className="p-5 sm:p-6 bg-white border-t border-[#FCE4D6]/60 shadow-[0_-8px_20px_-10px_rgba(0,0,0,0.1)] shrink-0 flex flex-col gap-3">
+            
+            {/* 🔴 NUEVO: Botón para Recoger Pedido y limpiar cocina */}
+            {backendOrder?.estado === 'ENTREGADO' && (
+              <button
+                onClick={async () => {
+                  await ordersService.updateStatus(backendOrder._id || backendOrder.id, 'SERVIDO');
+                  setBackendOrder({...backendOrder, estado: 'SERVIDO'});
+                  toast.success('Pedido recogido y entregado al cliente', { description: 'La cocina ha sido notificada.' });
+                }}
+                className="w-full mb-2 py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black shadow-lg shadow-emerald-500/20 transition-all text-[15px] flex items-center justify-center gap-2"
+              >
+                <CheckCircle2 size={20} /> Recoger Pedido Listo
+              </button>
+            )}
+
             {isVipOrder && (
               <div className="flex items-center gap-2.5 bg-gradient-to-r from-[#2C1A0E] to-[#4B2E2D] rounded-xl px-3.5 py-2.5 -mt-1">
                 <Crown size={14} className="text-yellow-300 shrink-0" strokeWidth={2.5} />

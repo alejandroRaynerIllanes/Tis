@@ -253,7 +253,7 @@ export function Dashboard({ onOpenSidebar }: DashboardProps) {
             </div>
             <div className="space-y-3.5">
               {platosMasVendidos.map((dish: any, idx: number) => (
-                <div key={dish.name} className="flex items-center gap-3">
+                <div key={dish.nombre} className="flex items-center gap-3">
                   <span
                     className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 ${
                       idx === 0
@@ -270,10 +270,10 @@ export function Dashboard({ onOpenSidebar }: DashboardProps) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="text-sm font-bold text-[#4B2E2D] truncate pr-2 max-w-[160px]">
-                        {dish.name}
+                        {dish.nombre}
                       </span>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="text-sm font-black text-[#4B2E2D]">{dish.cantidad}</span>
+                        <span className="text-sm font-black text-[#4B2E2D]">{dish.cantidad} ventas</span>
                           <span className="flex items-center gap-0.5 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100">
                             <TrendingUp size={9} strokeWidth={2.5} />↑
                           </span>
@@ -313,7 +313,7 @@ export function Dashboard({ onOpenSidebar }: DashboardProps) {
             </div>
             <div className="flex flex-col gap-3 pt-1">
               {categoriasFormateadas.map((cat: any, index: number) => (
-                <div key={cat.name} className="flex items-center gap-3">
+                <div key={cat.nombre} className="flex items-center gap-3">
                   <span className="w-5 text-center text-xs font-black text-[#4B2E2D]/30 shrink-0">
                     {index + 1}
                   </span>
@@ -322,7 +322,7 @@ export function Dashboard({ onOpenSidebar }: DashboardProps) {
                     style={{ backgroundColor: cat.color }}
                   />
                   <span className="text-sm font-bold text-[#4B2E2D] w-32 shrink-0 truncate">
-                    {cat.name}
+                    {cat.nombre}
                   </span>
                   <div className="flex-1 h-2 bg-[#FCE4D6] rounded-full overflow-hidden">
                     <div
@@ -362,15 +362,15 @@ export function Dashboard({ onOpenSidebar }: DashboardProps) {
                   <div className="flex items-center gap-2">
                     <span className="font-black text-[#4B2E2D] text-sm">{order.id}</span>
                     <span className="text-[#4B2E2D]/60 text-xs">·</span>
-                    <span className="font-medium text-[#4B2E2D] text-sm">{order.table}</span>
+                    <span className="font-medium text-[#4B2E2D] text-sm">{order.mesa}</span>
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-[#4B2E2D]/55">{order.time}</span>
+                    <span className="text-xs text-[#4B2E2D]/55">{order.hora}</span>
                     <span
                       className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                        order.status === 'Completada'
+                        order.estado === 'Completada'
                           ? 'bg-green-100 text-green-700'
-                          : order.status === 'En preparación'
+                          : order.estado === 'En preparación'
                             ? 'bg-orange-100 text-orange-700'
                             : 'bg-yellow-100 text-yellow-700'
                       }`}
@@ -418,22 +418,22 @@ export function Dashboard({ onOpenSidebar }: DashboardProps) {
                       {order.id}
                     </td>
                     <td className="py-3 lg:py-4 px-3 lg:px-4 font-medium text-[#4B2E2D] text-sm lg:text-base">
-                      {order.table}
+                      {order.mesa}
                     </td>
                     <td className="py-3 lg:py-4 px-3 lg:px-4 font-medium text-[#4B2E2D]/70 text-sm lg:text-base">
-                      {order.time}
+                      {order.hora}
                     </td>
                     <td className="py-3 lg:py-4 px-3 lg:px-4">
                       <span
                         className={`px-2.5 lg:px-3 py-1 lg:py-1.5 rounded-full text-xs lg:text-sm font-bold ${
-                          order.status === 'Completada'
+                          order.estado === 'Completada'
                             ? 'bg-green-100 text-green-700'
-                            : order.status === 'En preparación'
+                          : order.estado === 'En preparación'
                               ? 'bg-orange-100 text-orange-700'
                               : 'bg-yellow-100 text-yellow-700'
                         }`}
                       >
-                        {order.status}
+                        {order.estado}
                       </span>
                     </td>
                     <td className="py-3 lg:py-4 px-3 lg:px-4 text-right font-black text-[#D0543A] text-sm lg:text-base">

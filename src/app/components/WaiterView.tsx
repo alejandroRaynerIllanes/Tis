@@ -27,6 +27,7 @@ import { ReserveTableModal } from './ReserveTableModal'
 import { CancelReservationModal } from './CancelReservationModal'
 import { TableSidePanel } from './TableSidePanel'
 import { getStoredUser } from '../services/api'
+import { ordersService } from '../services/orders.service'
 import { WaiterHistoryModal } from './WaiterHistoryModal'
 
 // ─── Tipos y helpers ─────────────────────────────────────────────────────────
@@ -243,6 +244,22 @@ export function WaiterView({
 
   const unreadCount = notifications.filter(n => !n.read).length
 
+  // 🚀 Función Inteligente para las Notificaciones
+  const handleNotificationAction = async (e: React.MouseEvent, n: any) => {
+    e.stopPropagation()
+    if (n.meta?.actionType === 'deliver_order' && n.meta?.pedidoId) {
+      try {
+        await ordersService.updateStatus(n.meta.pedidoId, 'SERVIDO')
+      } catch (err) {
+        console.error(err)
+      }
+    } else if (n.meta?.actionType === 'process_payment' && n.meta?.tableId) {
+      handleTableClick(e as any, n.meta.tableId)
+      setIsNotificationsOpen(false)
+    }
+    markNotificationAsRead(n.id)
+  }
+
   return (
     <div
       className={`flex flex-col ${isEmbedded ? 'h-full bg-transparent' : 'h-[100dvh] bg-[#FCE4D6]'} font-sans selection:bg-[#E57C5D] selection:text-white relative overflow-hidden`}
@@ -328,7 +345,7 @@ export function WaiterView({
 
             {/* Panel Desplegable */}
             {isNotificationsOpen && (
-              <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-white rounded-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.3)] border border-gray-100 overflow-hidden z-[100] animate-in fade-in slide-in-from-top-4 duration-200 origin-top-right">
+              <div className="absolute right-0 mt-4 w-[340px] sm:w-[420px] bg-[#F8F9FA] rounded-3xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.4)] border border-gray-200 overflow-hidden z-[100] animate-in fade-in slide-in-from-top-4 duration-200 origin-top-right">
                 <div className="bg-gradient-to-r from-[#6B3E2E] to-[#4B2E2D] px-5 py-4 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Bell size={18} className="text-white/80" />
@@ -341,7 +358,7 @@ export function WaiterView({
                     <button onClick={() => clearNotifications()} className="text-white/70 hover:text-white text-xs font-bold px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg transition-all active:scale-95">Limpiar todas</button>
                   )}
                 </div>
-                <div className="max-h-[400px] overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-black/10 p-2">
+                <div className="max-h-[420px] overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-black/10 p-3">
                   {notifications.length === 0 ? (
                     <div className="p-10 flex flex-col items-center justify-center text-center">
                       <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-3">
@@ -351,24 +368,34 @@ export function WaiterView({
                       <p className="text-gray-400 text-xs mt-1">No tienes nuevas alertas por ahora.</p>
                     </div>
                   ) : (
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-2.5">
                       {notifications.map(n => (
-                        <div key={n.id} onClick={() => markNotificationAsRead(n.id)} className={`relative p-4 rounded-2xl transition-all cursor-pointer group ${n.read ? 'bg-transparent hover:bg-gray-50' : 'bg-[#FFF5F0] hover:bg-[#FCE4D6]/60 border border-[#FCE4D6]'}`}>
-                          {!n.read && <div className="absolute top-4 right-4 w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]" />}
+                        <div key={n.id} onClick={() => markNotificationAsRead(n.id)} className={`relative p-4 rounded-2xl transition-all cursor-pointer group shadow-sm ${n.read ? 'bg-white hover:bg-gray-50 border border-gray-100' : 'bg-white border-2 border-[#D96C4A]/30 hover:shadow-md'}`}>
+                          {!n.read && <div className="absolute top-4 right-4 w-2.5 h-2.5 rounded-full bg-[#D96C4A] shadow-[0_0_8px_rgba(217,108,74,0.8)] animate-pulse" />}
                           <div className="flex gap-3.5 items-start">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 shadow-sm ${n.type === 'success' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                            <div className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 shadow-inner ${n.type === 'success' ? 'bg-gradient-to-br from-emerald-100 to-emerald-200 text-emerald-600' : 'bg-gradient-to-br from-amber-100 to-amber-200 text-amber-600'}`}>
                               {n.type === 'success' ? <CheckCircle2 size={20} /> : <Receipt size={20} />}
                             </div>
                             <div className="flex-1 min-w-0 pr-4">
-                              <p className={`text-sm leading-tight mb-1 truncate ${n.read ? 'font-bold text-gray-700' : 'font-black text-[#4B2E2D]'}`}>{n.title}</p>
-                              <p className={`text-xs leading-relaxed mb-2 line-clamp-2 ${n.read ? 'text-gray-500 font-medium' : 'text-[#4B2E2D]/80 font-semibold'}`}>{n.message}</p>
-                              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider flex items-center gap-1"><Clock size={10} /> {new Date(n.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                              <p className={`text-[15px] leading-tight mb-1 truncate ${n.read ? 'font-bold text-gray-500' : 'font-black text-[#4B2E2D]'}`}>{n.title}</p>
+                              <p className={`text-[13px] leading-relaxed mb-2.5 line-clamp-2 ${n.read ? 'text-gray-400 font-medium' : 'text-[#4B2E2D]/80 font-semibold'}`}>{n.message}</p>
+                              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider flex items-center gap-1"><Clock size={11} /> {new Date(n.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
                             </div>
                           </div>
                           {!n.read && (
-                            <div className="mt-2.5 ml-[54px]">
-                              <button onClick={(e) => { e.stopPropagation(); markNotificationAsRead(n.id); }} className={`text-[11px] font-black px-3 py-1.5 rounded-lg transition-colors shadow-sm ${n.type === 'success' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border border-emerald-200' : 'bg-amber-100 text-amber-700 hover:bg-amber-200 border border-amber-200'}`}>
-                                ✔ Marcar como visto
+                            <div className="mt-3.5 ml-[58px] flex flex-wrap gap-2">
+                              {n.meta?.actionType === 'deliver_order' && (
+                                <button onClick={(e) => handleNotificationAction(e, n)} className="text-[12px] font-black px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl shadow-md shadow-emerald-500/20 transition-all active:scale-95 flex items-center gap-1.5">
+                                  <ChefHat size={14} /> Entregar Pedido
+                                </button>
+                              )}
+                              {n.meta?.actionType === 'process_payment' && (
+                                <button onClick={(e) => handleNotificationAction(e, n)} className="text-[12px] font-black px-4 py-2 bg-[#D96C4A] hover:bg-[#C25838] text-white rounded-xl shadow-md shadow-[#D96C4A]/20 transition-all active:scale-95 flex items-center gap-1.5">
+                                  <Receipt size={14} /> Ver Mesa y Cobrar
+                                </button>
+                              )}
+                              <button onClick={(e) => { e.stopPropagation(); markNotificationAsRead(n.id); }} className="text-[12px] font-bold px-3 py-2 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-xl transition-all active:scale-95">
+                                Ocultar
                               </button>
                             </div>
                           )}

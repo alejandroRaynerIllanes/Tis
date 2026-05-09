@@ -14,7 +14,9 @@ import {
   Save,
   Trash2,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  Eye,
+  EyeOff
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { usersService, type BackendUser } from '../services/users.service'
@@ -58,6 +60,7 @@ export function UserManagement() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<DisplayUser | null>(null)
   const [submitLoading, setSubmitLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   // Confirm delete modal
   const [deleteConfirm, setDeleteConfirm] = useState<DisplayUser | null>(null)
@@ -146,6 +149,7 @@ export function UserManagement() {
       })
     }
     setIsModalOpen(true)
+    setShowPassword(false)
   }
 
   const handleCloseModal = () => {
@@ -155,6 +159,28 @@ export function UserManagement() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Validaciones estrictas de Usuario
+    const regexNombres = /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s]+$/
+    if (!regexNombres.test(formData.firstName.trim())) {
+      return toast.error('El nombre solo puede contener letras.')
+    }
+    if (formData.firstName.trim().length > 30) {
+      return toast.error('El campo nombre no puede superar los 30 caracteres.')
+    }
+    if (!regexNombres.test(formData.lastName.trim())) {
+      return toast.error('Los apellidos solo pueden contener letras.')
+    }
+    if (formData.lastName.trim().length > 30) {
+      return toast.error('El campo apellidos no puede superar los 30 caracteres.')
+    }
+    if (!/^\d+$/.test(formData.ci.trim())) {
+      return toast.error('El CI solo debe contener números, sin letras ni símbolos.')
+    }
+    if (formData.ci.trim().length > 8) {
+      return toast.error('El CI no puede superar los 8 dígitos.')
+    }
+
     setSubmitLoading(true)
 
     try {
@@ -429,6 +455,7 @@ export function UserManagement() {
                   </label>
                   <input
                     required
+                    maxLength={30}
                     type="text"
                     placeholder="Ej: Juan Carlos"
                     value={formData.firstName}
@@ -443,6 +470,7 @@ export function UserManagement() {
                   </label>
                   <input
                     required
+                    maxLength={30}
                     type="text"
                     placeholder="Ej: Pérez Gómez"
                     value={formData.lastName}
@@ -455,6 +483,7 @@ export function UserManagement() {
                   <label className="block text-sm font-bold text-[#4B2E2D] mb-1.5 ml-1">CI</label>
                   <input
                     required
+                    maxLength={8}
                     type="text"
                     placeholder="Ej: 12345678"
                     value={formData.ci}
@@ -486,14 +515,23 @@ export function UserManagement() {
                       </span>
                     )}
                   </label>
-                  <input
-                    required={!editingUser}
-                    type="password"
-                    placeholder="••••••••"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#E6A23C]/50 focus:border-[#E6A23C] transition-all text-[#2C2C2C] font-medium"
-                  />
+                  <div className="relative">
+                    <input
+                      required={!editingUser}
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      className="w-full pl-4 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#E6A23C]/50 focus:border-[#E6A23C] transition-all text-[#2C2C2C] font-medium"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#D96C4A] focus:outline-none"
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                   {formData.password && (
                     <p className="text-[10px] text-green-600 font-semibold mt-1.5 ml-2 flex items-center gap-1">
                       <Shield size={10} /> La contraseña se almacenará encriptada en el servidor

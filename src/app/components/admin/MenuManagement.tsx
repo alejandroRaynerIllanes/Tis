@@ -585,6 +585,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
                 <input
                   type="text"
                   required
+                  maxLength={50}
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   className="w-full px-4 py-3 rounded-xl border-2 border-[#E57C5D] text-[#4B2E2D] focus:outline-none focus:ring-2 focus:ring-[#D0543A] focus:border-transparent transition-all placeholder:text-[#4B2E2D]/40"
@@ -610,11 +611,15 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
                 <label className="block text-sm font-bold text-[#4B2E2D] mb-2">Descripción</label>
                 <textarea
                   rows={3}
+                  maxLength={500}
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className="w-full px-4 py-3 rounded-xl border-2 border-[#E57C5D] text-[#4B2E2D] focus:outline-none focus:ring-2 focus:ring-[#D0543A] focus:border-transparent transition-all placeholder:text-[#4B2E2D]/40 resize-none"
                   placeholder="Ingredientes principales..."
                 />
+                <div className="text-right text-[10px] text-[#4B2E2D]/50 mt-1 font-bold">
+                  {formData.description.length} / 500
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-4 mt-8 pt-6 border-t border-[#FCE4D6]">

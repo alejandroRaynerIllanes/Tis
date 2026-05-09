@@ -69,6 +69,9 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
     if (trimmed.length < 3 || /^(.)\1+$/.test(trimmed)) {
       return 'Ingresa un nombre válido de al menos 3 caracteres.'
     }
+    if (trimmed.length > 25) {
+      return 'La categoría no puede superar los 25 caracteres.'
+    }
     const regexValido = /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s]+$/
     if (!regexValido.test(trimmed)) {
       return 'El nombre solo debe contener letras y espacios. Ejemplo: "Postres"'

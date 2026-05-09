@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { X, Receipt, Clock, MapPin, Banknote, ChefHat } from 'lucide-react'
-import { ordersService } from '../services/orders.service'
-import { getStoredUser } from '../services/api'
+import { getStoredUser, api } from '../services/api'
 
 interface WaiterHistoryModalProps {
   isOpen: boolean
@@ -21,19 +20,14 @@ export function WaiterHistoryModal({ isOpen, onClose }: WaiterHistoryModalProps)
   const fetchHistory = async () => {
     setLoading(true)
     try {
-      const allOrders = await ordersService.getAll()
+      // Optimización: Solo trae de la red los pedidos de hoy, reduciendo carga útil
+      const todaysOrders = await api.get<any[]>('/pedidos?hoy=true')
       const currentUser = getStoredUser()
       
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-
-      // Filtrar: Pedidos del mesero actual, que sean de hoy, y que estén cerrados/pagados
-      const history = allOrders.filter((o: any) => {
-        const orderDate = new Date(o.createdAt || o.fechaHora)
-        const isToday = orderDate >= today
+      const history = todaysOrders.filter((o: any) => {
         const isMyOrder = o.usuario?._id === currentUser?.id || o.usuario === currentUser?.id
         const isCompleted = o.estado === 'CERRADO' || o.estado === 'ENTREGADO'
-        return isToday && isMyOrder && isCompleted
+        return isMyOrder && isCompleted
       })
 
       setOrders(history.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()))

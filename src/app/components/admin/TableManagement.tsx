@@ -237,7 +237,7 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
       console.log('[FRONTEND] ✅ Eliminado en backend. Actualizando UI...')
       // Ahora podemos usar (prev) de forma segura para garantizar que la UI se limpie inmediatamente
       setLocations((prev) => prev.filter((loc) => loc.id !== locationId && loc._id !== locationId))
-      setTables((prevTables: any[]) => prevTables.filter((t: any) => getTableLocation(t) !== locationId))
+      setTables((prevTables: any[]) => prevTables.filter((t: any) => t.locationId !== locationId && getTableLocation(t) !== locationId))
       setLocationToDelete(null)
       window.dispatchEvent(new Event('locations_updated'))
       toast.success('Ubicación eliminada.')
@@ -405,7 +405,12 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
                 <div className="space-y-3 max-h-[400px] overflow-y-auto">
                   {locations.map((loc, index) => {
                     const tablesCount = tables.filter(
-                      (t) => !isDeletedTable(t) && getTableLocation(t) === loc.id
+                      (t: any) => {
+                        if (isDeletedTable(t)) return false
+                        const isVipLocation = loc.name.toLowerCase() === 'vip' || loc.name.toLowerCase() === 'zona vip'
+                        if (isVipLocation && t.type === 'vip') return true
+                        return t.locationId === loc.id || t.locationId === loc._id || getTableLocation(t) === loc.name
+                      }
                     ).length
                     return (
                       <div

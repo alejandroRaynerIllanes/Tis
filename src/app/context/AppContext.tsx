@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react'
 import { io } from 'socket.io-client'
-import { getToken } from '../services/api'
+import { getToken, api } from '../services/api'
 import { toast } from 'sonner'
 import type {
   Product,
@@ -154,8 +154,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           if (!ordersMap[tId]) ordersMap[tId] = []
           
           o.detalles?.forEach((d: any) => {
+            const productId = d.plato?._id || d.plato || 'unknown'
             const product: Product = {
-              id: d.plato?._id || d.plato || 'unknown',
+              id: productId,
               name: d.plato?.nombre || 'Plato',
               description: d.plato?.descripcion || '',
               price: d.precioUnitario || d.plato?.precio || 0,
@@ -163,7 +164,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
               category: d.plato?.categoria?.nombre || 'General',
               status: 'Disponible'
             }
-            ordersMap[tId].push({ product, quantity: d.cantidad || 1, note: d.observacion || '' })
+            
+            // Evitar duplicación visual: si el plato ya está en la lista de esta mesa, solo sumamos la cantidad
+            const existingItem = ordersMap[tId].find(item => item.product.id === productId)
+            if (existingItem) {
+              existingItem.quantity += (d.cantidad || 1)
+              if (d.observacion) existingItem.note = existingItem.note ? `${existingItem.note} | ${d.observacion}` : d.observacion
+            } else {
+              ordersMap[tId].push({ product, quantity: d.cantidad || 1, note: d.observacion || '' })
+            }
           })
         })
         setOrders(ordersMap)
@@ -634,9 +643,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           }))
         }
 
-        // 3. Enviar a BD y actualizar UI
-        await ordersService.create(payload)
-        updateTableStatus(tableId, 'Ocupada')
+        // 3. INTELIGENCIA: Revisar si la mesa ya tiene un pedido activo
+        const allOrders = await ordersService.getAll()
+        const existingOrder = allOrders.find((o: any) => 
+          (o.mesa?._id === tableId || o.mesa === tableId) && 
+          ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO'].includes(o.estado)
+        )
+
+        if (existingOrder) {
+          // Si ya existe, simplemente lo actualizamos
+          await api.put(`/pedidos/${existingOrder._id || existingOrder.id}`, payload)
+        } else {
+          // Si es un pedido nuevo, lo creamos
+          await ordersService.create(payload)
+          updateTableStatus(tableId, 'Ocupada')
+        }
       } catch (error) {
         console.error('Error al confirmar pedido:', error)
         throw error

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { UserCheck, MapPin, Receipt, Coins, Flame, ChefHat } from 'lucide-react'
 import { usersService } from '../../services/users.service'
-import { ordersService } from '../../services/orders.service'
+import { api } from '../../services/api'
 
 export function ActiveWaitersSection() {
   const [waitersData, setWaitersData] = useState<any[]>([])
@@ -14,12 +14,8 @@ export function ActiveWaitersSection() {
         const users = await usersService.getAll()
         const waiters = users.filter((u: any) => u.rol.toLowerCase() === 'mesero' && u.estado === true)
 
-        // 2. Obtener todas las órdenes de hoy
-        const orders = await ordersService.getAll()
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        
-        const todaysOrders = orders.filter((o: any) => new Date(o.createdAt || o.fechaHora) >= today)
+        // 2. Obtener órdenes de hoy optimizadas desde el servidor
+        const todaysOrders = await api.get<any[]>('/pedidos?hoy=true')
 
         // 3. Cruzar datos (Mapear a cada mesero sus órdenes)
         const enrichedWaiters = waiters.map((waiter: any) => {

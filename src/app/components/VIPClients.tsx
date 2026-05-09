@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { useAppContext } from '../context/AppContext'
 import { VIPManagement } from './VIPManagement'
 
 // ─── Mock data ───────────────────────────────────────────────────────────────
@@ -219,6 +220,9 @@ function PriorityIndicator() {
 // ─── Main component ──────────────────────────────────────────────────────────
 
 export function VIPClients() {
+  const { tables } = useAppContext()
+  const vipTablesCount = tables.filter((t) => t.type === 'vip').length
+
   const [activeTab, setActiveTab] = useState<
     'subscription' | 'clients' | 'priority' | 'management'
   >('subscription')
@@ -258,7 +262,7 @@ export function VIPClients() {
             </div>
             <div className="flex items-center gap-2 bg-white rounded-xl px-4 py-2.5 shadow-sm border border-[#E0D0C5]">
               <Zap size={14} className="text-[#D96C4A]" />
-              <span className="text-sm font-black text-[#4B2E2D]">2</span>
+              <span className="text-sm font-black text-[#4B2E2D]">{vipTablesCount}</span>
               <span className="text-xs font-medium text-[#4B2E2D]/55">Mesas VIP</span>
             </div>
           </div>

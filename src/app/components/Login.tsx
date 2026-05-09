@@ -3,6 +3,7 @@ import { User, Lock, Eye, EyeOff, ChefHat, AlertCircle } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { authService } from '../services/auth.service'
 import { setToken, setStoredUser } from '../services/api'
+import { toast } from 'sonner'
 
 export function Login() {
   const [username, setUsername] = useState('')
@@ -55,6 +56,8 @@ export function Login() {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Error al iniciar sesión'
       setError(message)
+      setPassword('') // Limpia únicamente el campo contraseña
+      toast.error(message) // Muestra el mensaje flotante tipo Toast
     } finally {
       setIsLoading(false)
     }

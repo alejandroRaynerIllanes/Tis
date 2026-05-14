@@ -24,14 +24,18 @@ export function WaiterHistoryModal({ isOpen, onClose }: WaiterHistoryModalProps)
       // Filtra por la fecha seleccionada en el calendario
       const selectedOrders = await api.get<any[]>(`/pedidos?fecha=${selectedDate}`)
       const currentUser = getStoredUser()
+      const userId = String(currentUser?.id || (currentUser as any)?._id || '')
       
-      const history = selectedOrders.filter((o: any) => {
-        const isMyOrder = o.usuario?._id === currentUser?.id || o.usuario === currentUser?.id
-        const isCompleted = o.estado === 'CERRADO' || o.estado === 'ENTREGADO'
+      const historyData = Array.isArray(selectedOrders) ? selectedOrders : (selectedOrders as any).data || []
+
+      const history = historyData.filter((o: any) => {
+        const orderUserId = String(o.usuario?._id || o.usuario?.id || o.usuario || '')
+        const isMyOrder = orderUserId === userId
+        const isCompleted = ['CERRADO', 'ENTREGADO', 'SERVIDO'].includes(o.estado)
         return isMyOrder && isCompleted
       })
 
-      setOrders(history.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()))
+      setOrders(history.sort((a: any, b: any) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime()))
     } catch (error) {
       console.error('Error fetching history:', error)
     } finally {

@@ -336,9 +336,14 @@ export function WaiterView({
               <ChefHat size={18} strokeWidth={2.5} className="text-white" />
             </div>
             <div className="flex flex-col items-start gap-0 leading-none">
-              <span className="font-black text-sm sm:text-[16px] text-[#4B2E2D] bg-white px-2.5 py-0.5 rounded-md shadow-sm whitespace-nowrap">
-                {waiterName}
-              </span>
+            <span className="font-black text-sm sm:text-[16px] text-[#4B2E2D] bg-white px-2.5 py-1 rounded-md shadow-sm flex items-center gap-2 whitespace-nowrap">
+              {waiterName}
+              {userLocation && (
+                <span className="bg-[#FCE4D6] text-[#D96C4A] text-[10px] px-1.5 py-0.5 rounded uppercase tracking-widest font-black border border-[#D96C4A]/20">
+                  {userLocation}
+                </span>
+              )}
+            </span>
             </div>
           </div>
 

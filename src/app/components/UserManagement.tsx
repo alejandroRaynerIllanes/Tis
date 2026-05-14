@@ -543,13 +543,13 @@ export function UserManagement() {
                   <label className="block text-sm font-bold text-[#4B2E2D] mb-2 ml-1">
                     Rol en el sistema
                   </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {(['Administrador', 'Mesero', 'Cocinero', 'Cajero'] as Role[]).map((r) => (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {(['Administrador', 'Cajero', 'Mesero', 'Cocinero'] as Role[]).map((r) => (
                       <button
                         key={r}
                         type="button"
                         onClick={() => setFormData({ ...formData, role: r })}
-                        className={`flex items-center gap-2 px-3 py-3 rounded-xl border-2 transition-all text-sm font-bold ${
+                    className={`flex flex-col items-center justify-center gap-1.5 px-2 py-3 rounded-xl border-2 transition-all text-xs font-bold ${
                           formData.role === r
                             ? 'border-[#D96C4A] bg-[#FFF5F0] text-[#D96C4A]'
                             : 'border-gray-100 bg-white text-gray-500 hover:border-gray-200'

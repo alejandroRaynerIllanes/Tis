@@ -264,7 +264,7 @@ export function TableSidePanel({
                 </div>
               </div>
               <button onClick={onOpenPayment} className="w-full mt-6 py-4 rounded-xl bg-[#D96C4A] hover:bg-[#C25838] text-white font-black text-lg shadow-lg shadow-[#D96C4A]/30 transition-all flex items-center justify-center gap-2">
-                <CreditCard size={20} /> Procesar Pago
+                <Receipt size={20} /> Llenar Datos y Enviar a Caja
               </button>
             </div>
           )}

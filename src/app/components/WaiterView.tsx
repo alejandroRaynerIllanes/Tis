@@ -23,7 +23,7 @@ import { toast } from 'sonner'
 import { TableStatus, Table, useAppContext } from '../context/AppContext'
 import { useWaiterLogic, getTableDisplayName, getTableLocation, type StateFilter, type TableWithFallbacks } from '../hooks/useWaiterLogic'
 import { ReservationsListModal } from './ReservationsListModal'
-import { PaymentModal } from './PaymentModal'
+import { PreCuentaModal } from './PreCuentaModal'
 import { ReserveTableModal } from './ReserveTableModal'
 import { CancelReservationModal } from './CancelReservationModal'
 import { TableSidePanel } from './TableSidePanel'
@@ -742,13 +742,16 @@ export function WaiterView({
       {/* ══════════════════════════════════════════════════════════════
           MODAL DE PAGO
       ══════════════════════════════════════════════════════════════ */}
-      <PaymentModal
+      <PreCuentaModal
         isOpen={showPaymentModal && !!activeTableId}
         onClose={closePaymentModal}
-        onProcessPayment={handleProcessPayment}
+        tableId={activeTableId || ''}
         tableName={activeTable?.name || 'Mesa'}
         activeOrder={activeOrder}
         orderTotal={orderTotal}
+        onSuccess={() => {
+          closePaymentModal()
+        }}
       />
 
       <ReservationsListModal

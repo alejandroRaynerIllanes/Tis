@@ -33,7 +33,7 @@ export function ActiveWaitersSection() {
             const loc = o.mesa?.ubicacion?.nombre || o.mesa?.ubicacionId?.nombre || 'Interior'
             locationsCounts[loc] = (locationsCounts[loc] || 0) + 1
           })
-          const primaryZone = Object.keys(locationsCounts).sort((a,b) => locationsCounts[b] - locationsCounts[a])[0] || 'Sin asignar'
+        const primaryZone = waiter.ubicacion || Object.keys(locationsCounts).sort((a,b) => locationsCounts[b] - locationsCounts[a])[0] || 'Sin asignar'
 
           return {
             id: waiter._id,

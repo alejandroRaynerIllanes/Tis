@@ -237,6 +237,17 @@ export function WaiterView({
   // Extraer el nombre real del mesero autenticado
   const currentUser = getStoredUser()
   const waiterName = currentUser ? `${currentUser.nombre} ${currentUser.apellido || ''}`.trim() : 'Mesero'
+  const userLocation = (currentUser as any)?.ubicacion || ''
+
+  // Filtrar ubicaciones según el rol (Los admin ven todo, los meseros solo su área asignada)
+  const displayLocations = isAdmin ? LOCATIONS : (userLocation ? [userLocation] : [])
+
+  // Si es mesero y tiene un área, forzar la selección de su área automáticamente
+  useEffect(() => {
+    if (!isAdmin && userLocation && activeLocation !== userLocation) {
+      setActiveLocation(userLocation)
+    }
+  }, [isAdmin, userLocation, activeLocation, setActiveLocation])
 
   const handleLogout = () => {
     localStorage.clear()
@@ -456,7 +467,7 @@ export function WaiterView({
             {/* Spacer for proper left scroll padding */}
             <div className="w-1 sm:w-2 shrink-0" aria-hidden="true" />
             <div className="flex gap-1.5 sm:gap-2 items-center shrink-0">
-              {LOCATIONS.map((loc, index) => (
+          {displayLocations.map((loc, index) => (
                 <button
                   key={loc || index}
                   onClick={() => setActiveLocation(loc)}

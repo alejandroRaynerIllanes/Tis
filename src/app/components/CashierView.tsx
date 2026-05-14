@@ -344,8 +344,8 @@ export function CashierView() {
                   <label className="block text-[11px] font-bold text-[#4B2E2D] uppercase mb-2">Método de pago</label>
                   <div className="grid grid-cols-3 gap-2">
                     {[
-                      { id: 'efectivo', label: 'Efectivo', icon: <Banknote size={18} /> },
-                      { id: 'tarjeta', label: 'Tarjeta', icon: <CreditCard size={18} /> },
+                      { id: 'Efectivo', label: 'Efectivo', icon: <Banknote size={18} /> },
+                      { id: 'Tarjeta', label: 'Tarjeta', icon: <CreditCard size={18} /> },
                       { id: 'QR', label: 'QR', icon: <QrCode size={18} /> }
                     ].map((method) => (
                       <button 

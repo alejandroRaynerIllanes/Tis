@@ -27,7 +27,7 @@ import { PreCuentaModal } from './PreCuentaModal'
 import { ReserveTableModal } from './ReserveTableModal'
 import { CancelReservationModal } from './CancelReservationModal'
 import { TableSidePanel } from './TableSidePanel'
-import { getStoredUser } from '../services/api'
+import { getStoredUser, api } from '../services/api'
 import { ordersService } from '../services/orders.service'
 import { WaiterHistoryModal } from './WaiterHistoryModal'
 
@@ -233,11 +233,27 @@ export function WaiterView({
 
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
+  const [fetchedLocation, setFetchedLocation] = useState<string>('')
 
   // Extraer el nombre real del mesero autenticado
   const currentUser = getStoredUser()
   const waiterName = currentUser ? `${currentUser.nombre} ${currentUser.apellido || ''}`.trim() : 'Mesero'
-  const userLocation = (currentUser as any)?.ubicacion || ''
+  const userLocation = (currentUser as any)?.ubicacion || fetchedLocation
+
+  // Respaldo dinámico: Si el backend no envió la ubicación al hacer login, la buscamos
+  useEffect(() => {
+    if (!isAdmin && !(currentUser as any)?.ubicacion && currentUser?.id) {
+      api.get('/usuarios').then((res: any) => {
+        const me = res.data.find((u: any) => u._id === currentUser.id || u.id === currentUser.id)
+        if (me && me.ubicacion) {
+          setFetchedLocation(me.ubicacion)
+          // Actualizamos la sesión localmente para que funcione más rápido en la próxima
+          const updatedUser = { ...currentUser, ubicacion: me.ubicacion }
+          localStorage.setItem('authUser', JSON.stringify(updatedUser)) 
+        }
+      }).catch(() => {})
+    }
+  }, [isAdmin, currentUser])
 
   // Filtrar ubicaciones según el rol (Los admin ven todo, los meseros solo su área asignada)
   const displayLocations = isAdmin ? LOCATIONS : (userLocation ? [userLocation] : [])
@@ -248,6 +264,11 @@ export function WaiterView({
       setActiveLocation(userLocation)
     }
   }, [isAdmin, userLocation, activeLocation, setActiveLocation])
+
+  // Filtro ESTRICTO final: Garantiza que un mesero NUNCA vea mesas que no le pertenecen
+  const finalFilteredTables = isAdmin 
+    ? filteredTables 
+    : filteredTables.filter(t => getTableLocation(t) === userLocation)
 
   const handleLogout = () => {
     localStorage.clear()
@@ -544,7 +565,7 @@ export function WaiterView({
 
           {/* ── Grid de Mesas ── */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5 pb-20">
-            {filteredTables.map((t, index) => {
+            {finalFilteredTables.map((t, index) => {
               const cfg = getTableConfig((t.status || '').toLowerCase())
               const isSelected = activeTableId === t.id
               const tableKey = t.id || (t as TableWithFallbacks)._id || index

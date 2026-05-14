@@ -9,7 +9,8 @@ import {
   Users,
   Shield,
   UserCheck,
-  UserCog
+  UserCog,
+  CreditCard
 } from 'lucide-react'
 import { usersService, BackendUser } from '../../services/users.service'
 import { toast } from 'sonner'
@@ -153,6 +154,13 @@ export function UserManagement() {
         text: 'text-[#D0543A]',
         border: 'border-[#D0543A]/30',
         icon: <Shield size={12} />
+      }
+    if (role === 'Cajero' || role === 'cajero')
+      return {
+        bg: 'bg-[#F5E6D3]',
+        text: 'text-[#4B2E2D]',
+        border: 'border-[#E0D0C5]',
+        icon: <CreditCard size={12} />
       }
     if (role === 'Mesero')
       return {
@@ -360,6 +368,7 @@ export function UserManagement() {
                   required
                 >
                   <option value="Administrador">Administrador</option>
+                  <option value="Cajero">Cajero</option>
                   <option value="Mesero">Mesero</option>
                   <option value="Cocinero">Cocinero</option>
                 </select>

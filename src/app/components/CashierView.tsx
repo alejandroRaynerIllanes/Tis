@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
+import { getStoredUser } from '../services/api'
 
 // ─── DATOS SIMULADOS (MOCKS) PARA EL DISEÑO ─────────────────────────────────
 
@@ -81,7 +82,8 @@ export function CashierView() {
   const [discountPercent, setDiscountPercent] = useState<number>(0)
   const [isProcessing, setIsProcessing] = useState(false)
 
-  const cashierName = localStorage.getItem('userName') || 'Cajero de Turno'
+  const currentUser = getStoredUser()
+  const cashierName = currentUser ? `${currentUser.nombre} ${currentUser.apellido || ''}`.trim() : 'Cajero de Turno'
 
   const handleLogout = () => {
     localStorage.clear()

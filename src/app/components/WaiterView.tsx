@@ -438,7 +438,7 @@ export function WaiterView({
                               )}
                               {n.meta?.actionType === 'process_payment' && (
                                 <button onClick={(e) => handleNotificationAction(e, n)} className="text-[12px] font-black px-4 py-2 bg-[#D96C4A] hover:bg-[#C25838] text-white rounded-xl shadow-md shadow-[#D96C4A]/20 transition-all active:scale-95 flex items-center gap-1.5">
-                                  <Receipt size={14} /> Ver Mesa y Cobrar
+                                  <Receipt size={14} /> Ver mesa
                                 </button>
                               )}
                               <button onClick={(e) => { e.stopPropagation(); markNotificationAsRead(n.id); }} className="text-[12px] font-bold px-3 py-2 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-xl transition-all active:scale-95">
@@ -799,6 +799,7 @@ export function WaiterView({
         orderTotal={orderTotal}
         onSuccess={() => {
           closePaymentModal()
+          handleCloseModal()
         }}
       />
 

@@ -56,7 +56,10 @@ export function ChefView() {
       try {
         const res: any = await api.get('/pedidos?activo=true')
         const activeOrders = res.data || res || []
-        setOrders(activeOrders.map(formatOrder))
+        
+        // Ocultar pedidos específicos atascados
+        const pedidosOcultos = ['PED-5EBA', 'PED-D2E7', 'PED-EDC2']
+        setOrders(activeOrders.map(formatOrder).filter((o: Order) => !pedidosOcultos.includes(o.id)))
       } catch (err) {
         console.error('Error fetching orders', err)
       }
@@ -68,11 +71,17 @@ export function ChefView() {
     if (!socket) return
 
     const handleNuevoPedido = (o: any) => {
+      const code = o.codigo || `PED-${String(o._id || '').slice(-4).toUpperCase()}`
+      if (['PED-5EBA', 'PED-D2E7', 'PED-EDC2'].includes(code)) return;
+
       setOrders(prev => [formatOrder(o), ...prev])
       toast.info(`🔔 ¡Nuevo pedido recibido! (${o.codigo || 'Mesa'})`)
     }
 
     const handleActualizarTablero = (o: any) => {
+      const code = o.codigo || `PED-${String(o._id || '').slice(-4).toUpperCase()}`
+      if (['PED-5EBA', 'PED-D2E7', 'PED-EDC2'].includes(code)) return;
+
       // Si el pedido fue cancelado o cobrado, desaparece de la vista.
       // Si está en 'ENTREGADO' (Listo), se queda en la última columna hasta que se pague.
       if (['CANCELADO', 'CERRADO'].includes(o.estado)) {

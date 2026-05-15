@@ -1,15 +1,24 @@
 import React, { useEffect, useState } from 'react'
-import { UserCheck, MapPin, Receipt, Coins, Flame, ChefHat } from 'lucide-react'
+import { UserCheck, MapPin, Receipt, Coins, Flame, ChefHat, Edit2, Check, X } from 'lucide-react'
 import { usersService } from '../../services/users.service'
 import { api } from '../../services/api'
+import { toast } from 'sonner'
 
 export function ActiveWaitersSection() {
   const [waitersData, setWaitersData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [locations, setLocations] = useState<any[]>([])
+  const [editingZone, setEditingZone] = useState<string | null>(null)
+  const [selectedZone, setSelectedZone] = useState<string>('')
+  const [isSavingZone, setIsSavingZone] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
+        // Obtener ubicaciones para el selector
+        const locs = await api.get<any[]>('/ubicaciones')
+        setLocations(locs)
+
         // 1. Obtener todos los usuarios y filtrar meseros
         const users = await usersService.getAll()
         const waiters = users.filter((u: any) => u.rol.toLowerCase() === 'mesero' && u.estado === true)
@@ -27,13 +36,18 @@ export function ActiveWaitersSection() {
           const totalSold = closedOrders.reduce((sum: number, o: any) => sum + (o.total || 0), 0)
           const totalTips = closedOrders.reduce((sum: number, o: any) => sum + (o.montoPropina || 0), 0)
 
-          // Deducir zona principal según la mesa que más atendieron
-          const locationsCounts: any = {}
-          myOrders.forEach((o: any) => {
-            const loc = o.mesa?.ubicacion?.nombre || o.mesa?.ubicacionId?.nombre || 'Interior'
-            locationsCounts[loc] = (locationsCounts[loc] || 0) + 1
-          })
-        const primaryZone = waiter.ubicacion || Object.keys(locationsCounts).sort((a,b) => locationsCounts[b] - locationsCounts[a])[0] || 'Sin asignar'
+          // 1. Obtener la zona real guardada en el perfil del mesero directamente
+          let primaryZone = waiter.zona
+
+          // 2. Si por algún motivo histórico no tiene zona asignada, deducirla de los pedidos
+          if (!primaryZone || typeof primaryZone !== 'string' || primaryZone.trim() === '') {
+            const locationsCounts: any = {}
+            myOrders.forEach((o: any) => {
+              const loc = o.mesa?.ubicacion?.nombre || o.mesa?.ubicacionId?.nombre || 'Interior'
+              locationsCounts[loc] = (locationsCounts[loc] || 0) + 1
+            })
+            primaryZone = Object.keys(locationsCounts).sort((a,b) => locationsCounts[b] - locationsCounts[a])[0] || 'Sin asignar'
+          }
 
           return {
             id: waiter._id,
@@ -56,6 +70,25 @@ export function ActiveWaitersSection() {
     }
     fetchData()
   }, [])
+
+  const handleSaveZone = async (waiterId: string) => {
+    if (!selectedZone) {
+      toast.error('Selecciona una zona válida')
+      return
+    }
+    setIsSavingZone(true)
+    try {
+      await usersService.update(waiterId, { zona: selectedZone })
+      toast.success('Zona asignada exitosamente')
+      setWaitersData(prev => prev.map(w => w.id === waiterId ? { ...w, zone: selectedZone } : w))
+      setEditingZone(null)
+    } catch (error) {
+      console.error('Error al asignar zona:', error)
+      toast.error('Error al asignar la zona')
+    } finally {
+      setIsSavingZone(false)
+    }
+  }
 
   return (
     <>
@@ -83,7 +116,28 @@ export function ActiveWaitersSection() {
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#6B3E2E] to-[#D96C4A] text-white flex items-center justify-center font-black text-xl shadow-md">{waiter.name.charAt(0)}</div>
-                    <div><h3 className="font-black text-lg text-[#4B2E2D] leading-tight">{waiter.name}</h3><span className="flex items-center gap-1 text-xs font-bold text-[#4B2E2D]/60 mt-0.5"><MapPin size={12} /> Zona: {waiter.zone}</span></div>
+                    <div>
+                      <h3 className="font-black text-lg text-[#4B2E2D] leading-tight">{waiter.name}</h3>
+                      {editingZone === waiter.id ? (
+                        <div className="flex items-center gap-1 mt-1">
+                          <select
+                            value={selectedZone}
+                            onChange={(e) => setSelectedZone(e.target.value)}
+                            className="text-xs border border-[#E0D0C5] rounded p-1 bg-white text-[#4B2E2D] outline-none focus:border-[#D96C4A]"
+                            disabled={isSavingZone}
+                          >
+                            <option value="">Seleccionar...</option>
+                            {locations.map((l: any) => (
+                              <option key={l._id || l.id} value={l.nombre || l.name}>{l.nombre || l.name}</option>
+                            ))}
+                          </select>
+                          <button disabled={isSavingZone} onClick={() => handleSaveZone(waiter.id)} className="p-1 bg-emerald-100 text-emerald-600 rounded hover:bg-emerald-200 disabled:opacity-50 transition-colors"><Check size={12}/></button>
+                          <button disabled={isSavingZone} onClick={() => setEditingZone(null)} className="p-1 bg-red-100 text-red-600 rounded hover:bg-red-200 disabled:opacity-50 transition-colors"><X size={12}/></button>
+                        </div>
+                      ) : (
+                        <span onClick={() => { setEditingZone(waiter.id); setSelectedZone(waiter.zone === 'Sin asignar' ? '' : waiter.zone); }} className="flex items-center gap-1 text-xs font-bold text-[#4B2E2D]/60 mt-0.5 cursor-pointer group hover:text-[#D96C4A] transition-colors" title="Click para editar zona"><MapPin size={12} /> Zona: {waiter.zone} <Edit2 size={10} className="opacity-0 group-hover:opacity-100 transition-opacity ml-1" /></span>
+                      )}
+                    </div>
                   </div>
                   <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${waiter.status === 'Ocupado' ? 'bg-orange-50 text-orange-600 border-orange-200' : 'bg-emerald-50 text-emerald-600 border-emerald-200'}`}>
                     {waiter.status === 'Ocupado' ? 'En servicio' : 'Libre'}

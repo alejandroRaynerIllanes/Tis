@@ -29,7 +29,7 @@ export function UserManagement() {
     email: '',
     role: 'Mesero',
     password: '',
-    ubicacion: ''
+    zona: ''
   })
   const [userToDelete, setUserToDelete] = useState<string | null>(null)
 
@@ -60,7 +60,7 @@ export function UserManagement() {
       email: '',
       role: 'Mesero',
       password: '',
-      ubicacion: ''
+      zona: ''
     })
     setIsUserModalOpen(true)
   }
@@ -74,7 +74,7 @@ export function UserManagement() {
       email: user.email,
       role: user.rol,
       password: '',
-      ubicacion: (user as any).ubicacion || ''
+      zona: (user as any).zona || (user as any).ubicacion || ''
     })
     setIsUserModalOpen(true)
   }
@@ -91,7 +91,7 @@ export function UserManagement() {
       return
     }
 
-  if (userFormData.role === 'Mesero' && !userFormData.ubicacion) {
+  if (userFormData.role === 'Mesero' && !userFormData.zona) {
     toast.error('El área asignada es obligatoria para los meseros.')
     return
   }
@@ -102,8 +102,8 @@ export function UserManagement() {
         apellido: userFormData.lastName,
         ci: userFormData.ci,
         email: userFormData.email,
-      rol: userFormData.role,
-      ubicacion: userFormData.role === 'Mesero' ? userFormData.ubicacion : undefined
+        rol: userFormData.role,
+        zona: userFormData.role === 'Mesero' ? userFormData.zona : undefined
       }
 
       if (userEditingId) {
@@ -256,9 +256,9 @@ export function UserManagement() {
                       {badge.icon}
                       {user.rol}
                     </span>
-                    {user.rol.toLowerCase() === 'mesero' && (user as any).ubicacion && (
+                    {user.rol.toLowerCase() === 'mesero' && (user as any).zona && (
                       <span className="text-[10px] font-bold text-[#4B2E2D]/60 flex items-center gap-1 mt-0.5 ml-1">
-                        <MapPin size={10} /> {(user as any).ubicacion}
+                        <MapPin size={10} /> {(user as any).zona}
                       </span>
                     )}
                   </div>
@@ -399,11 +399,11 @@ export function UserManagement() {
           {userFormData.role === 'Mesero' && (
             <div className="animate-in fade-in slide-in-from-top-2 duration-300">
               <label className="block text-sm font-bold text-[#4B2E2D] mb-2">
-                Área asignada (Ubicación) <span className="text-red-500">*</span>
+                Área asignada (Zona) <span className="text-red-500">*</span>
               </label>
               <select
-                value={userFormData.ubicacion}
-                onChange={(e) => setUserFormData({ ...userFormData, ubicacion: e.target.value })}
+                value={userFormData.zona}
+                onChange={(e) => setUserFormData({ ...userFormData, zona: e.target.value })}
                 className="w-full px-4 py-3 rounded-xl border-2 border-[#E57C5D] text-[#4B2E2D] focus:outline-none focus:ring-2 focus:ring-[#D0543A] focus:border-transparent transition-all bg-white cursor-pointer"
                 required
               >
@@ -411,10 +411,13 @@ export function UserManagement() {
                 {locations.map((loc) => (
                   <option key={loc.id} value={loc.name}>{loc.name}</option>
                 ))}
+                {userFormData.zona && !locations.some(l => l.name === userFormData.zona) && (
+                  <option value={userFormData.zona}>{userFormData.zona}</option>
+                )}
               </select>
               {(() => {
-                if (!userFormData.ubicacion) return null;
-                const count = users.filter((u) => u.rol.toLowerCase() === 'mesero' && (u as any).ubicacion === userFormData.ubicacion && u.estado && u._id !== userEditingId).length;
+                if (!userFormData.zona) return null;
+                const count = users.filter((u) => u.rol.toLowerCase() === 'mesero' && (u as any).zona === userFormData.zona && u.estado && u._id !== userEditingId).length;
                 if (count >= 3) {
                   return <p className="text-amber-600 text-[11px] font-bold mt-1.5 flex items-center gap-1"><AlertTriangle size={12}/> Ya hay {count} meseros en esta área (Límite recomendado).</p>;
                 }

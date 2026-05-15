@@ -13,6 +13,7 @@ export interface BackendUser {
   email: string
   rol: string
   estado: boolean
+  zona?: string
   createdAt?: string
   updatedAt?: string
 }
@@ -25,6 +26,7 @@ export interface CreateUserPayload {
   email: string
   password: string // <-- CORRECCIÓN: 'password' en lugar de 'contraseña'
   rol: string
+  zona?: string
 }
 
 // Payload para editar usuario
@@ -35,6 +37,7 @@ export interface UpdateUserPayload {
   email?: string
   password?: string // <-- CORRECCIÓN: 'password' en lugar de 'contraseña'
   rol?: string
+  zona?: string
 }
 
 export const usersService = {

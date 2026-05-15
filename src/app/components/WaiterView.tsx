@@ -238,37 +238,45 @@ export function WaiterView({
   // Extraer el nombre real del mesero autenticado
   const currentUser = getStoredUser()
   const waiterName = currentUser ? `${currentUser.nombre} ${currentUser.apellido || ''}`.trim() : 'Mesero'
-  const userLocation = (currentUser as any)?.ubicacion || fetchedLocation
+  const userLocation = (currentUser as any)?.zona || (currentUser as any)?.ubicacion || fetchedLocation
 
-  // Respaldo dinámico: Si el backend no envió la ubicación al hacer login, la buscamos
+  // Helper para normalizar nombres de zonas/ubicaciones y evitar problemas de mayúsculas/minúsculas/espacios
+  const normalizeZone = (z: string | null | undefined) => String(z || '').toLowerCase().trim()
+
+  // Buscar la ubicación exacta en el sistema (con sus mayúsculas originales) que coincide con la zona del mesero
+  const matchedUserLocation = LOCATIONS.find((loc: string) => normalizeZone(loc) === normalizeZone(userLocation)) || userLocation
+
+  // Respaldo dinámico: Si el backend no envió la zona al hacer login, la buscamos
   useEffect(() => {
-    if (!isAdmin && !(currentUser as any)?.ubicacion && currentUser?.id) {
+    if (!isAdmin && !userLocation && (currentUser?.id || (currentUser as any)?._id)) {
       api.get('/usuarios').then((res: any) => {
-        const me = res.data.find((u: any) => u._id === currentUser.id || u.id === currentUser.id)
-        if (me && me.ubicacion) {
-          setFetchedLocation(me.ubicacion)
+        const targetId = currentUser?.id || (currentUser as any)?._id
+        const me = res.data.find((u: any) => u._id === targetId || u.id === targetId)
+        if (me && me.zona) {
+          setFetchedLocation(me.zona)
           // Actualizamos la sesión localmente para que funcione más rápido en la próxima
-          const updatedUser = { ...currentUser, ubicacion: me.ubicacion }
-          localStorage.setItem('authUser', JSON.stringify(updatedUser)) 
+          const updatedUser = { ...(currentUser || {}), zona: me.zona, ubicacion: me.zona }
+          localStorage.setItem('user', JSON.stringify(updatedUser))
+          localStorage.setItem('authUser', JSON.stringify(updatedUser))
         }
       }).catch(() => {})
     }
   }, [isAdmin, currentUser])
 
   // Filtrar ubicaciones según el rol (Los admin ven todo, los meseros solo su área asignada)
-  const displayLocations = isAdmin ? LOCATIONS : (userLocation ? [userLocation] : [])
+  const displayLocations = isAdmin ? LOCATIONS : (matchedUserLocation ? [matchedUserLocation] : [])
 
   // Si es mesero y tiene un área, forzar la selección de su área automáticamente
   useEffect(() => {
-    if (!isAdmin && userLocation && activeLocation !== userLocation) {
-      setActiveLocation(userLocation)
+    if (!isAdmin && matchedUserLocation && activeLocation !== matchedUserLocation) {
+      setActiveLocation(matchedUserLocation)
     }
-  }, [isAdmin, userLocation, activeLocation, setActiveLocation])
+  }, [isAdmin, matchedUserLocation, activeLocation, setActiveLocation])
 
   // Filtro ESTRICTO final: Garantiza que un mesero NUNCA vea mesas que no le pertenecen
   const finalFilteredTables = isAdmin 
     ? filteredTables 
-    : filteredTables.filter(t => getTableLocation(t) === userLocation)
+    : filteredTables.filter(t => normalizeZone(getTableLocation(t)) === normalizeZone(userLocation))
 
   const handleLogout = () => {
     localStorage.clear()
@@ -730,6 +738,20 @@ export function WaiterView({
                 </div>
               )
             })}
+
+            {finalFilteredTables.length === 0 && (
+              <div className="col-span-full flex flex-col items-center justify-center py-20 opacity-80 text-center">
+                <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mb-4 border border-white/20">
+                  <MapPin size={32} className="text-white/60" />
+                </div>
+                <h3 className="text-2xl font-black text-white mb-2">No hay mesas visibles</h3>
+                <p className="text-white/70 font-medium max-w-md">
+                  {!userLocation 
+                    ? 'Aún no tienes una zona asignada. Por favor, pide al administrador que te asigne una ubicación (ej: Terraza).'
+                    : `No se encontraron mesas registradas en tu zona asignada (${userLocation}).`}
+                </p>
+              </div>
+            )}
           </div>
         </section>
 

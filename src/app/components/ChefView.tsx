@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react'
 import { ChefHat, Clock, Play, CheckCircle2, Flame, AlertCircle, LogOut, User } from 'lucide-react'
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router'
-import { io } from 'socket.io-client'
-import { getToken, getStoredUser, api } from '../services/api'
+import { getStoredUser, api } from '../services/api'
 import { ordersService } from '../services/orders.service'
+import { useAppContext } from '../context/AppContext'
 
 type OrderStatus = 'Pendiente' | 'En preparación' | 'Listo'
 
@@ -29,52 +29,50 @@ interface Order {
 export function ChefView() {
   const [orders, setOrders] = useState<Order[]>([])
   const navigate = useNavigate()
+  const { socket } = useAppContext()
 
   const currentUser = getStoredUser()
   const chefName = currentUser ? `${currentUser.nombre} ${currentUser.apellido || ''}`.trim() : 'Cocinero'
 
-  useEffect(() => {
-    const formatOrder = (o: any): Order => ({
-      // Si es un pedido antiguo sin código, generamos uno a partir del _id para que jamás se vea el hash largo
-      id: o.codigo || `PED-${String(o._id || '').slice(-4).toUpperCase()}`,
-      rawId: o._id,
-      table: o.mesa?.numero || o.mesa?.name || 'Mesa ?',
-      waiter: o.usuario?.nombre ? `${o.usuario.nombre} ${o.usuario.apellido || ''}`.trim() : 'Mesero',
-      time: new Date(o.fechaHora || o.createdAt || Date.now()).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-      status: o.estado === 'ABIERTO' ? 'Pendiente' : o.estado === 'EN_PREPARACION' ? 'En preparación' : 'Listo',
-      isVip: o.mesa?.tipo === 'vip' || o.vip,
-      items: (o.detalles || []).map((d: any, idx: number) => ({
-        id: d.plato?._id || String(idx),
-        name: d.plato?.nombre || 'Plato',
-        quantity: d.cantidad,
-        notes: d.observacion
-      }))
-    })
+  const formatOrder = (o: any): Order => ({
+    // Si es un pedido antiguo sin código, generamos uno a partir del _id para que jamás se vea el hash largo
+    id: o.codigo || `PED-${String(o._id || '').slice(-4).toUpperCase()}`,
+    rawId: o._id,
+    table: o.mesa?.numero || o.mesa?.name || 'Mesa ?',
+    waiter: o.usuario?.nombre ? `${o.usuario.nombre} ${o.usuario.apellido || ''}`.trim() : 'Mesero',
+    time: new Date(o.fechaHora || o.createdAt || Date.now()).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+    status: o.estado === 'ABIERTO' ? 'Pendiente' : o.estado === 'EN_PREPARACION' ? 'En preparación' : 'Listo',
+    isVip: o.mesa?.tipo === 'vip' || o.vip,
+    items: (o.detalles || []).map((d: any, idx: number) => ({
+      id: d.plato?._id || String(idx),
+      name: d.plato?.nombre || 'Plato',
+      quantity: d.cantidad,
+      notes: d.observacion
+    }))
+  })
 
+  useEffect(() => {
     const fetchOrders = async () => {
       try {
-        const data = await ordersService.getAll()
-        // SOLO se muestran pedidos activos reales
-        const activeOrders = data.filter((o: any) => ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO'].includes(o.estado))
+        const res: any = await api.get('/pedidos?activo=true')
+        const activeOrders = res.data || res || []
         setOrders(activeOrders.map(formatOrder))
       } catch (err) {
         console.error('Error fetching orders', err)
       }
     }
     fetchOrders()
+  }, [])
 
-    const token = getToken()
-    if (!token) return
-    const baseApi = (import.meta as any).env.VITE_API_URL || 'http://localhost:3000/api'
-    const socketUrl = baseApi.replace(/\/api\/?$/, '')
-    const socket = io(socketUrl, { auth: { token } })
+  useEffect(() => {
+    if (!socket) return
 
-    socket.on('cocina:nuevo_pedido', (o: any) => {
+    const handleNuevoPedido = (o: any) => {
       setOrders(prev => [formatOrder(o), ...prev])
       toast.info(`🔔 ¡Nuevo pedido recibido! (${o.codigo || 'Mesa'})`)
-    })
+    }
 
-    socket.on('cocina:actualizar_tablero', (o: any) => {
+    const handleActualizarTablero = (o: any) => {
       // Si el pedido fue cancelado, cobrado o entregado al cliente, desaparece de la vista
       if (['CANCELADO', 'CERRADO', 'SERVIDO'].includes(o.estado)) {
         setOrders(prev => prev.filter(ord => ord.rawId !== o._id))
@@ -85,10 +83,16 @@ export function ChefView() {
           return [formatOrder(o), ...prev]
         })
       }
-    })
+    }
 
-    return () => { socket.disconnect() }
-  }, [])
+    socket.on('cocina:nuevo_pedido', handleNuevoPedido)
+    socket.on('cocina:actualizar_tablero', handleActualizarTablero)
+
+    return () => { 
+      socket.off('cocina:nuevo_pedido', handleNuevoPedido)
+      socket.off('cocina:actualizar_tablero', handleActualizarTablero)
+    }
+  }, [socket])
 
   // Función para cambiar el estado del pedido
   const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {

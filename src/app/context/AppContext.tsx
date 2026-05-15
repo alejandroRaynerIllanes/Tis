@@ -44,6 +44,7 @@ interface AppContextType {
   orders: Record<string, OrderItem[]>
   reservations: Record<string, ReservationInfo[]>
   notifications: AppNotification[]
+  socket: any
   updateProductStatus: (id: string, status: ProductStatus) => void
   updateTableStatus: (id: string, status: TableStatus) => void
   addOrderItem: (tableId: string, product: Product) => void
@@ -116,7 +117,28 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [orders, setOrders] = useState<Record<string, OrderItem[]>>({})
   const [reservations, setReservations] = useState<Record<string, ReservationInfo[]>>({})
   const [notifications, setNotifications] = useState<AppNotification[]>([])
+  const [socketInstance, setSocketInstance] = useState<any>(null)
   const socketRef = useRef<any>(null)
+
+  const getTableId = (table: any) => table?.id || table?._id
+
+  const normalizarMesa = (item: any): Table => {
+    const rawStatus = item?.status || item?.estado || 'Libre'
+    const status: TableStatus =
+      rawStatus === 'Libre' ? 'Disponible'
+      : rawStatus === 'Cuenta Solicitada' ? 'Esperando pago'
+      : rawStatus
+
+    return {
+      id: (item?.id || item?._id)?.toString(),
+      name: item?.name || item?.numero || '—',
+      capacity: item?.capacity ?? item?.capacidad ?? 2,
+      location: typeof item?.ubicacion === 'object' ? item?.ubicacion?.nombre || item?.ubicacion?._id?.toString() || '' : item?.location || item?.ubicacion || '',
+      type: item?.type || item?.tipo || 'normal',
+      status,
+      locationId: item?.locationId || (typeof item?.ubicacion === 'object' ? item?.ubicacion?._id?.toString() : item?.ubicacion) || item?.location
+    } as any
+  }
 
   // 🚀 REPARACIÓN CRÍTICA: Función para inicializar Sockets SOLO cuando ya hay sesión
   const initSocket = useCallback(() => {
@@ -144,6 +166,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         reconnectionDelay: 2000
       })
       socketRef.current = socket
+      setSocketInstance(socket)
       socket.on('connect', () => console.log('🟢 Socket conectado correctamente:', socket.id))
       socket.on('disconnect', (reason) => console.warn('🔴 Socket desconectado:', reason))
 
@@ -276,7 +299,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const [fetchedTables, fetchedProducts, fetchedOrders, fetchedReservations] = await Promise.all([
         tablesService.getAll(),
         platosService.getAll(),
-        ordersService.getAll().catch(() => []), // Evita fallos si no hay ordenes
+        api.get('/pedidos?activo=true').then((r: any) => r.data || r).catch(() => []), // Trae solo activos
         reservationsService.getAll().catch(() => [])
       ])
 
@@ -299,7 +322,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
       // Sincronizar órdenes activas desde el backend
       if (Array.isArray(fetchedOrders)) {
-        const activeOrders = fetchedOrders.filter((o: any) => o.estado === 'ABIERTO' || o.estado === 'EN_PREPARACION' || o.estado === 'ENTREGADO' || o.estado === 'SERVIDO')
+        const activeOrders = fetchedOrders // Ya vienen filtrados por activo=true
         const ordersMap: Record<string, OrderItem[]> = {}
         
         activeOrders.forEach((o: any) => {
@@ -353,8 +376,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     loadInitialData()
   }, [loadInitialData])
 
-  const getTableId = (table: any) => table?.id || table?._id
-
   const normalizarReserva = (r: any) => {
     const tId = r.mesa?._id || r.mesa?.id || r.mesa || ''
     let dateStr = ''
@@ -378,28 +399,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       vip: Boolean(r.vip)
     }
     return { tableId: tId.toString(), resInfo }
-  }
-
-  // ─── Añadir después de getTableId (línea 92) ─────────────────────────────────
-  const normalizarMesa = (item: any): Table => {
-    const rawStatus = item?.status || item?.estado || 'Libre'
-    const status: TableStatus =
-      rawStatus === 'Libre' ? 'Disponible'
-      : rawStatus === 'Cuenta Solicitada' ? 'Esperando pago'
-      : rawStatus
-
-    return {
-      id: (item?.id || item?._id)?.toString(),
-      name: item?.name || item?.numero || '—',
-      capacity: item?.capacity ?? item?.capacidad ?? 2,
-      location:
-        typeof item?.ubicacion === 'object'
-          ? item?.ubicacion?.nombre || item?.ubicacion?._id?.toString() || ''
-          : item?.location || item?.ubicacion || '',
-      type: item?.type || item?.tipo || 'normal',
-      status,
-      locationId: item?.locationId || (typeof item?.ubicacion === 'object' ? item?.ubicacion?._id?.toString() : item?.ubicacion) || item?.location
-    } as any
   }
 
   useEffect(() => {
@@ -578,8 +577,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const clearOrder = async (tableId: string) => {
     try {
-      const allOrders = await ordersService.getAll()
-      const tableOrder = allOrders.find((o: any) => (o.mesa?._id === tableId || o.mesa === tableId) && ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO', 'SERVIDO'].includes(o.estado))
+      const resData: any = await api.get(`/pedidos?mesa=${tableId}&activo=true`)
+      const tableOrders = resData.data || resData || []
+      const tableOrder = tableOrders[0]
       if (tableOrder) {
         await ordersService.updateStatus(tableOrder._id || tableOrder.id, 'CANCELADO')
       }
@@ -670,11 +670,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
 
         // 3. INTELIGENCIA: Revisar si la mesa ya tiene un pedido activo
-        const allOrders = await ordersService.getAll()
-        const existingOrder = allOrders.find((o: any) => 
-          (o.mesa?._id === tableId || o.mesa === tableId) && 
-          ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO', 'SERVIDO'].includes(o.estado)
-        )
+        const resData: any = await api.get(`/pedidos?mesa=${tableId}&activo=true`)
+        const tableOrders = resData.data || resData || []
+        const existingOrder = tableOrders[0]
 
         if (existingOrder) {
           const targetId = existingOrder._id || existingOrder.id;
@@ -800,6 +798,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     orders,
     reservations,
     notifications,
+    socket: socketInstance,
     updateProductStatus,
     updateTableStatus,
     addOrderItem,

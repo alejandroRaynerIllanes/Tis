@@ -81,12 +81,9 @@ export function PreCuentaModal({ isOpen, onClose, tableId, tableName, activeOrde
     setIsSubmitting(true)
     try {
       // Buscar el pedido real en la base de datos para obtener su ID
-      const resData: any = await api.get('/pedidos?hoy=true')
-      const allOrders = resData.data || resData || []
-      const activeBackendOrder = allOrders.find((o: any) => 
-        (o.mesa?._id === tableId || o.mesa === tableId) && 
-        ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO', 'SERVIDO'].includes(o.estado)
-      )
+      const resData: any = await api.get(`/pedidos?mesa=${tableId}&activo=true`)
+      const tableOrders = resData.data || resData || []
+      const activeBackendOrder = tableOrders[0] // Como filtramos en backend, el primero es el correcto
 
       if (!activeBackendOrder) {
         toast.error('No hay un pedido activo en la base de datos (Posiblemente ya fue cobrado). Cierra el panel y usa "Liberar mesa".')

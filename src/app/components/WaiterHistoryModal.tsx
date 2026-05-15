@@ -21,18 +21,17 @@ export function WaiterHistoryModal({ isOpen, onClose }: WaiterHistoryModalProps)
   const fetchHistory = async () => {
     setLoading(true)
     try {
-      // Filtra por la fecha seleccionada en el calendario
-      const selectedOrders = await api.get<any[]>(`/pedidos?fecha=${selectedDate}`)
       const currentUser = getStoredUser()
       const userId = String(currentUser?.id || (currentUser as any)?._id || '')
+      
+      // Filtra por la fecha seleccionada en el calendario
+      const selectedOrders = await api.get<any[]>(`/pedidos?fecha=${selectedDate}&mesero=${userId}`)
       
       const historyData = Array.isArray(selectedOrders) ? selectedOrders : (selectedOrders as any).data || []
 
       const history = historyData.filter((o: any) => {
-        const orderUserId = String(o.usuario?._id || o.usuario?.id || o.usuario || '')
-        const isMyOrder = orderUserId === userId
         const isCompleted = ['CERRADO', 'ENTREGADO', 'SERVIDO'].includes(o.estado)
-        return isMyOrder && isCompleted
+        return isCompleted
       })
 
       setOrders(history.sort((a: any, b: any) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime()))

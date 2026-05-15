@@ -19,8 +19,8 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
-import { getStoredUser, api, getToken } from '../services/api'
-import { io } from 'socket.io-client'
+import { getStoredUser, api } from '../services/api'
+import { useAppContext } from '../context/AppContext'
 
 // ─── COMPONENTE PRINCIPAL ───────────────────────────────────────────────────
 
@@ -35,13 +35,15 @@ export function CashierView() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [isRegisterClosed, setIsRegisterClosed] = useState(false)
 
+  const { socket } = useAppContext()
   const currentUser = getStoredUser()
   const cashierName = currentUser ? `${currentUser.nombre} ${currentUser.apellido || ''}`.trim() : 'Cajero de Turno'
 
   const fetchDashboardData = async () => {
     try {
-      const resData: any = await api.get('/pedidos?hoy=true')
-      const myOrders = resData.filter((o: any) => o.cajeroAsignado === currentUser?.id || o.cajeroAsignado === (currentUser as any)?._id)
+      const cajeroId = currentUser?.id || (currentUser as any)?._id
+      const resData: any = await api.get(`/pedidos?hoy=true&cajero=${cajeroId}`)
+      const myOrders = resData.data || resData || []
       
       // Pendientes: Asignadas a mí y que aún no están cerradas
       const pending = myOrders.filter((o: any) => o.estado !== 'CERRADO' && o.estado !== 'CANCELADO')
@@ -72,27 +74,30 @@ export function CashierView() {
 
   useEffect(() => {
     fetchDashboardData()
+  }, [])
 
-    const token = getToken()
-    if (!token) return
-    const baseApi = (import.meta as any).env.VITE_API_URL || 'http://localhost:3000/api'
-    const socketUrl = baseApi.replace(/\/api\/?$/, '')
-    const socket = io(socketUrl, { auth: { token } })
+  useEffect(() => {
+    if (!socket) return
 
-    // Escuchar cuando un mesero envía una cuenta
-    socket.on('caja:nueva_cuenta', (pedido: any) => {
+    const handleNuevaCuenta = (pedido: any) => {
       if (pedido.cajeroAsignado === currentUser?.id || pedido.cajeroAsignado === (currentUser as any)?._id) {
         toast.info(`¡Nueva cuenta recibida de la ${pedido.mesa?.numero || 'Mesa'}!`)
         fetchDashboardData()
       }
-    })
-    
-    socket.on('cocina:actualizar_tablero', () => {
-      fetchDashboardData()
-    })
+    }
 
-    return () => { socket.disconnect() }
-  }, [])
+    const handleActualizarTablero = () => {
+      fetchDashboardData()
+    }
+
+    socket.on('caja:nueva_cuenta', handleNuevaCuenta)
+    socket.on('cocina:actualizar_tablero', handleActualizarTablero)
+
+    return () => { 
+      socket.off('caja:nueva_cuenta', handleNuevaCuenta)
+      socket.off('cocina:actualizar_tablero', handleActualizarTablero)
+    }
+  }, [socket])
 
   const handleLogout = () => {
     localStorage.clear()

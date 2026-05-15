@@ -16,6 +16,7 @@ import {
   CreditCard
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { api } from '../services/api'
 import { useAppContext } from '../context/AppContext'
 import { platosService } from '../services/platos.service'
 import { ordersService } from '../services/orders.service'
@@ -63,9 +64,9 @@ export function TableSidePanel({
       setSearchQuery('')
       
       // Buscar si la mesa tiene un pedido en estado "Listo/ENTREGADO" en la cocina
-      ordersService.getAll().then((all: any[]) => {
-        const active = all.find((o: any) => (o.mesa?._id === tableId || o.mesa === tableId) && ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO', 'SERVIDO'].includes(o.estado))
-        setBackendOrder(active)
+      api.get(`/pedidos?mesa=${tableId}&activo=true`).then((res: any) => {
+        const tableOrders = res.data || res || []
+        setBackendOrder(tableOrders[0])
       }).catch(() => {})
     }
   }, [isOpen, tableId])

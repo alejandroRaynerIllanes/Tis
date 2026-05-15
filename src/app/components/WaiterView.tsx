@@ -243,8 +243,11 @@ export function WaiterView({
   // Helper para normalizar nombres de zonas/ubicaciones y evitar problemas de mayúsculas/minúsculas/espacios
   const normalizeZone = (z: string | null | undefined) => String(z || '').toLowerCase().trim()
 
+  // Identificar si el mesero es de la zona VIP
+  const isUserVipZone = normalizeZone(userLocation) === 'vip' || normalizeZone(userLocation) === 'zona vip'
+
   // Buscar la ubicación exacta en el sistema (con sus mayúsculas originales) que coincide con la zona del mesero
-  const matchedUserLocation = LOCATIONS.find((loc: string) => normalizeZone(loc) === normalizeZone(userLocation)) || userLocation
+  const matchedUserLocation = isUserVipZone ? 'VIP' : (LOCATIONS.find((loc: string) => normalizeZone(loc) === normalizeZone(userLocation)) || userLocation)
 
   // Respaldo dinámico: Si el backend no envió la zona al hacer login, la buscamos
   useEffect(() => {
@@ -273,10 +276,25 @@ export function WaiterView({
     }
   }, [isAdmin, matchedUserLocation, activeLocation, setActiveLocation])
 
+  // Identificamos las mesas que le pertenecen a este mesero basado en su zona
+  const myAllowedTables = tables.filter(t => {
+    if (isUserVipZone) {
+      return t.type === 'vip' || normalizeZone(getTableLocation(t)) === 'vip' || normalizeZone(getTableLocation(t)) === 'zona vip'
+    }
+    return normalizeZone(getTableLocation(t)) === normalizeZone(userLocation)
+  })
+
   // Filtro ESTRICTO final: Garantiza que un mesero NUNCA vea mesas que no le pertenecen
   const finalFilteredTables = isAdmin 
     ? filteredTables 
-    : filteredTables.filter(t => normalizeZone(getTableLocation(t)) === normalizeZone(userLocation))
+    : myAllowedTables.filter(t => stateFilter === 'all' || t.status === stateFilter)
+
+  // Recalculamos los contadores para los meseros (así no dependen de la ubicación del hook)
+  const customTotalInLocation = isAdmin ? totalInLocation : myAllowedTables.length
+  const customTableCounts = isAdmin ? tableCounts : myAllowedTables.reduce((acc, t) => {
+    acc[t.status] = (acc[t.status] || 0) + 1
+    return acc
+  }, {} as Record<string, number>)
 
   const handleLogout = () => {
     localStorage.clear()
@@ -554,7 +572,7 @@ export function WaiterView({
                     }
                   `}
                   >
-                    {f.key === 'all' ? totalInLocation : tableCounts[f.key as TableStatus] || 0}
+                    {f.key === 'all' ? customTotalInLocation : customTableCounts[f.key as TableStatus] || 0}
                   </span>
                 </button>
               ))}

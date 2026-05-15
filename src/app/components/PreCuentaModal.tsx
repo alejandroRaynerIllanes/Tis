@@ -92,6 +92,7 @@ export function PreCuentaModal({ isOpen, onClose, tableId, tableName, activeOrde
       }
 
       const orderId = activeBackendOrder._id || activeBackendOrder.id
+      
       // 1. Actualizamos el pedido con los datos del cliente, cajero y finanzas
       await api.put(`/pedidos/${orderId}`, {
         clienteNombre: nombre.trim(),
@@ -103,8 +104,8 @@ export function PreCuentaModal({ isOpen, onClose, tableId, tableName, activeOrde
         subtotalCierre: subtotal
       })
 
-      // 2. Cambiamos el estado de la mesa a Esperando pago
-      await api.patch(`/mesas/${tableId}/estado`, { estado: 'Esperando pago' })
+      // 2. Ejecutamos el nuevo endpoint oficial del backend para solicitar cuenta
+      await api.patch(`/pedidos/${orderId}/solicitar-cuenta`)
 
       toast.success(`Cuenta enviada exitosamente al cajero.`)
       onSuccess()

@@ -30,7 +30,7 @@ export function WaiterHistoryModal({ isOpen, onClose }: WaiterHistoryModalProps)
       const historyData = Array.isArray(selectedOrders) ? selectedOrders : (selectedOrders as any).data || []
 
       const history = historyData.filter((o: any) => {
-        const isCompleted = ['CERRADO', 'ENTREGADO', 'SERVIDO'].includes(o.estado)
+        const isCompleted = ['CERRADO', 'ENTREGADO'].includes(o.estado)
         return isCompleted
       })
 

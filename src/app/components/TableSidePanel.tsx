@@ -411,13 +411,6 @@ export function TableSidePanel({
                 <>
                   <button onClick={handlePrintOrder} className="w-full py-3 rounded-2xl bg-white border-2 border-[#6B3E2E] text-[#4B2E2D] hover:bg-[#F5E6D3] font-bold transition-all text-[14px] flex items-center justify-center gap-2"><Printer size={18} /> Imprimir Pedido</button>
                   {backendOrder?.estado === 'ENTREGADO' && (
-                    <button onClick={async () => {
-                      await ordersService.updateStatus(backendOrder._id || backendOrder.id, 'SERVIDO');
-                      setBackendOrder({...backendOrder, estado: 'SERVIDO'});
-                      toast.success('Pedido entregado al cliente', { description: 'Ya puedes pedir la cuenta.' });
-                    }} className="w-full py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black shadow-lg shadow-emerald-500/20 transition-all text-[15px] flex items-center justify-center gap-2"><CheckCircle2 size={20} /> Confirmar Entrega (Respaldo)</button>
-                  )}
-                  {backendOrder?.estado === 'SERVIDO' && (
                     <button onClick={() => requestBill(tableId)} className="w-full py-4 rounded-2xl bg-[#D96C4A] hover:bg-[#C25838] text-white font-black shadow-lg shadow-[#D96C4A]/20 transition-all text-[15px] flex items-center justify-center gap-2"><Receipt size={20} /> Pedir Cuenta</button>
                   )}
                   <button onClick={handleClearOrder} className="w-full py-3.5 rounded-2xl bg-[#FEF2F2] border border-[#FECACA] text-[#DC2626] hover:bg-[#FEE2E2] hover:text-[#B91C1C] font-bold transition-all text-[15px] flex items-center justify-center gap-2 mt-1"><Trash2 size={18} /> Cancelar Pedido Completo</button>

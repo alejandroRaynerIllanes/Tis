@@ -73,8 +73,9 @@ export function ChefView() {
     }
 
     const handleActualizarTablero = (o: any) => {
-      // Si el pedido fue cancelado, cobrado o entregado al cliente, desaparece de la vista
-      if (['CANCELADO', 'CERRADO', 'SERVIDO'].includes(o.estado)) {
+      // Si el pedido fue cancelado o cobrado, desaparece de la vista.
+      // Si está en 'ENTREGADO' (Listo), se queda en la última columna hasta que se pague.
+      if (['CANCELADO', 'CERRADO'].includes(o.estado)) {
         setOrders(prev => prev.filter(ord => ord.rawId !== o._id))
       } else {
         setOrders(prev => {

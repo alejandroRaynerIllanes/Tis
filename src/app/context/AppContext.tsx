@@ -242,12 +242,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           duration: 15000,
           icon: '🔔',
           action: {
-            label: '✔ Entregado',
-            onClick: () => { 
-              ordersService.updateStatus(payload.pedidoId, 'SERVIDO')
-                .then(() => toast.success('Pedido entregado', { description: 'Ya puedes cobrar la cuenta.' }))
-                .catch(console.error) 
-            }
+            label: '✔ Entendido',
+            onClick: () => { toast.dismiss() }
           }
         })
         setNotifications((prev) => {

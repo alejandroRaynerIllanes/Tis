@@ -42,13 +42,18 @@ export function CashierView() {
   const fetchDashboardData = async () => {
     try {
       const cajeroId = currentUser?.id || (currentUser as any)?._id
-      const resData: any = await api.get(`/pedidos?hoy=true&cajero=${cajeroId}`)
-      const myOrders = resData.data || resData || []
       
-      // Pendientes: Asignadas a mí y que aún no están cerradas
-      const pending = myOrders.filter((o: any) => o.estado !== 'CERRADO' && o.estado !== 'CANCELADO')
+      // Descargamos las pendientes usando el nuevo endpoint y las cerradas para las estadísticas
+      const [pendientesRes, cerradasRes]: any = await Promise.all([
+        api.get('/pedidos/pendientes-cobro'),
+        api.get(`/pedidos?hoy=true&cajero=${cajeroId}`)
+      ])
+      
+      // El nuevo endpoint trae un JSON mapeado { pedidoId, codigo, mesaNombre, meseroNombre, total, items }
+      let pending = pendientesRes.data || pendientesRes || []
       
       // Cerradas: Para las estadísticas del día
+      const myOrders = cerradasRes.data || cerradasRes || []
       const closed = myOrders.filter((o: any) => o.estado === 'CERRADO')
       
       let totalDia = 0, efectivo = 0, tarjeta = 0, qr = 0;
@@ -64,7 +69,7 @@ export function CashierView() {
       
       // Actualizar vista seleccionada si sigue pendiente
       if (selectedBill) {
-        const stillPending = pending.find((p: any) => p._id === selectedBill._id)
+        const stillPending = pending.find((p: any) => p.pedidoId === selectedBill.pedidoId || p._id === selectedBill._id)
         if (!stillPending) setSelectedBill(null)
       }
     } catch (error) {
@@ -112,10 +117,12 @@ export function CashierView() {
     
     setIsProcessing(true)
     try {
-      await api.post(`/pagos/procesar/${selectedBill._id}`, {
+      const pId = selectedBill.pedidoId || selectedBill._id
+      // Usando la ruta oficial del backend
+      await api.post(`/pagos/${pId}/procesar`, {
         metodoPago: selectedMethod
       })
-      toast.success(`Pago procesado con éxito para ${selectedBill.mesa?.numero || 'Mesa'}`, { description: 'Se liberó la mesa.' })
+      toast.success(`Pago procesado con éxito para ${selectedBill.mesaNombre || selectedBill.mesa?.numero || 'Mesa'}`, { description: 'Se liberó la mesa.' })
       setSelectedMethod(null)
       fetchDashboardData()
     } catch (error: any) {
@@ -233,14 +240,27 @@ export function CashierView() {
             
             <div className="flex-1 overflow-y-auto p-4 space-y-3 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-black/10">
               {pendingBills.map(bill => {
-                const isSelected = selectedBill?._id === bill._id
-                const mesaName = bill.mesa?.numero || 'Barra'
-                const waiterName = bill.usuario?.nombre ? `${bill.usuario.nombre} ${bill.usuario.apellido || ''}` : 'Mesero'
-                const timeWaiting = new Date(bill.updatedAt || bill.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                const bId = bill.pedidoId || bill._id
+                const isSelected = (selectedBill?.pedidoId || selectedBill?._id) === bId
+                const mesaName = bill.mesaNombre || bill.mesa?.numero || 'Barra'
+                const waiterName = bill.meseroNombre || (bill.usuario?.nombre ? `${bill.usuario.nombre} ${bill.usuario.apellido || ''}` : 'Mesero')
+                const timeWaiting = bill.tiempoEsperaMinutos !== undefined ? `Hace ${bill.tiempoEsperaMinutos} min` : new Date(bill.updatedAt || bill.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                
                 return (
                   <div 
-                    key={bill._id}
-                    onClick={() => { setSelectedBill(bill); setSelectedMethod(null); }}
+                    key={bId}
+                    onClick={async () => { 
+                      // Opcional: Como el endpoint 'pendientes-cobro' devuelve un payload simplificado sin datos del cliente,
+                      // intentamos recuperar la versión completa del pedido para la facturación.
+                      try {
+                        const res: any = await api.get(`/pedidos?mesa=${bill.mesaId || bill.mesa?._id}&activo=true`);
+                        const fullOrder = (res.data || res)[0];
+                        setSelectedBill(fullOrder || bill);
+                      } catch {
+                        setSelectedBill(bill);
+                      }
+                      setSelectedMethod(null); 
+                    }}
                     className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between group ${
                       isSelected 
                         ? 'bg-[#FFF5F0] border-[#D96C4A] shadow-md transform scale-[1.01]' 
@@ -289,11 +309,11 @@ export function CashierView() {
                 <div className="flex justify-between items-start mb-2">
                   <div>
                     <p className="text-white/60 text-xs font-bold uppercase tracking-wider mb-1">Comprobante / Ticket</p>
-                    <h2 className="text-2xl font-black">{selectedBill.mesa?.numero || 'Mesa'}</h2>
+                    <h2 className="text-2xl font-black">{selectedBill.mesaNombre || selectedBill.mesa?.numero || 'Mesa'}</h2>
                   </div>
                   <div className="text-right">
                     <p className="text-white/60 text-xs font-bold uppercase tracking-wider mb-1">N° Pedido</p>
-                    <p className="text-lg font-black text-[#E57C5D]">{selectedBill.codigo || `PED-${selectedBill._id.slice(-4).toUpperCase()}`}</p>
+                    <p className="text-lg font-black text-[#E57C5D]">{selectedBill.codigo || `PED-${String(selectedBill.pedidoId || selectedBill._id).slice(-4).toUpperCase()}`}</p>
                   </div>
                 </div>
                 <div className="mt-3 bg-white/10 p-3 rounded-xl">
@@ -306,13 +326,13 @@ export function CashierView() {
               <div className="flex-1 overflow-y-auto p-5 bg-gray-50/50 border-b border-gray-100">
                 <h4 className="font-bold text-xs text-gray-400 uppercase tracking-widest mb-3">Detalle de consumo</h4>
                 <div className="space-y-3">
-                  {(selectedBill.detalles || []).map((item: any, idx: number) => (
+                  {(selectedBill.items || selectedBill.detalles || []).map((item: any, idx: number) => (
                     <div key={idx} className="flex justify-between items-start text-sm border-b border-gray-100 pb-2 last:border-0">
                       <div className="flex items-start gap-2">
                         <span className="font-bold text-gray-400 w-5">{item.cantidad}x</span>
-                        <span className="font-bold text-[#4B2E2D]">{item.plato?.nombre || 'Plato'}</span>
+                        <span className="font-bold text-[#4B2E2D]">{item.nombre || item.plato?.nombre || 'Plato'}</span>
                       </div>
-                      <span className="font-bold text-[#4B2E2D] shrink-0">Bs. {((item.plato?.precio || 0) * item.cantidad).toFixed(2)}</span>
+                      <span className="font-bold text-[#4B2E2D] shrink-0">Bs. {(item.subtotal || ((item.precioUnitario || item.plato?.precio || 0) * item.cantidad)).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>

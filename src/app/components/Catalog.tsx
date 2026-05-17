@@ -2,7 +2,6 @@ import { useNavigate } from 'react-router'
 import { useState, useEffect } from 'react'
 import { categoriesService } from '../services/categories.service'
 import { locationsService } from '../services/locations.service'
-import { INITIAL_CATEGORIES, INITIAL_LOCATIONS } from '../data/constants'
 import type { AdminView } from './layout/Sidebar'
 import { Sidebar } from './layout/Sidebar'
 
@@ -14,18 +13,24 @@ import { TableManagement } from './admin/TableManagement'
 import { UserManagement } from './admin/UserManagement'
 import { ReportsSection } from './admin/ReportsSection'
 import { VIPClients } from './VIPClients'
+import { ActiveWaitersSection } from './admin/ActiveWaitersSection'
+import { useAppContext } from '../context/AppContext'
 
 export function Catalog() {
   const navigate = useNavigate()
   const [activeView, setActiveView] = useState<AdminView | 'categories' | 'locations'>('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
+  const { loadInitialData } = useAppContext()
+
   // Estado compartido
-  const [categories, setCategories] = useState(INITIAL_CATEGORIES)
-  const [locations, setLocations] = useState(INITIAL_LOCATIONS)
+  const [categories, setCategories] = useState<any[]>([])
+  const [locations, setLocations] = useState<any[]>([])
 
   // 🔧 Cargar categorías y ubicaciones desde backend
   useEffect(() => {
+    loadInitialData()
+
     const cargarDatos = async () => {
       try {
         const dataCat = await categoriesService.getAll()
@@ -90,6 +95,8 @@ export function Catalog() {
           <ReportsSection />
         ) : activeView === 'vip-clients' ? (
           <VIPClients />
+        ) : activeView === 'waiters' ? (
+          <ActiveWaitersSection />
         ) : null}
       </main>
     </div>

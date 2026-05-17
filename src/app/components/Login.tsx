@@ -3,6 +3,7 @@ import { User, Lock, Eye, EyeOff, ChefHat, AlertCircle } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { authService } from '../services/auth.service'
 import { setToken, setStoredUser } from '../services/api'
+import { toast } from 'sonner'
 
 export function Login() {
   const [username, setUsername] = useState('')
@@ -12,19 +13,27 @@ export function Login() {
   const [isLoading, setIsLoading] = useState(false)
   const navigate = useNavigate()
 
+  // Centralizamos la redirección por rol para evitar repetición
+  const redirectByRole = (role: string) => {
+    const normalizedRole = role.toLowerCase()
+    if (normalizedRole === 'admin' || normalizedRole === 'administrador') {
+      navigate('/catalog', { replace: true })
+    } else if (normalizedRole === 'waiter' || normalizedRole === 'mesero') {
+      navigate('/waiter-view', { replace: true })
+    } else if (normalizedRole === 'chef' || normalizedRole === 'cocinero') {
+      navigate('/chef-view', { replace: true })
+    } else if (normalizedRole === 'cashier' || normalizedRole === 'cajero') {
+      navigate('/cashier-view', { replace: true })
+    } else {
+      navigate('/en-construccion', { replace: true })
+    }
+  }
+
   useEffect(() => {
     const userRole = localStorage.getItem('userRole')
     const token = localStorage.getItem('authToken')
     if (userRole && token) {
-      if (userRole === 'admin' || userRole === 'administrador') {
-        navigate('/catalog', { replace: true })
-      } else if (userRole === 'waiter' || userRole === 'mesero') {
-        navigate('/waiter-view', { replace: true })
-      } else if (userRole === 'chef' || userRole === 'cocinero') {
-        navigate('/chef-view', { replace: true })
-      } else if (userRole === 'cashier' || userRole === 'cajero') {
-        navigate('/en-construccion', { replace: true })
-      }
+      redirectByRole(userRole)
     }
   }, [navigate])
 
@@ -42,19 +51,12 @@ export function Login() {
       setStoredUser(user)
       localStorage.setItem('userRole', role)
 
-      // Validamos los roles (tu mejora)
-      if (role === 'admin' || role === 'administrador') {
-        navigate('/catalog', { replace: true })
-      } else if (role === 'waiter' || role === 'mesero') {
-        navigate('/waiter-view', { replace: true })
-      } else if (role === 'chef' || role === 'cocinero') {
-        navigate('/chef-view', { replace: true })
-      } else {
-        navigate('/en-construccion', { replace: true })
-      }
+      redirectByRole(role)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Error al iniciar sesión'
       setError(message)
+      setPassword('') // Limpia únicamente el campo contraseña
+      toast.error(message) // Muestra el mensaje flotante tipo Toast
     } finally {
       setIsLoading(false)
     }
@@ -194,7 +196,7 @@ export function Login() {
               >
                 <AlertCircle
                   size={18}
-                  className="flex-shrink-0 mt-0.5"
+                  className="shrink-0 mt-0.5"
                   style={{ color: '#DC2626' }}
                 />
                 <p className="text-sm font-medium" style={{ color: '#DC2626' }}>

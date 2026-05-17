@@ -1,7 +1,10 @@
-import { useState } from 'react'
-import { ChefHat, Clock, Play, CheckCircle2, Flame, AlertCircle, LogOut } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { ChefHat, Clock, Play, CheckCircle2, Flame, AlertCircle, LogOut, User } from 'lucide-react'
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router'
+import { getStoredUser, api } from '../services/api'
+import { ordersService } from '../services/orders.service'
+import { useAppContext } from '../context/AppContext'
 
 type OrderStatus = 'Pendiente' | 'En preparación' | 'Listo'
 
@@ -15,68 +18,97 @@ interface OrderItem {
 interface Order {
   id: string
   table: string
+  waiter: string
   time: string
   status: OrderStatus
   isVip?: boolean
   items: OrderItem[]
+  rawId?: string
 }
 
-// Datos simulados (Mock Data)
-const INITIAL_ORDERS: Order[] = [
-  {
-    id: 'ORD-001',
-    table: 'Mesa 4',
-    time: '14:30',
-    status: 'Pendiente',
-    items: [
-      { id: 'i1', name: 'Lomo Saltado', quantity: 2, notes: 'Sin cebolla' },
-      { id: 'i2', name: 'Ceviche Clásico', quantity: 1 }
-    ]
-  },
-  {
-    id: 'ORD-002',
-    table: 'VIP 1',
-    time: '14:35',
-    status: 'Pendiente',
-    isVip: true,
-    items: [
-      { id: 'i3', name: 'Risotto de Hongos', quantity: 1, notes: 'Extra queso parmesano' },
-      { id: 'i4', name: 'Vino Tinto Copa', quantity: 2 }
-    ]
-  },
-  {
-    id: 'ORD-003',
-    table: 'Mesa 12',
-    time: '14:15',
-    status: 'En preparación',
-    items: [
-      { id: 'i5', name: 'Hamburguesa Doble', quantity: 3 },
-      { id: 'i6', name: 'Papas Fritas', quantity: 2, notes: 'Bien crujientes' }
-    ]
-  },
-  {
-    id: 'ORD-004',
-    table: 'Terraza 2',
-    time: '14:05',
-    status: 'Listo',
-    items: [{ id: 'i7', name: 'Ensalada César', quantity: 1 }]
-  }
-]
-
 export function ChefView() {
-  const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS)
+  const [orders, setOrders] = useState<Order[]>([])
   const navigate = useNavigate()
+  const { socket } = useAppContext()
+
+  const currentUser = getStoredUser()
+  const chefName = currentUser ? `${currentUser.nombre} ${currentUser.apellido || ''}`.trim() : 'Cocinero'
+
+  const formatOrder = (o: any): Order => ({
+    // Si es un pedido antiguo sin código, generamos uno a partir del _id para que jamás se vea el hash largo
+    id: o.codigo || `PED-${String(o._id || '').slice(-4).toUpperCase()}`,
+    rawId: o._id,
+    table: o.mesa?.numero || o.mesa?.name || 'Mesa ?',
+    waiter: o.usuario?.nombre ? `${o.usuario.nombre} ${o.usuario.apellido || ''}`.trim() : 'Mesero',
+    time: new Date(o.fechaHora || o.createdAt || Date.now()).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+    status: o.estado === 'ABIERTO' ? 'Pendiente' : o.estado === 'EN_PREPARACION' ? 'En preparación' : 'Listo',
+    isVip: o.mesa?.tipo === 'vip' || o.vip,
+    items: (o.detalles || []).map((d: any, idx: number) => ({
+      id: d.plato?._id || String(idx),
+      name: d.plato?.nombre || 'Plato',
+      quantity: d.cantidad,
+      notes: d.observacion
+    }))
+  })
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        const res: any = await api.get('/pedidos?activo=true')
+        const activeOrders = res.data || res || []
+        
+        setOrders(activeOrders.map(formatOrder))
+      } catch (err) {
+        console.error('Error fetching orders', err)
+      }
+    }
+    fetchOrders()
+  }, [])
+
+  useEffect(() => {
+    if (!socket) return
+
+    const handleNuevoPedido = (o: any) => {
+      setOrders(prev => [formatOrder(o), ...prev])
+      toast.info(`🔔 ¡Nuevo pedido recibido! (${o.codigo || 'Mesa'})`)
+    }
+
+    const handleActualizarTablero = (o: any) => {
+      // Si el pedido fue cancelado o cobrado, desaparece de la vista.
+      // Si está en 'ENTREGADO' (Listo), se queda en la última columna hasta que se pague.
+      if (['CANCELADO', 'CERRADO'].includes(o.estado)) {
+        setOrders(prev => prev.filter(ord => ord.rawId !== o._id))
+      } else {
+        setOrders(prev => {
+          const exists = prev.find(ord => ord.rawId === o._id)
+          if (exists) return prev.map(ord => ord.rawId === o._id ? formatOrder(o) : ord)
+          return [formatOrder(o), ...prev]
+        })
+      }
+    }
+
+    socket.on('cocina:nuevo_pedido', handleNuevoPedido)
+    socket.on('cocina:actualizar_tablero', handleActualizarTablero)
+
+    return () => { 
+      socket.off('cocina:nuevo_pedido', handleNuevoPedido)
+      socket.off('cocina:actualizar_tablero', handleActualizarTablero)
+    }
+  }, [socket])
 
   // Función para cambiar el estado del pedido
-  const updateOrderStatus = (orderId: string, newStatus: OrderStatus) => {
-    setOrders((prevOrders) =>
-      prevOrders.map((order) => (order.id === orderId ? { ...order, status: newStatus } : order))
-    )
-
-    if (newStatus === 'En preparación') {
-      toast.success(`Pedido ${orderId} en preparación 🔥`)
-    } else if (newStatus === 'Listo') {
-      toast.success(`¡Pedido ${orderId} listo para entregar! ✅`)
+  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+    const order = orders.find(o => o.id === orderId)
+    if (!order || !order.rawId) return
+    const backendStatus = newStatus === 'Pendiente' ? 'ABIERTO' : newStatus === 'En preparación' ? 'EN_PREPARACION' : 'ENTREGADO'
+    
+    try {
+      await ordersService.updateStatus(order.rawId, backendStatus)
+      setOrders((prevOrders) => prevOrders.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)))
+      if (newStatus === 'En preparación') toast.success(`Pedido ${orderId} en preparación 🔥`)
+      else if (newStatus === 'Listo') toast.success(`¡Pedido ${orderId} listo para entregar! ✅`)
+    } catch (e) {
+      toast.error('Error al actualizar el estado en el servidor.')
     }
   }
 
@@ -100,8 +132,13 @@ export function ChefView() {
       {/* Cabecera de la tarjeta */}
       <div className="flex justify-between items-start border-b border-[#FCE4D6] pb-3">
         <div>
-          <div className="flex items-center gap-2">
-            <h3 className="font-black text-lg text-[#4B2E2D]">{order.id}</h3>
+          <p className="text-[10px] font-bold text-[#4B2E2D]/50 uppercase tracking-widest mb-1">
+            Identificador
+          </p>
+          <div className="flex items-center gap-2 mb-1.5">
+            <h3 className="font-black text-2xl sm:text-3xl text-[#D0543A] leading-none tracking-tight">
+              {order.id}
+            </h3>
             {order.isVip && (
               <span className="bg-amber-100 text-amber-700 text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 border border-amber-200">
                 ★ VIP
@@ -109,6 +146,9 @@ export function ChefView() {
             )}
           </div>
           <p className="text-sm font-bold text-[#4B2E2D]/60">{order.table}</p>
+          <p className="text-xs font-semibold text-[#4B2E2D]/50 flex items-center gap-1 mt-0.5">
+            <User size={12} /> {order.waiter}
+          </p>
         </div>
         <div className="flex items-center gap-1 bg-[#FCE4D6]/50 px-2 py-1 rounded-lg text-[#4B2E2D]/80">
           <Clock size={14} />
@@ -169,35 +209,37 @@ export function ChefView() {
   const readyOrders = orders.filter((o) => o.status === 'Listo')
 
   return (
-    <div className="min-h-full bg-[#FCE4D6]/30 flex flex-col">
+    <div className="h-[100dvh] bg-[#FCE4D6]/30 flex flex-col overflow-hidden">
       {/* Cabecera */}
-      <header className="px-6 sm:px-10 py-6 sticky top-0 bg-[#FCE4D6]/90 backdrop-blur-md z-10 border-b border-[#E57C5D]/20 flex items-center justify-between shadow-sm">
+      <header className="px-6 sm:px-10 py-6 shrink-0 bg-[#FCE4D6]/90 backdrop-blur-md z-10 border-b border-[#E57C5D]/20 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-[#D0543A] rounded-2xl flex items-center justify-center text-white shadow-lg shadow-[#D0543A]/30 shrink-0">
             <ChefHat size={26} />
           </div>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-black text-[#4B2E2D]">Cocina (KDS)</h1>
-            <p className="text-[#4B2E2D]/70 font-medium text-sm">
-              Panel de control de comandas en tiempo real
+            <h1 className="text-xl sm:text-3xl font-black text-[#4B2E2D]">Cocina (KDS)</h1>
+            <p className="text-[#4B2E2D]/70 font-medium text-sm mt-1">
+              <span className="bg-white px-3 py-1 rounded-lg border border-[#E57C5D]/30 shadow-sm font-black text-[#D0543A]">👨‍🍳 Chef: {chefName}</span>
             </p>
           </div>
         </div>
 
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-2 px-4 py-2.5 bg-white/50 hover:bg-red-50 text-red-600 hover:text-red-700 rounded-xl font-bold transition-colors shadow-sm border border-red-100"
-        >
-          <LogOut size={18} />
-          <span className="hidden sm:inline">Salir</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white/50 hover:bg-red-50 text-red-600 hover:text-red-700 rounded-xl font-bold transition-colors shadow-sm border border-red-100"
+          >
+            <LogOut size={18} />
+            <span className="hidden sm:inline">Salir</span>
+          </button>
+        </div>
       </header>
 
       {/* Tablero Kanban */}
-      <div className="flex-1 p-6 sm:p-10 grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8 items-start">
+      <div className="flex-1 p-6 sm:p-10 grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8 overflow-y-auto lg:overflow-hidden min-h-0">
         {/* Columna 1: Pendientes */}
-        <div className="flex flex-col gap-4 bg-white/50 p-4 rounded-3xl border-2 border-yellow-200/50 min-h-[500px]">
-          <div className="flex items-center justify-between mb-2">
+        <div className="flex flex-col bg-white/50 rounded-3xl border-2 border-yellow-200/50 h-[500px] lg:h-full overflow-hidden shadow-sm">
+          <div className="flex items-center justify-between p-4 sm:p-5 border-b border-yellow-200/50 shrink-0 bg-white/40">
             <h2 className="text-xl font-black text-[#4B2E2D] flex items-center gap-2">
               <Clock className="text-yellow-500" /> Por hacer
             </h2>
@@ -205,19 +247,21 @@ export function ChefView() {
               {pendingOrders.length}
             </span>
           </div>
-          {pendingOrders.map((order) => (
-            <OrderCard key={order.id} order={order} />
-          ))}
-          {pendingOrders.length === 0 && (
-            <p className="text-center text-[#4B2E2D]/40 font-medium py-10">
-              No hay pedidos pendientes
-            </p>
-          )}
+          <div className="flex-1 overflow-y-auto p-4 sm:p-5 flex flex-col gap-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-black/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-black/20">
+            {pendingOrders.map((order) => (
+              <OrderCard key={order.id} order={order} />
+            ))}
+            {pendingOrders.length === 0 && (
+              <p className="text-center text-[#4B2E2D]/40 font-medium py-10">
+                No hay pedidos pendientes
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Columna 2: En Preparación */}
-        <div className="flex flex-col gap-4 bg-[#FCE4D6]/40 p-4 rounded-3xl border-2 border-[#D0543A]/20 min-h-[500px]">
-          <div className="flex items-center justify-between mb-2">
+        <div className="flex flex-col bg-[#FCE4D6]/40 rounded-3xl border-2 border-[#D0543A]/20 h-[500px] lg:h-full overflow-hidden shadow-sm">
+          <div className="flex items-center justify-between p-4 sm:p-5 border-b border-[#D0543A]/10 shrink-0 bg-white/20">
             <h2 className="text-xl font-black text-[#4B2E2D] flex items-center gap-2">
               <Flame className="text-[#D0543A]" /> Cocinando
             </h2>
@@ -225,19 +269,21 @@ export function ChefView() {
               {prepOrders.length}
             </span>
           </div>
-          {prepOrders.map((order) => (
-            <OrderCard key={order.id} order={order} />
-          ))}
-          {prepOrders.length === 0 && (
-            <p className="text-center text-[#4B2E2D]/40 font-medium py-10">
-              No hay platos en preparación
-            </p>
-          )}
+          <div className="flex-1 overflow-y-auto p-4 sm:p-5 flex flex-col gap-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-black/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-black/20">
+            {prepOrders.map((order) => (
+              <OrderCard key={order.id} order={order} />
+            ))}
+            {prepOrders.length === 0 && (
+              <p className="text-center text-[#4B2E2D]/40 font-medium py-10">
+                No hay platos en preparación
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Columna 3: Listos */}
-        <div className="flex flex-col gap-4 bg-emerald-50/50 p-4 rounded-3xl border-2 border-emerald-200/50 min-h-[500px]">
-          <div className="flex items-center justify-between mb-2">
+        <div className="flex flex-col bg-emerald-50/50 rounded-3xl border-2 border-emerald-200/50 h-[500px] lg:h-full overflow-hidden shadow-sm">
+          <div className="flex items-center justify-between p-4 sm:p-5 border-b border-emerald-200/50 shrink-0 bg-white/40">
             <h2 className="text-xl font-black text-[#4B2E2D] flex items-center gap-2">
               <CheckCircle2 className="text-emerald-500" /> Listos
             </h2>
@@ -245,14 +291,16 @@ export function ChefView() {
               {readyOrders.length}
             </span>
           </div>
-          {readyOrders.map((order) => (
-            <OrderCard key={order.id} order={order} />
-          ))}
-          {readyOrders.length === 0 && (
-            <p className="text-center text-[#4B2E2D]/40 font-medium py-10">
-              No hay pedidos para recoger
-            </p>
-          )}
+          <div className="flex-1 overflow-y-auto p-4 sm:p-5 flex flex-col gap-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-black/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-black/20">
+            {readyOrders.map((order) => (
+              <OrderCard key={order.id} order={order} />
+            ))}
+            {readyOrders.length === 0 && (
+              <p className="text-center text-[#4B2E2D]/40 font-medium py-10">
+                No hay pedidos para recoger
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </div>

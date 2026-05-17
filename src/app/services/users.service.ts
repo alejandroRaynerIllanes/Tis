@@ -6,12 +6,14 @@ import { api } from './api'
 // Tipo del usuario como viene del backend
 export interface BackendUser {
   _id: string // <-- CORRECCIÓN: _id como string (MongoDB)
+  id?: string // <-- Añadido para que React (UserManagement) no marque error al buscar .id
   nombre: string
   apellido: string
   ci: string
   email: string
   rol: string
   estado: boolean
+  zona?: string
   createdAt?: string
   updatedAt?: string
 }
@@ -24,6 +26,7 @@ export interface CreateUserPayload {
   email: string
   password: string // <-- CORRECCIÓN: 'password' en lugar de 'contraseña'
   rol: string
+  zona?: string
 }
 
 // Payload para editar usuario
@@ -34,6 +37,7 @@ export interface UpdateUserPayload {
   email?: string
   password?: string // <-- CORRECCIÓN: 'password' en lugar de 'contraseña'
   rol?: string
+  zona?: string
 }
 
 export const usersService = {

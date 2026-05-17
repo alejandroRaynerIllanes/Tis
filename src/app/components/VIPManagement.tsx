@@ -17,76 +17,59 @@ import {
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { useAppContext } from '../context/AppContext'
-import { VIP_SUBSCRIBERS } from '../data/mock-data'
-
-// Mock de pedidos entrantes con prioridad VIP
-const INCOMING_ORDERS = [
-  {
-    id: 'ORD-001',
-    tableId: 'vip1',
-    tableName: 'VIP 1',
-    clientName: 'Alex Martínez',
-    isVip: true,
-    items: ['Lomo Saltado ×2', 'Ceviche Clásico ×1'],
-    time: '14:32',
-    estimatedTime: '12 min',
-    priority: 'ALTA',
-    status: 'En preparación'
-  },
-  {
-    id: 'ORD-002',
-    tableId: 'vip2',
-    tableName: 'VIP 2',
-    clientName: 'Pedro Gómez',
-    isVip: true,
-    items: ['Pasta al Pesto ×1', 'Pisco Sour ×2'],
-    time: '14:28',
-    estimatedTime: '15 min',
-    priority: 'ALTA',
-    status: 'Pendiente'
-  },
-  {
-    id: 'ORD-003',
-    tableId: '3',
-    tableName: 'Mesa 3',
-    clientName: 'Cliente Regular',
-    isVip: false,
-    items: ['Arroz con Pollo ×2', 'Chicha Morada ×2'],
-    time: '14:25',
-    estimatedTime: '18 min',
-    priority: 'NORMAL',
-    status: 'En preparación'
-  },
-  {
-    id: 'ORD-004',
-    tableId: '1',
-    tableName: 'Mesa 1',
-    clientName: 'Cliente Regular',
-    isVip: false,
-    items: ['Ensalada Fresca ×1', 'Limonada de Menta ×1'],
-    time: '14:20',
-    estimatedTime: '22 min',
-    priority: 'NORMAL',
-    status: 'Pendiente'
-  },
-  {
-    id: 'ORD-005',
-    tableId: '5',
-    tableName: 'Terraza 1',
-    clientName: 'Cliente Regular',
-    isVip: false,
-    items: ['Tiramisú ×2', 'Suspiro a la Limeña ×1'],
-    time: '14:18',
-    estimatedTime: '25 min',
-    priority: 'NORMAL',
-    status: 'Pendiente'
-  }
-]
+import { useEffect } from 'react'
+import { api } from '../services/api'
 
 export function VIPManagement() {
   const { tables } = useAppContext()
   const [vipZoneEnabled, setVipZoneEnabled] = useState(true)
   const [selectedSubscriber, setSelectedSubscriber] = useState<number | null>(null)
+  const [incomingOrders, setIncomingOrders] = useState<any[]>([])
+  const [vipSubscribers, setVipSubscribers] = useState<any[]>([])
+
+  useEffect(() => {
+    // Carga independiente de datos reales al montar la vista
+    const fetchDynamicData = async () => {
+      try {
+        const resOrders: any = await api.get('/pedidos?activo=true')
+        const ordersData = resOrders.data || resOrders || []
+        const activeOrders = ordersData
+          .map((o: any) => ({
+            id: o.codigo || o._id,
+            tableId: o.mesa?._id || '?',
+            tableName: o.mesa?.numero || 'Mesa ?',
+            clientName: o.usuario?.nombre || 'Cliente',
+            isVip: o.mesa?.tipo === 'vip' || o.vip,
+            items: (o.detalles || []).map((d: any) => `${d.plato?.nombre} ×${d.cantidad}`),
+            time: new Date(o.fechaHora || o.createdAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+            estimatedTime: '15 min',
+            priority: (o.mesa?.tipo === 'vip' || o.vip) ? 'ALTA' : 'NORMAL',
+            status: o.estado === 'ABIERTO' ? 'Pendiente' : o.estado === 'EN_PREPARACION' ? 'En preparación' : 'Listo'
+          }))
+        setIncomingOrders(activeOrders)
+
+        // Cargar clientes VIP reales desde la base de datos (Usuarios con rol 'Cliente')
+        const resUsers: any = await api.get('/usuarios')
+        const usersData = resUsers.data || resUsers || []
+        const vipClients = usersData.filter((u: any) => u.rol === 'Cliente').map((c: any) => ({
+          id: c._id || c.id,
+          name: `${c.nombre} ${c.apellido || ''}`.trim(),
+          email: c.email,
+          plan: 'VIP Premium',
+          status: c.estado ? 'Activo' : 'Inactivo',
+          visits: Math.floor(Math.random() * 15) + 1, // Simulado hasta tener módulo de lealtad
+          totalSpent: Math.floor(Math.random() * 2000) + 100, // Simulado
+          joinDate: c.createdAt || new Date(),
+          nextBilling: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          avgTicket: 150
+        }))
+        setVipSubscribers(vipClients)
+      } catch (error) {
+        console.error('Error al cargar los datos VIP:', error)
+      }
+    }
+    fetchDynamicData()
+  }, [])
 
   // Obtener estadísticas de zona VIP
   const vipTables = tables.filter((t) => t.type === 'vip')
@@ -114,7 +97,7 @@ export function VIPManagement() {
   }
 
   // Ordenar pedidos: VIP primero
-  const sortedOrders = [...INCOMING_ORDERS].sort((a, b) => {
+  const sortedOrders = [...incomingOrders].sort((a, b) => {
     if (a.isVip && !b.isVip) return -1
     if (!a.isVip && b.isVip) return 1
     return 0
@@ -132,7 +115,7 @@ export function VIPManagement() {
                 Suscriptores VIP
               </p>
               <p className="text-3xl font-black text-[#4B2E2D] mt-1 leading-none">
-                {VIP_SUBSCRIBERS.length}
+            {vipSubscribers.length}
               </p>
             </div>
             <div className="w-11 h-11 rounded-xl bg-amber-400/15 flex items-center justify-center shrink-0">
@@ -431,7 +414,7 @@ export function VIPManagement() {
 
                         {/* Items del pedido */}
                         <div className="flex flex-wrap gap-1.5">
-                          {order.items.map((item, i) => (
+                          {order.items.map((item: string, i: number) => (
                             <span
                               key={i}
                               className={`text-xs font-bold px-2.5 py-1 rounded-lg ${
@@ -496,14 +479,14 @@ export function VIPManagement() {
           </div>
 
           <div className="bg-white/10 rounded-lg px-3 py-1.5">
-            <span className="text-sm font-black text-white">{VIP_SUBSCRIBERS.length} activos</span>
+        <span className="text-sm font-black text-white">{vipSubscribers.length} activos</span>
           </div>
         </div>
 
         <div className="p-6">
           {/* Tabla de suscriptores */}
           <div className="space-y-3">
-            {VIP_SUBSCRIBERS.map((subscriber) => (
+            {vipSubscribers.map((subscriber: any) => (
               <div key={subscriber.id}>
                 <div
                   className="bg-[#FCE4D6]/30 rounded-xl p-4 border border-[#E0D0C5] hover:bg-[#FCE4D6]/50 transition-all cursor-pointer"
@@ -611,7 +594,7 @@ export function VIPManagement() {
             ))}
           </div>
 
-          {VIP_SUBSCRIBERS.length === 0 && (
+          {vipSubscribers.length === 0 && (
             <div className="text-center py-12 text-[#4B2E2D]/40">
               <Crown size={48} className="mx-auto mb-3 opacity-30" />
               <p className="font-bold">No hay suscriptores VIP activos</p>

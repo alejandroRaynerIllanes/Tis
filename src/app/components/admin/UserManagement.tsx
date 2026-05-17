@@ -9,13 +9,17 @@ import {
   Users,
   Shield,
   UserCheck,
-  UserCog
+  UserCog,
+  CreditCard,
+  MapPin
 } from 'lucide-react'
 import { usersService, BackendUser } from '../../services/users.service'
 import { toast } from 'sonner'
+import { locationsService } from '../../services/locations.service'
 
 export function UserManagement() {
   const [users, setUsers] = useState<BackendUser[]>([])
+  const [locations, setLocations] = useState<{id: string, name: string}[]>([])
   const [isUserModalOpen, setIsUserModalOpen] = useState(false)
   const [userEditingId, setUserEditingId] = useState<string | null>(null)
   const [userFormData, setUserFormData] = useState({
@@ -24,7 +28,8 @@ export function UserManagement() {
     ci: '',
     email: '',
     role: 'Mesero',
-    password: ''
+    password: '',
+    zona: ''
   })
   const [userToDelete, setUserToDelete] = useState<string | null>(null)
 
@@ -41,6 +46,9 @@ export function UserManagement() {
   // Se ejecuta al montar el componente
   useEffect(() => {
     cargarUsuarios()
+    locationsService.getAll().then(data => {
+      setLocations(data.map((l: any) => ({ id: l._id || l.id, name: l.nombre || l.name })))
+    }).catch(console.error)
   }, [])
 
   const handleOpenAddUserModal = () => {
@@ -51,7 +59,8 @@ export function UserManagement() {
       ci: '',
       email: '',
       role: 'Mesero',
-      password: ''
+      password: '',
+      zona: ''
     })
     setIsUserModalOpen(true)
   }
@@ -64,7 +73,8 @@ export function UserManagement() {
       ci: user.ci,
       email: user.email,
       role: user.rol,
-      password: ''
+      password: '',
+      zona: (user as any).zona || (user as any).ubicacion || ''
     })
     setIsUserModalOpen(true)
   }
@@ -81,13 +91,19 @@ export function UserManagement() {
       return
     }
 
+  if (userFormData.role === 'Mesero' && !userFormData.zona) {
+    toast.error('El área asignada es obligatoria para los meseros.')
+    return
+  }
+
     try {
       const payload: any = {
         nombre: userFormData.firstName,
         apellido: userFormData.lastName,
         ci: userFormData.ci,
         email: userFormData.email,
-        rol: userFormData.role
+        rol: userFormData.role,
+        zona: userFormData.role === 'Mesero' ? userFormData.zona : undefined
       }
 
       if (userEditingId) {
@@ -113,10 +129,10 @@ export function UserManagement() {
       }
 
       setIsUserModalOpen(false)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error al guardar usuario en BD:', error)
-      toast.error('Hubo un error al guardar.', {
-        description: 'Verifica la consola para más detalles.'
+      toast.error(error.message || 'Hubo un error al guardar.', {
+        description: 'Por favor, verifica los datos ingresados e intenta de nuevo.'
       })
     }
   }
@@ -153,6 +169,13 @@ export function UserManagement() {
         text: 'text-[#D0543A]',
         border: 'border-[#D0543A]/30',
         icon: <Shield size={12} />
+      }
+    if (role === 'Cajero' || role === 'cajero')
+      return {
+        bg: 'bg-[#F5E6D3]',
+        text: 'text-[#4B2E2D]',
+        border: 'border-[#E0D0C5]',
+        icon: <CreditCard size={12} />
       }
     if (role === 'Mesero')
       return {
@@ -226,12 +249,19 @@ export function UserManagement() {
                       </td>
                       <td className="py-5 px-6 text-[#4B2E2D]/70 font-medium">{user.email}</td>
                       <td className="py-5 px-6">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold border ${badge.bg} ${badge.text} ${badge.border}`}
-                        >
-                          {badge.icon}
-                          {user.rol}
-                        </span>
+                  <div className="flex flex-col gap-1 items-start">
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold border ${badge.bg} ${badge.text} ${badge.border}`}
+                    >
+                      {badge.icon}
+                      {user.rol}
+                    </span>
+                    {user.rol.toLowerCase() === 'mesero' && (user as any).zona && (
+                      <span className="text-[10px] font-bold text-[#4B2E2D]/60 flex items-center gap-1 mt-0.5 ml-1">
+                        <MapPin size={10} /> {(user as any).zona}
+                      </span>
+                    )}
+                  </div>
                       </td>
                       <td className="py-5 px-6">
                         <div className="flex items-center gap-3">
@@ -360,10 +390,42 @@ export function UserManagement() {
                   required
                 >
                   <option value="Administrador">Administrador</option>
+                  <option value="Cajero">Cajero</option>
                   <option value="Mesero">Mesero</option>
                   <option value="Cocinero">Cocinero</option>
                 </select>
               </div>
+
+          {userFormData.role === 'Mesero' && (
+            <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+              <label className="block text-sm font-bold text-[#4B2E2D] mb-2">
+                Área asignada (Zona) <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={userFormData.zona}
+                onChange={(e) => setUserFormData({ ...userFormData, zona: e.target.value })}
+                className="w-full px-4 py-3 rounded-xl border-2 border-[#E57C5D] text-[#4B2E2D] focus:outline-none focus:ring-2 focus:ring-[#D0543A] focus:border-transparent transition-all bg-white cursor-pointer"
+                required
+              >
+                <option value="" disabled>Selecciona un área...</option>
+                {locations.map((loc) => (
+                  <option key={loc.id} value={loc.name}>{loc.name}</option>
+                ))}
+                {userFormData.zona && !locations.some(l => l.name === userFormData.zona) && (
+                  <option value={userFormData.zona}>{userFormData.zona}</option>
+                )}
+              </select>
+              {(() => {
+                if (!userFormData.zona) return null;
+                const count = users.filter((u) => u.rol.toLowerCase() === 'mesero' && (u as any).zona === userFormData.zona && u.estado && u._id !== userEditingId).length;
+                if (count >= 3) {
+                  return <p className="text-amber-600 text-[11px] font-bold mt-1.5 flex items-center gap-1"><AlertTriangle size={12}/> Ya hay {count} meseros en esta área (Límite recomendado).</p>;
+                }
+                return <p className="text-emerald-600 text-[11px] font-bold mt-1.5 flex items-center gap-1"><UserCheck size={12}/> Distribución óptima ({count} meseros actuales).</p>;
+              })()}
+            </div>
+          )}
+
               <div>
                 <label className="block text-sm font-bold text-[#4B2E2D] mb-2">
                   {userEditingId ? 'Nueva Contraseña (opcional)' : 'Contraseña'}
@@ -400,7 +462,7 @@ export function UserManagement() {
       {/* Modal Eliminar Usuario */}
       {userToDelete !== null && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#FCE4D6] w-full max-w-[400px] border-[4px] border-[#D0543A] rounded-3xl p-8 relative shadow-2xl animate-in fade-in zoom-in-95 duration-200 flex flex-col items-center text-center">
+          <div className="bg-[#FCE4D6] w-full max-w-[400px] border-4 border-[#D0543A] rounded-3xl p-8 relative shadow-2xl animate-in fade-in zoom-in-95 duration-200 flex flex-col items-center text-center">
             <div className="w-16 h-16 bg-[#D0543A]/10 rounded-full flex items-center justify-center mb-4">
               <AlertTriangle size={32} className="text-[#D0543A]" />
             </div>

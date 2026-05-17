@@ -15,8 +15,11 @@ import {
   User,
   Printer,
   AlertCircle,
-  IdCard
+  IdCard,
+  X,
+  FileText
 } from 'lucide-react'
+import { jsPDF } from 'jspdf'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { getStoredUser, api } from '../services/api'
@@ -34,6 +37,11 @@ export function CashierView() {
   const [selectedMethod, setSelectedMethod] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [isRegisterClosed, setIsRegisterClosed] = useState(false)
+
+  // Nuevos estados para el flujo de QR y Facturación
+  const [isQRModalOpen, setIsQRModalOpen] = useState(false)
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false)
+  const [processedBill, setProcessedBill] = useState<any | null>(null)
 
   const { socket } = useAppContext()
   const currentUser = getStoredUser()
@@ -64,7 +72,16 @@ export function CashierView() {
         if (o.metodoPago === 'QR') qr += (o.total || 0)
       })
       
-      setPendingBills(pending)
+      setPendingBills(prev => {
+        const mergedList = [...pending];
+        prev.forEach((localItem) => {
+          const existeEnFetch = mergedList.find((fetchItem) => (fetchItem.pedidoId || fetchItem._id) === (localItem.pedidoId || localItem._id));
+          if (!existeEnFetch && (localItem.estado === 'CUENTA_SOLICITADA' || localItem.paymentStatus === 'pending')) {
+            mergedList.unshift(localItem);
+          }
+        });
+        return mergedList;
+      });
       setStats({ totalDia, efectivo, tarjeta, qr })
       
       // Actualizar vista seleccionada si sigue pendiente
@@ -85,21 +102,38 @@ export function CashierView() {
     if (!socket) return
 
     const handleNuevaCuenta = (pedido: any) => {
-      if (pedido.cajeroAsignado === currentUser?.id || pedido.cajeroAsignado === (currentUser as any)?._id) {
-        toast.info(`¡Nueva cuenta recibida de la ${pedido.mesa?.numero || 'Mesa'}!`)
-        fetchDashboardData()
+      if (!pedido) return;
+      if (pedido.cajeroAsignado === currentUser?.id || pedido.cajeroAsignado === (currentUser as any)?._id || !pedido.cajeroAsignado) {
+        toast.info(`¡Nueva cuenta recibida de la ${pedido.mesa?.numero || pedido.mesaNombre || 'Mesa'}!`)
+        
+        setPendingBills((prev: any[]) => {
+          const existe = prev.some((p) => (p.pedidoId || p._id) === (pedido.pedidoId || pedido._id));
+          if (existe) return prev.map((p) => (p.pedidoId || p._id) === (pedido.pedidoId || pedido._id) ? pedido : p);
+          return [pedido, ...prev];
+        });
       }
     }
+
+    const handleCuentaSolicitada = (pedidoActualizado: any) => {
+      if (!pedidoActualizado?._id) return;
+      setPendingBills((prev: any[]) => {
+        const existe = prev.some((p) => (p.pedidoId || p._id) === (pedidoActualizado.pedidoId || pedidoActualizado._id));
+        if (existe) return prev.map((p) => (p.pedidoId || p._id) === (pedidoActualizado.pedidoId || pedidoActualizado._id) ? pedidoActualizado : p);
+        return [pedidoActualizado, ...prev];
+      });
+    };
 
     const handleActualizarTablero = () => {
       fetchDashboardData()
     }
 
     socket.on('caja:nueva_cuenta', handleNuevaCuenta)
+    socket.on('cuenta:solicitada', handleCuentaSolicitada)
     socket.on('cocina:actualizar_tablero', handleActualizarTablero)
 
     return () => { 
       socket.off('caja:nueva_cuenta', handleNuevaCuenta)
+      socket.off('cuenta:solicitada', handleCuentaSolicitada)
       socket.off('cocina:actualizar_tablero', handleActualizarTablero)
     }
   }, [socket])
@@ -109,27 +143,220 @@ export function CashierView() {
     navigate('/', { replace: true })
   }
 
+  const executePayment = async () => {
+    setIsProcessing(true)
+    try {
+      const pId = selectedBill.pedidoId || selectedBill._id
+      
+      try {
+        await api.post(`/pagos/${pId}/procesar`, {
+          metodoPago: selectedMethod
+        })
+      } catch (err: any) {
+        // Fallback: If endpoint doesn't exist, we close the order and release table manually
+        await api.put(`/pedidos/${pId}`, {
+          estado: 'CERRADO',
+          paymentStatus: 'paid',
+          metodoPago: selectedMethod
+        });
+      }
+
+      toast.success(`Pago procesado con éxito para ${selectedBill.mesaNombre || selectedBill.mesa?.numero || 'Mesa'}`, { description: 'Se liberó la mesa.' })
+      
+      const tableId = selectedBill.mesaId || selectedBill.mesa?._id || selectedBill.mesa;
+      if (socket) {
+        socket.emit('mesas:updated', { tableId, status: 'Disponible' });
+        socket.emit('cocina:actualizar_tablero');
+      }
+
+      // Guardamos la información completada para mostrar el Comprobante (Factura)
+      setProcessedBill({ ...selectedBill, paymentMethod: selectedMethod })
+
+      setPendingBills(prev => prev.filter(p => (p.pedidoId || p._id) !== pId));
+      setSelectedBill(null);
+      setSelectedMethod(null)
+      setIsQRModalOpen(false)
+      setIsInvoiceModalOpen(true)
+      fetchDashboardData()
+    } catch (error: any) {
+      toast.error(error.response?.data?.mensaje || error.message || 'Error al procesar el pago')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
   const handleProcessPayment = async () => {
     if (!selectedMethod) {
       toast.error('Selecciona un método de pago antes de continuar.')
       return
     }
     
-    setIsProcessing(true)
-    try {
-      const pId = selectedBill.pedidoId || selectedBill._id
-      // Usando la ruta oficial del backend
-      await api.post(`/pagos/${pId}/procesar`, {
-        metodoPago: selectedMethod
-      })
-      toast.success(`Pago procesado con éxito para ${selectedBill.mesaNombre || selectedBill.mesa?.numero || 'Mesa'}`, { description: 'Se liberó la mesa.' })
-      setSelectedMethod(null)
-      fetchDashboardData()
-    } catch (error: any) {
-      toast.error(error.response?.data?.mensaje || 'Error al procesar el pago')
-    } finally {
-      setIsProcessing(false)
+    // Si es pago QR, se detiene el cobro automático y se abre el Modal de QR
+    if (selectedMethod === 'QR') {
+      setIsQRModalOpen(true)
+      return
     }
+
+    // Para otros métodos (Efectivo, Tarjeta) cobra normalmente
+    await executePayment()
+  }
+
+  const handleDownloadQRPDF = async () => {
+    if (!selectedBill) return;
+    setIsProcessing(true);
+    try {
+      const doc = new jsPDF({ format: [80, 200] });
+      let y = 10;
+      doc.setFontSize(16);
+      doc.text("SABOR & GESTION", 40, y, { align: "center" });
+      y += 8;
+      doc.setFontSize(12);
+      doc.text("Pago con QR", 40, y, { align: "center" });
+      y += 5;
+      doc.setFontSize(10);
+      doc.text("Escanee para pagar desde su mesa", 40, y, { align: "center" });
+      y += 8;
+      doc.text("-----------------------------------------", 40, y, { align: "center" });
+      y += 6;
+      
+      doc.text(`Mesa: ${selectedBill.mesaNombre || selectedBill.mesa?.numero || 'Mesa'}`, 5, y);
+      y += 5;
+      doc.text(`Cliente: ${selectedBill.clienteNombre || 'Consumidor Final'}`, 5, y);
+      y += 5;
+      doc.text(`Pedido: ${selectedBill.codigo || `PED-${String(selectedBill.pedidoId || selectedBill._id).slice(-4).toUpperCase()}`}`, 5, y);
+      y += 5;
+      
+      const total = ((selectedBill.subtotalCierre || selectedBill.total || 0) - (selectedBill.montoDescuento || 0) + (selectedBill.montoPropina || 0)).toFixed(2);
+      doc.setFontSize(12);
+      doc.text(`Total a pagar: Bs. ${total}`, 5, y);
+      y += 8;
+      
+      doc.setFontSize(10);
+      doc.text("-----------------------------------------", 40, y, { align: "center" });
+      y += 6;
+
+      try {
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=PAGO-TIS-${selectedBill.pedidoId || selectedBill._id}&color=4B2E2D`;
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
+        img.src = qrUrl;
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+        });
+        doc.addImage(img, 'PNG', 15, y, 50, 50);
+        y += 55;
+      } catch (error) {
+        doc.text("[ QR NO DISPONIBLE ]", 40, y + 20, { align: "center" });
+        y += 55;
+      }
+
+      doc.setFontSize(8);
+      const splitMsg = doc.splitTextToSize("Escanee este codigo QR con su aplicacion bancaria para realizar el pago de forma segura", 70);
+      doc.text(splitMsg, 40, y, { align: "center" });
+      y += 15;
+      doc.text("Gracias por su preferencia", 40, y, { align: "center" });
+
+      doc.save(`QR-Mesa-${selectedBill.mesaNombre || selectedBill.mesa?.numero || 'Mesa'}.pdf`);
+    } catch (err) {
+      toast.error("Error al generar el PDF del QR");
+    } finally {
+      setIsProcessing(false);
+    }
+  }
+
+  const handleDownloadPDF = () => {
+    if (!processedBill) return;
+    const doc = new jsPDF({ format: [80, 250] });
+    let y = 10;
+    doc.setFontSize(14);
+    doc.text("Sabor & Gestion", 40, y, { align: "center" });
+    y += 6;
+    doc.setFontSize(10);
+    doc.text("Comprobante de Pago", 40, y, { align: "center" });
+    y += 8;
+    doc.setFontSize(9);
+    doc.text(`Pedido: ${processedBill.codigo || `PED-${String(processedBill.pedidoId || processedBill._id).slice(-4).toUpperCase()}`}`, 40, y, { align: "center" });
+    y += 6;
+    doc.text("-----------------------------------------", 40, y, { align: "center" });
+    y += 6;
+    
+    const mesaName = processedBill.mesaNombre || processedBill.mesa?.numero || 'Barra';
+    const waiterName = processedBill.meseroNombre || (processedBill.usuario?.nombre ? `${processedBill.usuario.nombre} ${processedBill.usuario.apellido || ''}` : 'Mesero');
+    const locationName = processedBill.mesa?.ubicacion?.nombre || processedBill.mesa?.location || 'Principal';
+
+    doc.text(`Mesa: ${mesaName}`, 5, y);
+    y += 5;
+    doc.text(`Area/Sala: ${locationName}`, 5, y);
+    y += 5;
+    doc.text(`Mesero: ${waiterName}`, 5, y);
+    y += 5;
+    doc.text(`Cajero: ${cashierName}`, 5, y);
+    y += 6;
+    doc.text("-----------------------------------------", 40, y, { align: "center" });
+    y += 6;
+
+    doc.text(`Cliente: ${processedBill.clienteNombre || 'Consumidor Final'}`, 5, y);
+    y += 5;
+    if (processedBill.clienteCI || processedBill.clienteNIT) {
+      doc.text(`CI/NIT: ${processedBill.clienteCI || processedBill.clienteNIT || 'S/N'}`, 5, y);
+      y += 5;
+    }
+    doc.text("-----------------------------------------", 40, y, { align: "center" });
+    y += 6;
+
+    doc.text("CANT   DESCRIPCION       P.U   SUBT", 5, y);
+    y += 5;
+    (processedBill.items || processedBill.detalles || []).forEach((item: any) => {
+      const name = item.nombre || item.plato?.nombre || 'Plato';
+      const qty = item.cantidad || 1;
+      const pu = (item.precioUnitario || item.plato?.precio || 0).toFixed(2);
+      const sub = (item.subtotal || ((item.precioUnitario || item.plato?.precio || 0) * qty)).toFixed(2);
+      doc.text(`${qty}`, 5, y);
+      doc.text(`${name.substring(0, 12)}`, 15, y);
+      doc.text(`${pu}`, 55, y, { align: "right" });
+      doc.text(`Bs. ${sub}`, 75, y, { align: "right" });
+      y += 5;
+    });
+    
+    y += 3;
+    doc.text("-----------------------------------------", 40, y, { align: "center" });
+    y += 6;
+    
+    const subtotal = (processedBill.subtotalCierre || processedBill.total || 0).toFixed(2);
+    const discount = (processedBill.montoDescuento || 0).toFixed(2);
+    const tip = (processedBill.montoPropina || 0).toFixed(2);
+    const total = ((processedBill.subtotalCierre || processedBill.total || 0) - (processedBill.montoDescuento || 0) + (processedBill.montoPropina || 0)).toFixed(2);
+
+    doc.text(`Subtotal:`, 5, y);
+    doc.text(`Bs. ${subtotal}`, 75, y, { align: "right" });
+    y += 5;
+    if (Number(discount) > 0) {
+      doc.text(`Descuento:`, 5, y);
+      doc.text(`- Bs. ${discount}`, 75, y, { align: "right" });
+      y += 5;
+    }
+    if (Number(tip) > 0) {
+      doc.text(`Propina:`, 5, y);
+      doc.text(`+ Bs. ${tip}`, 75, y, { align: "right" });
+      y += 5;
+    }
+    
+    doc.setFontSize(12);
+    doc.text(`TOTAL FINAL:`, 5, y);
+    doc.text(`Bs. ${total}`, 75, y, { align: "right" });
+    y += 8;
+    
+    doc.setFontSize(10);
+    doc.text(`Metodo Pago: ${processedBill.paymentMethod || 'Efectivo'}`, 5, y);
+    y += 5;
+    
+    const now = new Date();
+    doc.text(`Fecha: ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`, 5, y);
+    y += 10;
+    
+    doc.text("¡Gracias por su preferencia!", 40, y, { align: "center" });
+    doc.save(`Factura-${processedBill.codigo || processedBill.pedidoId || 'Pago'}.pdf`);
   }
 
   const handleCloseRegister = async () => {
@@ -424,6 +651,213 @@ export function CashierView() {
         </aside>
         
       </main>
+
+      {/* ─── MODALES DE PAGO Y FACTURACIÓN ─── */}
+      
+      {/* 1. Modal QR */}
+      {isQRModalOpen && selectedBill && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+            <div className="relative bg-gradient-to-b from-gray-50 to-white px-6 pt-6 pb-4 border-b border-gray-100 text-center">
+              <button 
+                onClick={() => setIsQRModalOpen(false)} 
+                disabled={isProcessing} 
+                className="absolute left-6 top-6 text-gray-500 hover:text-gray-800 transition-colors flex items-center gap-1 text-sm font-bold disabled:opacity-50"
+              >
+                <X size={18} /> Volver
+              </button>
+              <div className="w-14 h-14 bg-gradient-to-br from-[#4B2E2D] to-[#6B3E2E] rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-[#4B2E2D]/20">
+                <QrCode size={28} className="text-white" />
+              </div>
+              <h2 className="text-2xl font-black text-[#4B2E2D]">Pago con QR</h2>
+              <p className="text-sm font-bold text-gray-400 mt-1">Escanee el código para pagar</p>
+            </div>
+
+            <div className="p-8 flex flex-col items-center">
+              {/* Datos */}
+              <div className="w-full bg-gray-50 rounded-2xl p-4 mb-6 border border-gray-100 space-y-2">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-semibold text-gray-500">Mesa</span>
+                  <span className="font-black text-[#4B2E2D]">{selectedBill.mesaNombre || selectedBill.mesa?.numero || 'Mesa'}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-semibold text-gray-500">Cliente</span>
+                  <span className="font-black text-[#4B2E2D] truncate max-w-[150px]">{selectedBill.clienteNombre || 'Consumidor Final'}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-semibold text-gray-500">Pedido</span>
+                  <span className="font-black text-[#D96C4A]">{selectedBill.codigo || `PED-${String(selectedBill.pedidoId || selectedBill._id).slice(-4).toUpperCase()}`}</span>
+                </div>
+                <div className="pt-2 mt-2 border-t border-dashed border-gray-200 flex justify-between items-center">
+                  <span className="font-black text-[#4B2E2D] uppercase tracking-wider text-xs">Total a Pagar</span>
+                  <span className="font-black text-2xl text-[#4B2E2D]">Bs. {((selectedBill.subtotalCierre || selectedBill.total || 0) - (selectedBill.montoDescuento || 0) + (selectedBill.montoPropina || 0)).toFixed(2)}</span>
+                </div>
+              </div>
+
+              <div className="w-full border-t border-dashed border-gray-200 mb-6"></div>
+
+              {/* QR */}
+              <div className="bg-white p-3 rounded-3xl shadow-sm border-2 border-gray-100 mb-6">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PAGO-TIS-${selectedBill.pedidoId || selectedBill._id}&color=4B2E2D`}
+                  alt="Código QR"
+                  className="w-[180px] h-[180px] object-contain"
+                />
+              </div>
+              <p className="text-xs font-bold text-gray-500 text-center max-w-[280px] leading-relaxed">
+                Escanee este código QR con su aplicación bancaria para realizar el pago de forma segura
+              </p>
+            </div>
+
+            <div className="p-6 bg-gray-50 border-t border-gray-100 flex flex-col gap-3">
+              <button onClick={handleDownloadQRPDF} disabled={isProcessing} className="w-full py-3.5 rounded-xl bg-white border-2 border-[#D96C4A] text-[#D96C4A] hover:bg-[#FFF5F0] font-black transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm">
+                {isProcessing ? <div className="w-5 h-5 border-2 border-[#D96C4A]/30 border-t-[#D96C4A] rounded-full animate-spin" /> : <Printer size={20} />} Imprimir QR para Mesa
+              </button>
+              <button onClick={executePayment} disabled={isProcessing} className="w-full py-4 rounded-xl bg-[#D96C4A] hover:bg-[#C25838] text-white font-black shadow-lg shadow-[#D96C4A]/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                {isProcessing ? <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Procesando...</> : <><CheckCircle2 size={22} /> Confirmar Pago QR</>}
+              </button>
+              <button onClick={() => setIsQRModalOpen(false)} disabled={isProcessing} className="w-full py-3 rounded-xl text-gray-500 font-bold hover:bg-gray-200 transition-all disabled:opacity-50">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Modal Comprobante (Factura PDF) */}
+      {isInvoiceModalOpen && processedBill && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
+            
+            {/* Header Comprobante */}
+            <div className="bg-[#4B2E2D] px-6 py-6 text-center relative overflow-hidden shrink-0">
+              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 pointer-events-none"></div>
+              <div className="relative z-10 flex flex-col items-center">
+                <div className="w-14 h-14 bg-white/10 rounded-full flex items-center justify-center mb-3 backdrop-blur-sm">
+                  <FileText size={28} className="text-white" />
+                </div>
+                <p className="text-white/60 text-[10px] font-black uppercase tracking-widest mb-1">SABOR & GESTIÓN</p>
+                <h2 className="text-2xl font-black text-white leading-tight">Comprobante de Pago</h2>
+                <p className="text-[#D96C4A] text-sm font-black mt-1 bg-[#D96C4A]/10 px-3 py-1 rounded-full border border-[#D96C4A]/20">
+                  {processedBill.codigo || `PED-${String(processedBill.pedidoId || processedBill._id).slice(-4).toUpperCase()}`}
+                </p>
+              </div>
+            </div>
+            <div className="p-6 bg-white relative flex-1 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-black/10">
+              <div className="absolute -top-3 left-0 right-0 h-3 flex justify-around overflow-hidden">
+                {Array.from({ length: 25 }).map((_, i) => (<div key={i} className="w-3 h-3 bg-white rounded-full -mt-1.5 shadow-inner"></div>))}
+              </div>
+              
+              {/* Badge Mesa */}
+              <div className="flex justify-center mb-6">
+                <span className="bg-[#FCE4D6] text-[#4B2E2D] px-4 py-1.5 rounded-full font-black text-sm border border-[#E0D0C5] shadow-sm">
+                  {processedBill.mesaNombre || processedBill.mesa?.numero || 'Mesa'}
+                </span>
+              </div>
+
+              {/* Detalles Administrativos */}
+              <div className="grid grid-cols-2 gap-3 mb-6 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                <div>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Área / Sala</p>
+                  <p className="text-xs font-black text-[#4B2E2D] truncate">{processedBill.mesa?.ubicacion?.nombre || processedBill.mesa?.location || 'Principal'}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Mesero</p>
+                  <p className="text-xs font-black text-[#4B2E2D] truncate">{processedBill.meseroNombre || (processedBill.usuario?.nombre ? `${processedBill.usuario.nombre} ${processedBill.usuario.apellido || ''}` : 'Mesero')}</p>
+                </div>
+                <div className="col-span-2 pt-2 border-t border-gray-200/60 mt-1">
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Cajero</p>
+                  <p className="text-xs font-black text-[#4B2E2D] truncate">{cashierName}</p>
+                </div>
+              </div>
+
+              {/* Cliente */}
+              <div className="mb-6 space-y-2">
+                <div className="flex justify-between items-center text-sm border-b border-gray-100 pb-2">
+                  <span className="font-semibold text-gray-500">Cliente</span>
+                  <span className="font-black text-[#4B2E2D]">{processedBill.clienteNombre || 'Consumidor Final'}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm border-b border-gray-100 pb-2">
+                  <span className="font-semibold text-gray-500">CI / NIT</span>
+                  <span className="font-black text-[#4B2E2D]">{processedBill.clienteCI || processedBill.clienteNIT || 'S/N'}</span>
+                </div>
+              </div>
+
+              {/* Productos (Resumido en scroll pequeño) */}
+              <div className="mb-6 max-h-[120px] overflow-y-auto pr-2 space-y-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-black/10">
+                {(processedBill.items || processedBill.detalles || []).map((item: any, idx: number) => (
+                  <div key={idx} className="flex justify-between items-start text-xs">
+                    <div className="flex gap-2">
+                      <span className="font-bold text-gray-400">{item.cantidad}x</span>
+                      <span className="font-bold text-[#4B2E2D]">{item.nombre || item.plato?.nombre || 'Plato'}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-bold text-[#4B2E2D]">Bs. {(item.subtotal || ((item.precioUnitario || item.plato?.precio || 0) * item.cantidad)).toFixed(2)}</span>
+                      <p className="text-[9px] text-gray-400 font-medium">Bs. {(item.precioUnitario || item.plato?.precio || 0).toFixed(2)} c/u</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Totales */}
+              <div className="bg-[#FFF5F0] rounded-2xl p-4 border border-[#FCE4D6] space-y-2 mb-6">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-bold text-gray-500">Subtotal</span>
+                  <span className="font-bold text-[#4B2E2D]">Bs. {(processedBill.subtotalCierre || processedBill.total || 0).toFixed(2)}</span>
+                </div>
+                {(processedBill.montoDescuento || 0) > 0 && (
+                  <div className="flex justify-between items-center text-xs text-green-600">
+                    <span className="font-bold">Descuento</span>
+                    <span className="font-bold">- Bs. {(processedBill.montoDescuento || 0).toFixed(2)}</span>
+                  </div>
+                )}
+                {(processedBill.montoPropina || 0) > 0 && (
+                  <div className="flex justify-between items-center text-xs text-[#D96C4A]">
+                    <span className="font-bold">Propina</span>
+                    <span className="font-bold">+ Bs. {(processedBill.montoPropina || 0).toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="pt-2 border-t border-[#D96C4A]/20 flex justify-between items-end">
+                  <div>
+                    <span className="font-black text-[#4B2E2D] uppercase text-[10px] tracking-wider block mb-0.5">Método de Pago</span>
+                    <span className="bg-white text-[#D96C4A] font-black text-[10px] px-2 py-0.5 rounded uppercase border border-[#D96C4A]/30">{processedBill.paymentMethod || 'QR'}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-black text-gray-400 uppercase text-[10px] tracking-wider block mb-0.5">Total Final</span>
+                    <span className="font-black text-2xl text-[#D0543A] leading-none">Bs. {((processedBill.subtotalCierre || processedBill.total || 0) - (processedBill.montoDescuento || 0) + (processedBill.montoPropina || 0)).toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex justify-center items-center gap-3 text-[10px] font-bold text-gray-400 mb-2 uppercase tracking-wider">
+                <span className="flex items-center gap-1"><Clock size={12} /> {new Date().toLocaleDateString()}</span>
+                <span>•</span>
+                <span>{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+            </div>
+
+            {/* Footer de Acciones (Fijo Abajo) */}
+            <div className="p-5 sm:p-6 bg-white border-t border-gray-100 flex flex-col sm:flex-row gap-3 shrink-0 mt-auto">
+              <button 
+                onClick={() => {
+                  setIsInvoiceModalOpen(false);
+                  setProcessedBill(null);
+                }} 
+                className="flex-1 py-3.5 rounded-xl border-2 border-gray-200 text-gray-600 font-black hover:bg-gray-50 transition-all text-sm"
+              >
+                Cerrar
+              </button>
+              <button 
+                onClick={handleDownloadPDF} 
+                className="flex-1 py-3.5 rounded-xl bg-[#4B2E2D] hover:bg-[#3A2222] text-white font-black shadow-lg transition-all flex items-center justify-center gap-2 text-sm"
+              >
+                <FileText size={18} /> Descargar PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

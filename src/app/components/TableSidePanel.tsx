@@ -122,6 +122,14 @@ export function TableSidePanel({
         d.category.toLowerCase().includes(searchQuery.toLowerCase()))
   )
 
+  const canRequestBill = (Array.isArray(activeOrder) && activeOrder.length > 0 && activeOrder.every((item: any) => 
+      item.estado === 'ENTREGADO' || 
+      item.estado === 'COMPLETADO' || 
+      item.estado === 'SERVIDO' || 
+      item.status === 'ENTREGADO' ||
+      item.estado === 'LISTO'
+  )) || backendOrder?.estado === 'ENTREGADO' || backendOrder?.estado === 'SERVIDO' || backendOrder?.estado === 'LISTO';
+
   // Handlers
   const handleConfirmOrder = async () => {
     setIsSubmitting(true)
@@ -410,8 +418,11 @@ export function TableSidePanel({
               {!viewingMenu && !showSummary && activeTable.status === 'Ocupada' && (
                 <>
                   <button onClick={handlePrintOrder} className="w-full py-3 rounded-2xl bg-white border-2 border-[#6B3E2E] text-[#4B2E2D] hover:bg-[#F5E6D3] font-bold transition-all text-[14px] flex items-center justify-center gap-2"><Printer size={18} /> Imprimir Pedido</button>
-                  {backendOrder?.estado === 'ENTREGADO' && (
-                    <button onClick={() => requestBill(tableId)} className="w-full py-4 rounded-2xl bg-[#D96C4A] hover:bg-[#C25838] text-white font-black shadow-lg shadow-[#D96C4A]/20 transition-all text-[15px] flex items-center justify-center gap-2"><Receipt size={20} /> Pedir Cuenta</button>
+                  
+                  {canRequestBill && (
+                    <button onClick={() => { requestBill(tableId); onOpenPayment(); }} className="w-full py-4 rounded-2xl bg-[#E6A23C] hover:bg-[#d59330] text-white font-black shadow-lg shadow-[#E6A23C]/20 transition-all text-[15px] flex items-center justify-center gap-2 mt-1 mb-1">
+                      <Receipt size={20} /> Pedir Cuenta
+                    </button>
                   )}
                   <button onClick={handleClearOrder} className="w-full py-3.5 rounded-2xl bg-[#FEF2F2] border border-[#FECACA] text-[#DC2626] hover:bg-[#FEE2E2] hover:text-[#B91C1C] font-bold transition-all text-[15px] flex items-center justify-center gap-2 mt-1"><Trash2 size={18} /> Cancelar Pedido Completo</button>
                 </>

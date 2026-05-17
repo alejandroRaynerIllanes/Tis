@@ -343,8 +343,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             if (existingItem) {
               existingItem.quantity += (d.cantidad || 1)
               if (d.observacion) existingItem.note = existingItem.note ? `${existingItem.note} | ${d.observacion}` : d.observacion
+              if (d.estado) (existingItem as any).estado = d.estado
             } else {
-              ordersMap[tId].push({ product, quantity: d.cantidad || 1, note: d.observacion || '' })
+              ordersMap[tId].push({ product, quantity: d.cantidad || 1, note: d.observacion || '', estado: d.estado || o.estado || 'PENDIENTE' } as any)
             }
           })
         })

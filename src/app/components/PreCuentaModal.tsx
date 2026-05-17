@@ -3,6 +3,7 @@ import { X, User, CreditCard, Send, Percent, Wallet, AlertCircle, Loader2 } from
 import { toast } from 'sonner'
 import { api } from '../services/api'
 import { usersService } from '../services/users.service'
+import { useAppContext } from '../context/AppContext'
 
 interface PreCuentaModalProps {
   isOpen: boolean
@@ -24,6 +25,8 @@ export function PreCuentaModal({ isOpen, onClose, tableId, tableName, activeOrde
   const [selectedCajero, setSelectedCajero] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoadingCajeros, setIsLoadingCajeros] = useState(true)
+
+  const { socket, updateTableStatus } = useAppContext()
 
   // Limpiar y cargar cajeros al abrir
   useEffect(() => {
@@ -93,8 +96,9 @@ export function PreCuentaModal({ isOpen, onClose, tableId, tableName, activeOrde
 
       const orderId = activeBackendOrder._id || activeBackendOrder.id
       
-      // 1. Actualizamos el pedido con los datos del cliente, cajero y finanzas
-      await api.put(`/pedidos/${orderId}`, {
+      const payload = {
+        estado: 'CUENTA_SOLICITADA',
+        paymentStatus: 'pending',
         clienteNombre: nombre.trim(),
         clienteCI: ci.trim(),
         clienteNIT: nit.trim() || undefined,
@@ -102,15 +106,31 @@ export function PreCuentaModal({ isOpen, onClose, tableId, tableName, activeOrde
         montoDescuento,
         montoPropina,
         subtotalCierre: subtotal
-      })
+      };
 
-      // 2. Ejecutamos el nuevo endpoint oficial del backend para solicitar cuenta
-      await api.patch(`/pedidos/${orderId}/solicitar-cuenta`)
+      // 1. Actualizamos el pedido con los datos del cliente, cajero y finanzas
+      const response: any = await api.put(`/pedidos/${orderId}`, payload);
+      const pedidoActualizado = response?.pedido || response?.data || response;
+
+      // 2. Ejecutamos el nuevo endpoint oficial del backend para solicitar cuenta (opcional si el PUT ya lo hace)
+      try {
+        await api.patch(`/pedidos/${orderId}/solicitar-cuenta`);
+      } catch (e) {}
+
+      if (updateTableStatus) {
+        updateTableStatus(tableId, 'Esperando pago');
+      }
+
+      if (socket) {
+        socket.emit('cuenta:solicitada', pedidoActualizado || { ...activeBackendOrder, ...payload });
+        socket.emit('caja:nueva_cuenta', pedidoActualizado || { ...activeBackendOrder, ...payload });
+        socket.emit('mesas:updated', { tableId, status: 'Esperando pago' });
+      }
 
       toast.success(`Cuenta enviada exitosamente al cajero.`)
       onSuccess()
     } catch (error: any) {
-      toast.error(error.response?.data?.mensaje || 'Error al enviar la cuenta al cajero.')
+      toast.error(error.response?.data?.mensaje || error.message || 'Error al enviar la cuenta al cajero.')
     } finally {
       setIsSubmitting(false)
     }

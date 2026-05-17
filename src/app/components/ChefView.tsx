@@ -18,6 +18,7 @@ interface OrderItem {
 interface Order {
   id: string
   table: string
+  tableId?: string
   waiter: string
   time: string
   status: OrderStatus
@@ -39,6 +40,7 @@ export function ChefView() {
     id: o.codigo || `PED-${String(o._id || '').slice(-4).toUpperCase()}`,
     rawId: o._id,
     table: o.mesa?.numero || o.mesa?.name || 'Mesa ?',
+    tableId: o.mesa?._id || o.mesa?.id || o.mesa,
     waiter: o.usuario?.nombre ? `${o.usuario.nombre} ${o.usuario.apellido || ''}`.trim() : 'Mesero',
     time: new Date(o.fechaHora || o.createdAt || Date.now()).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
     status: o.estado === 'ABIERTO' ? 'Pendiente' : o.estado === 'EN_PREPARACION' ? 'En preparación' : 'Listo',
@@ -105,6 +107,15 @@ export function ChefView() {
     try {
       await ordersService.updateStatus(order.rawId, backendStatus)
       setOrders((prevOrders) => prevOrders.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)))
+      
+      if (socket) {
+        if (newStatus === 'Listo') {
+          socket.emit('pedido:listo', { pedidoId: order.rawId, mesaId: order.tableId, mesaNombre: order.table });
+          socket.emit('mesas:alerta_listo', { pedidoId: order.rawId, mesaId: order.tableId, mesaNombre: order.table });
+        }
+        socket.emit('cocina:actualizar_tablero', { _id: order.rawId, estado: backendStatus });
+      }
+
       if (newStatus === 'En preparación') toast.success(`Pedido ${orderId} en preparación 🔥`)
       else if (newStatus === 'Listo') toast.success(`¡Pedido ${orderId} listo para entregar! ✅`)
     } catch (e) {
@@ -236,72 +247,53 @@ export function ChefView() {
       </header>
 
       {/* Tablero Kanban */}
-      <div className="flex-1 p-6 sm:p-10 grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8 overflow-y-auto lg:overflow-hidden min-h-0">
-        {/* Columna 1: Pendientes */}
-        <div className="flex flex-col bg-white/50 rounded-3xl border-2 border-yellow-200/50 h-[500px] lg:h-full overflow-hidden shadow-sm">
-          <div className="flex items-center justify-between p-4 sm:p-5 border-b border-yellow-200/50 shrink-0 bg-white/40">
-            <h2 className="text-xl font-black text-[#4B2E2D] flex items-center gap-2">
-              <Clock className="text-yellow-500" /> Por hacer
+      <div className="flex-1 p-6 sm:p-10 grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8 overflow-y-auto lg:overflow-hidden">
+        
+        {/* Columna: Pendientes */}
+        <div className="flex flex-col gap-4 overflow-hidden h-full">
+          <div className="flex items-center justify-between pb-2 border-b-2 border-yellow-200 shrink-0">
+            <h2 className="font-black text-lg text-[#4B2E2D] flex items-center gap-2">
+              <Clock className="text-yellow-500" size={20} /> Por hacer
             </h2>
-            <span className="bg-yellow-200 text-yellow-800 font-black px-3 py-1 rounded-full text-sm">
+            <span className="bg-yellow-100 text-yellow-800 font-bold px-2.5 py-0.5 rounded-full text-xs shadow-sm">
               {pendingOrders.length}
             </span>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 sm:p-5 flex flex-col gap-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-black/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-black/20">
-            {pendingOrders.map((order) => (
-              <OrderCard key={order.id} order={order} />
-            ))}
-            {pendingOrders.length === 0 && (
-              <p className="text-center text-[#4B2E2D]/40 font-medium py-10">
-                No hay pedidos pendientes
-              </p>
-            )}
+          <div className="flex-1 overflow-y-auto pr-2 space-y-4 pb-4">
+            {pendingOrders.map(order => <OrderCard key={order.id} order={order} />)}
           </div>
         </div>
 
-        {/* Columna 2: En Preparación */}
-        <div className="flex flex-col bg-[#FCE4D6]/40 rounded-3xl border-2 border-[#D0543A]/20 h-[500px] lg:h-full overflow-hidden shadow-sm">
-          <div className="flex items-center justify-between p-4 sm:p-5 border-b border-[#D0543A]/10 shrink-0 bg-white/20">
-            <h2 className="text-xl font-black text-[#4B2E2D] flex items-center gap-2">
-              <Flame className="text-[#D0543A]" /> Cocinando
+        {/* Columna: En Preparación */}
+        <div className="flex flex-col gap-4 overflow-hidden h-full">
+          <div className="flex items-center justify-between pb-2 border-b-2 border-[#D0543A]/30 shrink-0">
+            <h2 className="font-black text-lg text-[#4B2E2D] flex items-center gap-2">
+              <Flame className="text-[#D0543A]" size={20} /> Cocinando
             </h2>
-            <span className="bg-[#D0543A] text-white font-black px-3 py-1 rounded-full text-sm">
+            <span className="bg-[#FCE4D6] text-[#D0543A] font-bold px-2.5 py-0.5 rounded-full text-xs shadow-sm">
               {prepOrders.length}
             </span>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 sm:p-5 flex flex-col gap-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-black/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-black/20">
-            {prepOrders.map((order) => (
-              <OrderCard key={order.id} order={order} />
-            ))}
-            {prepOrders.length === 0 && (
-              <p className="text-center text-[#4B2E2D]/40 font-medium py-10">
-                No hay platos en preparación
-              </p>
-            )}
+          <div className="flex-1 overflow-y-auto pr-2 space-y-4 pb-4">
+            {prepOrders.map(order => <OrderCard key={order.id} order={order} />)}
           </div>
         </div>
 
-        {/* Columna 3: Listos */}
-        <div className="flex flex-col bg-emerald-50/50 rounded-3xl border-2 border-emerald-200/50 h-[500px] lg:h-full overflow-hidden shadow-sm">
-          <div className="flex items-center justify-between p-4 sm:p-5 border-b border-emerald-200/50 shrink-0 bg-white/40">
-            <h2 className="text-xl font-black text-[#4B2E2D] flex items-center gap-2">
-              <CheckCircle2 className="text-emerald-500" /> Listos
+        {/* Columna: Listos */}
+        <div className="flex flex-col gap-4 overflow-hidden h-full">
+          <div className="flex items-center justify-between pb-2 border-b-2 border-emerald-200 shrink-0">
+            <h2 className="font-black text-lg text-[#4B2E2D] flex items-center gap-2">
+              <CheckCircle2 className="text-emerald-500" size={20} /> Listos
             </h2>
-            <span className="bg-emerald-200 text-emerald-800 font-black px-3 py-1 rounded-full text-sm">
+            <span className="bg-emerald-100 text-emerald-700 font-bold px-2.5 py-0.5 rounded-full text-xs shadow-sm">
               {readyOrders.length}
             </span>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 sm:p-5 flex flex-col gap-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-black/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-black/20">
-            {readyOrders.map((order) => (
-              <OrderCard key={order.id} order={order} />
-            ))}
-            {readyOrders.length === 0 && (
-              <p className="text-center text-[#4B2E2D]/40 font-medium py-10">
-                No hay pedidos para recoger
-              </p>
-            )}
+          <div className="flex-1 overflow-y-auto pr-2 space-y-4 pb-4">
+            {readyOrders.map(order => <OrderCard key={order.id} order={order} />)}
           </div>
         </div>
+
       </div>
     </div>
   )

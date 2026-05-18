@@ -1,6 +1,7 @@
+//src/app/context/AppContext.tsx
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useRef } from 'react'
 import { io } from 'socket.io-client'
-import { getToken, api } from '../services/api'
+import { getToken, getStoredUser, api } from '../services/api'
 import { toast } from 'sonner'
 import type {
   Product,
@@ -20,7 +21,6 @@ import {
   timesOverlap,
   getCurrentActiveReservation
 } from '../utils/reservations'
-
 // Re-export types for backward compatibility
 export type { Product, ProductStatus, Table, TableStatus, OrderItem, ReservationInfo }
 
@@ -636,14 +636,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           }
         }
 
-        // Intento 2: Fallback a localStorage por si el token no se pudo leer
+      // Intento 2: Fallback usando la función oficial
         if (!userId) {
-          const storedUserStr = localStorage.getItem('user') || localStorage.getItem('usuario')
-          if (storedUserStr) {
-            try {
-              const storedUser = JSON.parse(storedUserStr)
-              userId = storedUser.id || storedUser._id || ''
-            } catch (e) {}
+          const storedUser = getStoredUser()
+          if (storedUser) {
+            userId = storedUser.id?.toString() || (storedUser as any)._id || ''
           }
         }
 

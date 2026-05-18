@@ -1,3 +1,4 @@
+//src/app/services/locations.service.ts
 import { api } from './api'
 
 export interface BackendLocation {

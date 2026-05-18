@@ -1,3 +1,4 @@
+//src/app/App.tsx
 export default function App() {
   return (
     <div className="min-h-screen bg-red-500 flex items-center justify-center">

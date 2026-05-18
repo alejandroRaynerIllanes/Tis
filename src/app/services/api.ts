@@ -1,3 +1,4 @@
+//src/app/services/api.ts
 // ─── Configuración base de la API ────────────────────────────────────────────
 // Cambia esta URL a la de tu backend real
 // Por defecto asumimos que las rutas del backend están bajo '/api'

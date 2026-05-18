@@ -1,3 +1,4 @@
+//src/app/hooks/useWaiterLogic.ts
 import { useState, useMemo, MouseEvent, useEffect } from 'react'
 import { toast } from 'sonner'
 import { generateReservationPDF } from '../utils/pdf.utils'

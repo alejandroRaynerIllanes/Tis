@@ -1,3 +1,4 @@
+//src/app/routes.tsx
 import { createBrowserRouter, Outlet } from 'react-router'
 import { Login } from './components/Login'
 import { Catalog } from './components/Catalog'

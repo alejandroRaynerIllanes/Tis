@@ -1,3 +1,4 @@
+//src/app/services/index.ts
 // ─── Servicios API ───────────────────────────────────────────────────────────
 // Punto de entrada centralizado para todos los servicios
 

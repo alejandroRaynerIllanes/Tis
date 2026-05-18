@@ -1,3 +1,4 @@
+//src/app/hooks/useAuth.ts
 // ─── Hook de autenticación ──────────────────────────────────────────────────
 
 import { useNavigate } from 'react-router'

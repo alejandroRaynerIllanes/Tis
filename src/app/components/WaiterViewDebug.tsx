@@ -1,3 +1,4 @@
+//src/app/components/WaiterViewDebug.tsx
 import { useNavigate } from 'react-router'
 
 export function WaiterViewDebug() {

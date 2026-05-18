@@ -1,3 +1,4 @@
+//src/app/types/index.ts
 // ─── Tipos compartidos de la aplicación ─────────────────────────────────────
 
 export type ProductStatus = 'Disponible' | 'Agotado'

@@ -1,3 +1,4 @@
+//src/app/services/auth.service.ts
 // ─── Servicio de Autenticación Corregido ─────────────────────────────────────
 
 import { api, setToken, setStoredUser, clearToken, clearStoredUser, type AuthUser } from './api'
@@ -51,9 +52,19 @@ export const authService = {
     return { user: data.usuario, role, token: data.token }
   },
 
-  logout(): void {
+ logout(): void {
+    // 1. Limpiar funciones nativas
     clearToken()
     clearStoredUser()
+    
+    // 2. Limpiar CUALQUIER rastro fantasma de la "Sopa de LocalStorage"
     localStorage.removeItem('userRole')
+    localStorage.removeItem('user')    // Rastro fantasma 1
+    localStorage.removeItem('usuario') // Rastro fantasma 2
+    localStorage.removeItem('authToken')
+    localStorage.removeItem('authUser')
+    
+    // 3. (Opcional pero seguro) Forzar limpieza total de la sesión actual
+    // localStorage.clear(); 
   }
 }

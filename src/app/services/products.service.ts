@@ -1,3 +1,4 @@
+//src/app/services/products.service.ts
 import { api } from './api'
 
 export const productsService = {

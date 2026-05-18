@@ -1,3 +1,4 @@
+//src/app/services/tables.service.ts
 import { api } from './api'
 
 export interface TablePayload {

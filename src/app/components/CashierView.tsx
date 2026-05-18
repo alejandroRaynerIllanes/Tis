@@ -1,3 +1,4 @@
+//src/app/components/CashierView.tsx
 import React, { useState, useEffect } from 'react'
 import {
   Calculator,
@@ -19,7 +20,7 @@ import {
   X,
   FileText
 } from 'lucide-react'
-import { jsPDF } from 'jspdf'
+import jsPDF from "jspdf";
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { getStoredUser, api } from '../services/api'
@@ -147,11 +148,14 @@ export function CashierView() {
     setIsProcessing(true)
     try {
       const pId = selectedBill.pedidoId || selectedBill._id
+      let comprobanteBackend = null; // 1. NUEVA VARIABLE PARA ATRAPAR EL COMPROBANTE
       
       try {
-        await api.post(`/pagos/${pId}/procesar`, {
+        // 2. ATRAPAMOS LA RESPUESTA
+        const response: any = await api.post(`/pagos/${pId}/procesar`, {
           metodoPago: selectedMethod
         })
+        comprobanteBackend = response.comprobante; // Aquí viene el meseroNombre real
       } catch (err: any) {
         // Fallback: If endpoint doesn't exist, we close the order and release table manually
         await api.put(`/pedidos/${pId}`, {
@@ -169,8 +173,12 @@ export function CashierView() {
         socket.emit('cocina:actualizar_tablero');
       }
 
-      // Guardamos la información completada para mostrar el Comprobante (Factura)
-      setProcessedBill({ ...selectedBill, paymentMethod: selectedMethod })
+      // 3. INYECTAMOS EL COMPROBANTE DEL BACKEND EN EL PROCESSED BILL
+      setProcessedBill({ 
+        ...selectedBill, 
+        ...comprobanteBackend, // Esto sobrescribe cualquier nombre erróneo con el real
+        paymentMethod: selectedMethod 
+      })
 
       setPendingBills(prev => prev.filter(p => (p.pedidoId || p._id) !== pId));
       setSelectedBill(null);

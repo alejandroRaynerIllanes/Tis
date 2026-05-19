@@ -1,3 +1,4 @@
+// src/app/routes.tsx
 import { createBrowserRouter, Outlet } from 'react-router'
 import { Login } from './components/Login'
 import { Catalog } from './components/Catalog'
@@ -10,6 +11,7 @@ import { UnderConstruction } from './components/UnderConstruction'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { AppProvider } from './context/AppContext'
 import { Toaster } from 'sonner'
+import { PaymentSimulator } from './components/PaymentSimulator'
 
 function RootLayout() {
   return (
@@ -34,6 +36,11 @@ export const router = createBrowserRouter([
       {
         index: true,
         element: <Login />
+      },
+      {
+        // RUTA PÚBLICA AÑADIDA AQUÍ
+        path: 'pay-simulator',
+        element: <PaymentSimulator />
       },
       {
         path: 'catalog',

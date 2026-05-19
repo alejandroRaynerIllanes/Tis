@@ -1,3 +1,4 @@
+// src/app/data/constants.ts
 // ─── Constantes de la aplicación ─────────────────────────────────────────────
 
 import type { Category, Location, AppUser } from '../types'

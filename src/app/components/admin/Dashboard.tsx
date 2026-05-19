@@ -1,3 +1,4 @@
+//src/app/components/admin/Dashboard.tsx
 import { useEffect, useState } from 'react'
 import { TrendingUp, TrendingDown, Menu } from 'lucide-react'
 import { api } from '../../services/api'

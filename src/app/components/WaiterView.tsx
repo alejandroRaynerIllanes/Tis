@@ -1,3 +1,4 @@
+//SRC/app/components/WaiterView.tsx
 import {
   ChevronLeft,
   LogOut,
@@ -27,10 +28,9 @@ import { PreCuentaModal } from './PreCuentaModal'
 import { ReserveTableModal } from './ReserveTableModal'
 import { CancelReservationModal } from './CancelReservationModal'
 import { TableSidePanel } from './TableSidePanel'
-import { getStoredUser, api } from '../services/api'
+import { getStoredUser, setStoredUser, api } from '../services/api'
 import { ordersService } from '../services/orders.service'
 import { WaiterHistoryModal } from './WaiterHistoryModal'
-
 // ─── Tipos y helpers ─────────────────────────────────────────────────────────
 
 interface TableConfig {
@@ -255,12 +255,11 @@ export function WaiterView({
       api.get('/usuarios').then((res: any) => {
         const targetId = currentUser?.id || (currentUser as any)?._id
         const me = res.data.find((u: any) => u._id === targetId || u.id === targetId)
-        if (me && me.zona) {
+       if (me && me.zona) {
           setFetchedLocation(me.zona)
-          // Actualizamos la sesión localmente para que funcione más rápido en la próxima
+          // Actualizamos la sesión localmente SIN crear llaves duplicadas (fantasmas)
           const updatedUser = { ...(currentUser || {}), zona: me.zona, ubicacion: me.zona }
-          localStorage.setItem('user', JSON.stringify(updatedUser))
-          localStorage.setItem('authUser', JSON.stringify(updatedUser))
+          setStoredUser(updatedUser as any) // Usamos solo la función oficial
         }
       }).catch(() => {})
     }

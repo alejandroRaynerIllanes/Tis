@@ -1,3 +1,4 @@
+//src/app/data/mock-data.ts
 // ─── Datos mock de la aplicación ─────────────────────────────────────────────
 
 import type { Product, Table } from '../types'

@@ -1,3 +1,4 @@
+// src/app/components/CashierView.tsx
 import React, { useState, useEffect } from 'react'
 import {
   Calculator,
@@ -19,7 +20,7 @@ import {
   X,
   FileText
 } from 'lucide-react'
-import { jsPDF } from 'jspdf'
+import jsPDF from "jspdf";
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { getStoredUser, api } from '../services/api'
@@ -51,16 +52,12 @@ export function CashierView() {
     try {
       const cajeroId = currentUser?.id || (currentUser as any)?._id
       
-      // Descargamos las pendientes usando el nuevo endpoint y las cerradas para las estadísticas
       const [pendientesRes, cerradasRes]: any = await Promise.all([
         api.get('/pedidos/pendientes-cobro'),
         api.get(`/pedidos?hoy=true&cajero=${cajeroId}`)
       ])
       
-      // El nuevo endpoint trae un JSON mapeado { pedidoId, codigo, mesaNombre, meseroNombre, total, items }
       let pending = pendientesRes.data || pendientesRes || []
-      
-      // Cerradas: Para las estadísticas del día
       const myOrders = cerradasRes.data || cerradasRes || []
       const closed = myOrders.filter((o: any) => o.estado === 'CERRADO')
       
@@ -84,7 +81,6 @@ export function CashierView() {
       });
       setStats({ totalDia, efectivo, tarjeta, qr })
       
-      // Actualizar vista seleccionada si sigue pendiente
       if (selectedBill) {
         const stillPending = pending.find((p: any) => p.pedidoId === selectedBill.pedidoId || p._id === selectedBill._id)
         if (!stillPending) setSelectedBill(null)
@@ -98,6 +94,7 @@ export function CashierView() {
     fetchDashboardData()
   }, [])
 
+  // 1. Escuchas generales de Socket
   useEffect(() => {
     if (!socket) return
 
@@ -123,9 +120,7 @@ export function CashierView() {
       });
     };
 
-    const handleActualizarTablero = () => {
-      fetchDashboardData()
-    }
+    const handleActualizarTablero = () => fetchDashboardData()
 
     socket.on('caja:nueva_cuenta', handleNuevaCuenta)
     socket.on('cuenta:solicitada', handleCuentaSolicitada)
@@ -138,6 +133,32 @@ export function CashierView() {
     }
   }, [socket])
 
+  // 2. NUEVA ESCUCHA: El simulador de QR disparará este evento
+  useEffect(() => {
+    if (!socket) return;
+
+    const handlePagoQRConfirmado = (data: any) => {
+      const paidId = data.pedidoId;
+      const currentSelectedId = selectedBill?.pedidoId || selectedBill?._id;
+      
+      // Si el tribunal acaba de pagar la mesa que el cajero tiene abierta en pantalla:
+      if (currentSelectedId === paidId) {
+        toast.success('📱 ¡Transferencia QR detectada desde el celular!', { 
+          description: 'Generando comprobante automáticamente...' 
+        });
+        executePayment(); // Lanza el cobro de forma automática
+      } else {
+        // Si pagaron una mesa que el cajero no está viendo, solo recargamos la lista
+        fetchDashboardData();
+      }
+    };
+
+    socket.on('caja:pago_confirmado', handlePagoQRConfirmado);
+    return () => {
+      socket.off('caja:pago_confirmado', handlePagoQRConfirmado);
+    }
+  }, [socket, selectedBill, selectedMethod]); // Importante pasar las dependencias
+
   const handleLogout = () => {
     localStorage.clear()
     navigate('/', { replace: true })
@@ -147,17 +168,18 @@ export function CashierView() {
     setIsProcessing(true)
     try {
       const pId = selectedBill.pedidoId || selectedBill._id
+      let comprobanteBackend = null; 
       
       try {
-        await api.post(`/pagos/${pId}/procesar`, {
-          metodoPago: selectedMethod
+        const response: any = await api.post(`/pagos/${pId}/procesar`, {
+          metodoPago: selectedMethod || 'QR' // Fallback a QR si se autoejecutó
         })
+        comprobanteBackend = response.comprobante; 
       } catch (err: any) {
-        // Fallback: If endpoint doesn't exist, we close the order and release table manually
         await api.put(`/pedidos/${pId}`, {
           estado: 'CERRADO',
           paymentStatus: 'paid',
-          metodoPago: selectedMethod
+          metodoPago: selectedMethod || 'QR'
         });
       }
 
@@ -169,8 +191,11 @@ export function CashierView() {
         socket.emit('cocina:actualizar_tablero');
       }
 
-      // Guardamos la información completada para mostrar el Comprobante (Factura)
-      setProcessedBill({ ...selectedBill, paymentMethod: selectedMethod })
+      setProcessedBill({ 
+        ...selectedBill, 
+        ...comprobanteBackend,
+        paymentMethod: selectedMethod || 'QR' 
+      })
 
       setPendingBills(prev => prev.filter(p => (p.pedidoId || p._id) !== pId));
       setSelectedBill(null);
@@ -191,13 +216,11 @@ export function CashierView() {
       return
     }
     
-    // Si es pago QR, se detiene el cobro automático y se abre el Modal de QR
     if (selectedMethod === 'QR') {
       setIsQRModalOpen(true)
       return
     }
 
-    // Para otros métodos (Efectivo, Tarjeta) cobra normalmente
     await executePayment()
   }
 
@@ -205,6 +228,14 @@ export function CashierView() {
     if (!selectedBill) return;
     setIsProcessing(true);
     try {
+      const pId = selectedBill.pedidoId || selectedBill._id;
+      const mesaNameStr = selectedBill.mesaNombre || selectedBill.mesa?.numero || 'Mesa';
+      const codigoStr = selectedBill.codigo || `PED-${String(pId).slice(-4).toUpperCase()}`;
+      const totalStr = ((selectedBill.subtotalCierre || selectedBill.total || 0) - (selectedBill.montoDescuento || 0) + (selectedBill.montoPropina || 0)).toFixed(2);
+      
+      // Construimos la URL mágica para el Vercel
+      const simUrl = `https://tis-pied.vercel.app/pay-simulator?id=${pId}&mesa=${encodeURIComponent(mesaNameStr)}&total=${totalStr}&codigo=${codigoStr}`;
+      
       const doc = new jsPDF({ format: [80, 200] });
       let y = 10;
       doc.setFontSize(16);
@@ -214,21 +245,20 @@ export function CashierView() {
       doc.text("Pago con QR", 40, y, { align: "center" });
       y += 5;
       doc.setFontSize(10);
-      doc.text("Escanee para pagar desde su mesa", 40, y, { align: "center" });
+      doc.text("Escanee para pagar desde su celular", 40, y, { align: "center" });
       y += 8;
       doc.text("-----------------------------------------", 40, y, { align: "center" });
       y += 6;
       
-      doc.text(`Mesa: ${selectedBill.mesaNombre || selectedBill.mesa?.numero || 'Mesa'}`, 5, y);
+      doc.text(`Mesa: ${mesaNameStr}`, 5, y);
       y += 5;
       doc.text(`Cliente: ${selectedBill.clienteNombre || 'Consumidor Final'}`, 5, y);
       y += 5;
-      doc.text(`Pedido: ${selectedBill.codigo || `PED-${String(selectedBill.pedidoId || selectedBill._id).slice(-4).toUpperCase()}`}`, 5, y);
+      doc.text(`Pedido: ${codigoStr}`, 5, y);
       y += 5;
       
-      const total = ((selectedBill.subtotalCierre || selectedBill.total || 0) - (selectedBill.montoDescuento || 0) + (selectedBill.montoPropina || 0)).toFixed(2);
       doc.setFontSize(12);
-      doc.text(`Total a pagar: Bs. ${total}`, 5, y);
+      doc.text(`Total a pagar: Bs. ${totalStr}`, 5, y);
       y += 8;
       
       doc.setFontSize(10);
@@ -236,7 +266,7 @@ export function CashierView() {
       y += 6;
 
       try {
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=PAGO-TIS-${selectedBill.pedidoId || selectedBill._id}&color=4B2E2D`;
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(simUrl)}&color=4B2E2D`;
         const img = new Image();
         img.crossOrigin = "Anonymous";
         img.src = qrUrl;
@@ -252,12 +282,12 @@ export function CashierView() {
       }
 
       doc.setFontSize(8);
-      const splitMsg = doc.splitTextToSize("Escanee este codigo QR con su aplicacion bancaria para realizar el pago de forma segura", 70);
+      const splitMsg = doc.splitTextToSize("Escanee este codigo QR con su camara para acceder a la pasarela de pago simulada", 70);
       doc.text(splitMsg, 40, y, { align: "center" });
       y += 15;
       doc.text("Gracias por su preferencia", 40, y, { align: "center" });
 
-      doc.save(`QR-Mesa-${selectedBill.mesaNombre || selectedBill.mesa?.numero || 'Mesa'}.pdf`);
+      doc.save(`QR-Mesa-${mesaNameStr}.pdf`);
     } catch (err) {
       toast.error("Error al generar el PDF del QR");
     } finally {
@@ -366,7 +396,6 @@ export function CashierView() {
       await api.patch(`/usuarios/${currentUser.id || (currentUser as any)._id}/estado`, { estado: false });
       toast.success('Caja cerrada exitosamente');
       setIsRegisterClosed(true);
-      // Eliminamos el token para que, si recarga la página, lo expulse al login y el cajero NO pueda volver a entrar
       localStorage.removeItem('authToken');
     } catch (error: any) {
       toast.error(error.response?.data?.mensaje || 'Error al cerrar la caja');
@@ -395,14 +424,23 @@ export function CashierView() {
     )
   }
 
+  // Lógica para renderizar variables del QR solo si hay selectedBill
+  let modalQRImage = '';
+  if (selectedBill) {
+    const pId = selectedBill.pedidoId || selectedBill._id;
+    const mesaNameStr = selectedBill.mesaNombre || selectedBill.mesa?.numero || 'Mesa';
+    const codigoStr = selectedBill.codigo || `PED-${String(pId).slice(-4).toUpperCase()}`;
+    const totalStr = ((selectedBill.subtotalCierre || selectedBill.total || 0) - (selectedBill.montoDescuento || 0) + (selectedBill.montoPropina || 0)).toFixed(2);
+    const simUrl = `https://tis-pied.vercel.app/pay-simulator?id=${pId}&mesa=${encodeURIComponent(mesaNameStr)}&total=${totalStr}&codigo=${codigoStr}`;
+    modalQRImage = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(simUrl)}&color=4B2E2D`;
+  }
+
   return (
     <div className="flex flex-col h-[100dvh] bg-[#FCE4D6] font-sans selection:bg-[#E57C5D] selection:text-white relative overflow-hidden">
-      {/* Fondo estético (opcional para mantener la línea) */}
       <div className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat blur-[2px] scale-[1.02] pointer-events-none opacity-20"
         style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080)' }}
       />
       
-      {/* ─── CABECERA ─── */}
       <header className="px-6 py-5 bg-gradient-to-r from-[#4B2E2D] to-[#6B3E2E] text-white flex items-center justify-between z-10 shadow-lg shrink-0">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-[#D96C4A] rounded-xl flex items-center justify-center shadow-lg border border-[#E57C5D]/50">
@@ -430,13 +468,10 @@ export function CashierView() {
         </div>
       </header>
 
-      {/* ─── CUERPO PRINCIPAL ─── */}
       <main className="flex-1 flex flex-col lg:flex-row p-4 sm:p-6 gap-6 overflow-hidden z-10">
         
-        {/* Panel Izquierdo: Estadísticas y Cola de cobro */}
         <section className="flex-1 flex flex-col min-w-0 gap-6 overflow-hidden">
           
-          {/* Tarjetas de Resumen (Stats) */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 shrink-0">
             {[
               { label: 'Caja Actual (Total)', amount: stats.totalDia, icon: <TrendingUp size={20} className="text-emerald-600" />, bg: 'bg-emerald-50 border-emerald-200' },
@@ -454,7 +489,6 @@ export function CashierView() {
             ))}
           </div>
 
-          {/* Lista de Mesas por Cobrar */}
           <div className="flex-1 bg-white/80 backdrop-blur-md rounded-3xl border border-[#E0D0C5] shadow-lg flex flex-col overflow-hidden">
             <div className="px-6 py-4 bg-white border-b border-[#E0D0C5] flex justify-between items-center shrink-0">
               <h2 className="font-black text-lg text-[#4B2E2D] flex items-center gap-2">
@@ -477,8 +511,6 @@ export function CashierView() {
                   <div 
                     key={bId}
                     onClick={async () => { 
-                      // Opcional: Como el endpoint 'pendientes-cobro' devuelve un payload simplificado sin datos del cliente,
-                      // intentamos recuperar la versión completa del pedido para la facturación.
                       try {
                         const res: any = await api.get(`/pedidos?mesa=${bill.mesaId || bill.mesa?._id}&activo=true`);
                         const fullOrder = (res.data || res)[0];
@@ -527,11 +559,9 @@ export function CashierView() {
           </div>
         </section>
 
-        {/* Panel Derecho: POS / Terminal de Cobro */}
         <aside className="w-full lg:w-[420px] xl:w-[480px] bg-white rounded-3xl border border-[#E0D0C5] shadow-2xl flex flex-col overflow-hidden shrink-0">
           {selectedBill ? (
             <>
-              {/* Header POS */}
               <div className="bg-[#4B2E2D] p-5 text-white shrink-0">
                 <div className="flex justify-between items-start mb-2">
                   <div>
@@ -549,7 +579,6 @@ export function CashierView() {
                 </div>
               </div>
 
-              {/* Lista de Consumo (Scrollable) */}
               <div className="flex-1 overflow-y-auto p-5 bg-gray-50/50 border-b border-gray-100">
                 <h4 className="font-bold text-xs text-gray-400 uppercase tracking-widest mb-3">Detalle de consumo</h4>
                 <div className="space-y-3">
@@ -565,9 +594,7 @@ export function CashierView() {
                 </div>
               </div>
 
-              {/* Panel de Descuentos, Propinas y Totales */}
               <div className="p-5 shrink-0 bg-white space-y-4">
-                {/* Resumen matemático */}
                 <div className="bg-[#F9F9F9] rounded-xl p-4 border border-gray-100 space-y-2">
                   <div className="flex justify-between items-center text-sm">
                     <span className="font-semibold text-gray-500">Subtotal</span>
@@ -591,7 +618,6 @@ export function CashierView() {
                   </div>
                 </div>
 
-                {/* Métodos de Pago */}
                 <div>
                   <label className="block text-[11px] font-bold text-[#4B2E2D] uppercase mb-2">Método de pago</label>
                   <div className="grid grid-cols-3 gap-2">
@@ -616,7 +642,6 @@ export function CashierView() {
                   </div>
                 </div>
 
-                {/* Botón de Acción Principal */}
                 <button 
                   onClick={handleProcessPayment}
                   disabled={isProcessing}
@@ -637,7 +662,6 @@ export function CashierView() {
               </div>
             </>
           ) : (
-            // Pantalla Vacía
             <div className="h-full flex flex-col items-center justify-center p-8 text-center bg-gray-50">
               <div className="w-24 h-24 bg-white rounded-full shadow-sm flex items-center justify-center mb-4 border border-gray-100">
                 <Calculator size={40} className="text-gray-300" />
@@ -652,9 +676,6 @@ export function CashierView() {
         
       </main>
 
-      {/* ─── MODALES DE PAGO Y FACTURACIÓN ─── */}
-      
-      {/* 1. Modal QR */}
       {isQRModalOpen && selectedBill && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
@@ -674,7 +695,6 @@ export function CashierView() {
             </div>
 
             <div className="p-8 flex flex-col items-center">
-              {/* Datos */}
               <div className="w-full bg-gray-50 rounded-2xl p-4 mb-6 border border-gray-100 space-y-2">
                 <div className="flex justify-between items-center text-sm">
                   <span className="font-semibold text-gray-500">Mesa</span>
@@ -696,16 +716,15 @@ export function CashierView() {
 
               <div className="w-full border-t border-dashed border-gray-200 mb-6"></div>
 
-              {/* QR */}
               <div className="bg-white p-3 rounded-3xl shadow-sm border-2 border-gray-100 mb-6">
                 <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PAGO-TIS-${selectedBill.pedidoId || selectedBill._id}&color=4B2E2D`}
-                  alt="Código QR"
+                  src={modalQRImage}
+                  alt="Código QR dinámico"
                   className="w-[180px] h-[180px] object-contain"
                 />
               </div>
               <p className="text-xs font-bold text-gray-500 text-center max-w-[280px] leading-relaxed">
-                Escanee este código QR con su aplicación bancaria para realizar el pago de forma segura
+                Escanee este código QR con su aplicación bancaria (o cámara del celular) para acceder al pago seguro simulado.
               </p>
             </div>
 
@@ -714,22 +733,20 @@ export function CashierView() {
                 {isProcessing ? <div className="w-5 h-5 border-2 border-[#D96C4A]/30 border-t-[#D96C4A] rounded-full animate-spin" /> : <Printer size={20} />} Imprimir QR para Mesa
               </button>
               <button onClick={executePayment} disabled={isProcessing} className="w-full py-4 rounded-xl bg-[#D96C4A] hover:bg-[#C25838] text-white font-black shadow-lg shadow-[#D96C4A]/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
-                {isProcessing ? <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Procesando...</> : <><CheckCircle2 size={22} /> Confirmar Pago QR</>}
+                {isProcessing ? <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Procesando...</> : <><CheckCircle2 size={22} /> Forzar Pago Manual</>}
               </button>
               <button onClick={() => setIsQRModalOpen(false)} disabled={isProcessing} className="w-full py-3 rounded-xl text-gray-500 font-bold hover:bg-gray-200 transition-all disabled:opacity-50">
-                Cancelar
+                Cerrar QR
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 2. Modal Comprobante (Factura PDF) */}
       {isInvoiceModalOpen && processedBill && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
             
-            {/* Header Comprobante */}
             <div className="bg-[#4B2E2D] px-6 py-6 text-center relative overflow-hidden shrink-0">
               <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 pointer-events-none"></div>
               <div className="relative z-10 flex flex-col items-center">
@@ -748,14 +765,12 @@ export function CashierView() {
                 {Array.from({ length: 25 }).map((_, i) => (<div key={i} className="w-3 h-3 bg-white rounded-full -mt-1.5 shadow-inner"></div>))}
               </div>
               
-              {/* Badge Mesa */}
               <div className="flex justify-center mb-6">
                 <span className="bg-[#FCE4D6] text-[#4B2E2D] px-4 py-1.5 rounded-full font-black text-sm border border-[#E0D0C5] shadow-sm">
                   {processedBill.mesaNombre || processedBill.mesa?.numero || 'Mesa'}
                 </span>
               </div>
 
-              {/* Detalles Administrativos */}
               <div className="grid grid-cols-2 gap-3 mb-6 bg-gray-50 p-4 rounded-2xl border border-gray-100">
                 <div>
                   <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Área / Sala</p>
@@ -771,7 +786,6 @@ export function CashierView() {
                 </div>
               </div>
 
-              {/* Cliente */}
               <div className="mb-6 space-y-2">
                 <div className="flex justify-between items-center text-sm border-b border-gray-100 pb-2">
                   <span className="font-semibold text-gray-500">Cliente</span>
@@ -783,7 +797,6 @@ export function CashierView() {
                 </div>
               </div>
 
-              {/* Productos (Resumido en scroll pequeño) */}
               <div className="mb-6 max-h-[120px] overflow-y-auto pr-2 space-y-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-black/10">
                 {(processedBill.items || processedBill.detalles || []).map((item: any, idx: number) => (
                   <div key={idx} className="flex justify-between items-start text-xs">
@@ -799,7 +812,6 @@ export function CashierView() {
                 ))}
               </div>
 
-              {/* Totales */}
               <div className="bg-[#FFF5F0] rounded-2xl p-4 border border-[#FCE4D6] space-y-2 mb-6">
                 <div className="flex justify-between items-center text-xs">
                   <span className="font-bold text-gray-500">Subtotal</span>
@@ -836,7 +848,6 @@ export function CashierView() {
               </div>
             </div>
 
-            {/* Footer de Acciones (Fijo Abajo) */}
             <div className="p-5 sm:p-6 bg-white border-t border-gray-100 flex flex-col sm:flex-row gap-3 shrink-0 mt-auto">
               <button 
                 onClick={() => {

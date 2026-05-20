@@ -231,10 +231,11 @@ export function CashierView() {
       const pId = selectedBill.pedidoId || selectedBill._id;
       const mesaNameStr = selectedBill.mesaNombre || selectedBill.mesa?.numero || 'Mesa';
       const codigoStr = selectedBill.codigo || `PED-${String(pId).slice(-4).toUpperCase()}`;
-     const totalCalculado = ((selectedBill.subtotalCierre || selectedBill.total || 0) - (selectedBill.montoDescuento || 0) + (selectedBill.montoPropina || 0)).toFixed(2);
-      const baseUrl = "https://tis-pied.vercel.app/pay-simulator";
-      // Construimos la URL mágica para el Vercel
-      const simUrl = `${baseUrl}?id=${pId}&mesa=${encodeURIComponent(mesaNameStr)}&total=${totalCalculado}&codigo=${encodeURIComponent(codigoStr)}`;
+      const totalStr = ((selectedBill.subtotalCierre || selectedBill.total || 0) - (selectedBill.montoDescuento || 0) + (selectedBill.montoPropina || 0)).toFixed(2);
+      
+      // 1. OBTENEMOS LA URL AUTOMÁTICA (Igual que en la pantalla)
+      const baseUrl = "https://quirquinita.onrender.com";
+      const simUrl = `${baseUrl}/pay-simulator?id=${pId}&mesa=${encodeURIComponent(mesaNameStr)}&total=${totalStr}&codigo=${encodeURIComponent(codigoStr)}`;
       
       const doc = new jsPDF({ format: [80, 200] });
       let y = 10;
@@ -258,7 +259,7 @@ export function CashierView() {
       y += 5;
       
       doc.setFontSize(12);
-      doc.text(`Total a pagar: Bs. ${totalCalculado}`, 5, y);
+      doc.text(`Total a pagar: Bs. ${totalStr}`, 5, y);
       y += 8;
       
       doc.setFontSize(10);
@@ -266,7 +267,8 @@ export function CashierView() {
       y += 6;
 
       try {
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(simUrl)}&color=4B2E2D`;
+        // 2. INYECTAMOS LA URL AUTOMÁTICA EN LA IMAGEN DEL PDF
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(simUrl)}&color=4B2E2D`;
         const img = new Image();
         img.crossOrigin = "Anonymous";
         img.src = qrUrl;

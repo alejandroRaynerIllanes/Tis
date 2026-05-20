@@ -431,7 +431,9 @@ export function CashierView() {
     const mesaNameStr = selectedBill.mesaNombre || selectedBill.mesa?.numero || 'Mesa';
     const codigoStr = selectedBill.codigo || `PED-${String(pId).slice(-4).toUpperCase()}`;
     const totalStr = ((selectedBill.subtotalCierre || selectedBill.total || 0) - (selectedBill.montoDescuento || 0) + (selectedBill.montoPropina || 0)).toFixed(2);
-    const simUrl = `https://tis-pied.vercel.app/pay-simulator?id=${pId}&mesa=${encodeURIComponent(mesaNameStr)}&total=${totalStr}&codigo=${codigoStr}`;
+    
+    // AQUÍ ESTÁ EL CAMBIO A RENDER
+    const simUrl = `https://quirquinita.onrender.com/pay-simulator?id=${pId}&mesa=${encodeURIComponent(mesaNameStr)}&total=${totalStr}&codigo=${codigoStr}`;
     modalQRImage = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(simUrl)}&color=4B2E2D`;
   }
 

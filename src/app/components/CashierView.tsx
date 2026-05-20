@@ -234,7 +234,7 @@ export function CashierView() {
       const totalStr = ((selectedBill.subtotalCierre || selectedBill.total || 0) - (selectedBill.montoDescuento || 0) + (selectedBill.montoPropina || 0)).toFixed(2);
       
       // 1. OBTENEMOS LA URL AUTOMÁTICA (Igual que en la pantalla)
-      const baseUrl = window.location.origin;
+      const baseUrl = "https://quirquinita.onrender.com";
       const simUrl = `${baseUrl}/pay-simulator?id=${pId}&mesa=${encodeURIComponent(mesaNameStr)}&total=${totalStr}&codigo=${encodeURIComponent(codigoStr)}`;
       
       const doc = new jsPDF({ format: [80, 200] });

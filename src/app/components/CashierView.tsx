@@ -39,6 +39,9 @@ export function CashierView() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [isRegisterClosed, setIsRegisterClosed] = useState(false)
 
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+
   // Nuevos estados para el flujo de QR y Facturación
   const [isQRModalOpen, setIsQRModalOpen] = useState(false)
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false)
@@ -159,6 +162,38 @@ export function CashierView() {
     }
   }, [socket, selectedBill, selectedMethod]); // Importante pasar las dependencias
 
+  // ─── FUNCIONES DE ACCIÓN ───
+
+  const handleSendEmail = async () => {
+    if (!customerEmail || !customerEmail.includes('@')) {
+      toast.error('Ingrese un correo electrónico válido');
+      return;
+    }
+    setIsSendingEmail(true);
+    try {
+      const pId = processedBill?.pedidoId || processedBill?._id;
+      if (!pId) return;
+
+      // 1. Capturamos los datos EXACTOS que ves en la pantalla
+      const nombrePantalla = processedBill.clienteNombre || 'Consumidor Final';
+      const ciPantalla = processedBill.clienteCI || processedBill.clienteNIT || 'S/N';
+
+      // 2. Se los enviamos al backend junto con el correo
+      await api.post(`/pagos/${pId}/enviar-recibo`, { 
+        email: customerEmail,
+        clienteNombre: nombrePantalla,
+        clienteCI: ciPantalla
+      });
+      
+      toast.success('¡Recibo enviado por correo!');
+      setCustomerEmail(''); 
+    } catch (error: any) {
+      toast.error(error.response?.data?.mensaje || 'Error al enviar el correo');
+    } finally {
+      setIsSendingEmail(false);
+    }
+  }
+
   const handleLogout = () => {
     localStorage.clear()
     navigate('/', { replace: true })
@@ -233,7 +268,6 @@ export function CashierView() {
       const codigoStr = selectedBill.codigo || `PED-${String(pId).slice(-4).toUpperCase()}`;
       const totalStr = ((selectedBill.subtotalCierre || selectedBill.total || 0) - (selectedBill.montoDescuento || 0) + (selectedBill.montoPropina || 0)).toFixed(2);
       
-      // 1. OBTENEMOS LA URL AUTOMÁTICA (Igual que en la pantalla)
       const baseUrl = "https://quirquinita.onrender.com";
       const simUrl = `${baseUrl}/pay-simulator?id=${pId}&mesa=${encodeURIComponent(mesaNameStr)}&total=${totalStr}&codigo=${encodeURIComponent(codigoStr)}`;
       
@@ -267,7 +301,6 @@ export function CashierView() {
       y += 6;
 
       try {
-        // 2. INYECTAMOS LA URL AUTOMÁTICA EN LA IMAGEN DEL PDF
         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(simUrl)}&color=4B2E2D`;
         const img = new Image();
         img.crossOrigin = "Anonymous";
@@ -426,7 +459,6 @@ export function CashierView() {
     )
   }
 
-  // Lógica para renderizar variables del QR solo si hay selectedBill
   let modalQRImage = '';
   if (selectedBill) {
     const pId = selectedBill.pedidoId || selectedBill._id;
@@ -434,8 +466,8 @@ export function CashierView() {
     const codigoStr = selectedBill.codigo || `PED-${String(pId).slice(-4).toUpperCase()}`;
     const totalStr = ((selectedBill.subtotalCierre || selectedBill.total || 0) - (selectedBill.montoDescuento || 0) + (selectedBill.montoPropina || 0)).toFixed(2);
     
-    // AQUÍ ESTÁ EL CAMBIO A RENDER
-    const simUrl = `https://quirquinita.onrender.com/pay-simulator?id=${pId}&mesa=${encodeURIComponent(mesaNameStr)}&total=${totalStr}&codigo=${codigoStr}`;
+    const baseUrl = "https://quirquinita.onrender.com";
+    const simUrl = `${baseUrl}/pay-simulator?id=${pId}&mesa=${encodeURIComponent(mesaNameStr)}&total=${totalStr}&codigo=${codigoStr}`;
     modalQRImage = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(simUrl)}&color=4B2E2D`;
   }
 
@@ -852,11 +884,31 @@ export function CashierView() {
               </div>
             </div>
 
+            <div className="px-5 sm:px-6 pb-2 pt-4 bg-white">
+              <div className="flex gap-2">
+                <input 
+                  type="email" 
+                  placeholder="correo@cliente.com" 
+                  value={customerEmail}
+                  onChange={(e) => setCustomerEmail(e.target.value)}
+                  className="flex-1 border border-gray-200 rounded-xl px-4 text-sm focus:outline-none focus:border-[#D96C4A] focus:ring-1 focus:ring-[#D96C4A]"
+                />
+                <button 
+                  onClick={handleSendEmail}
+                  disabled={isSendingEmail || !customerEmail}
+                  className="bg-[#FCE4D6] text-[#D96C4A] px-4 py-2 rounded-xl font-bold text-sm hover:bg-[#E57C5D] hover:text-white transition-colors disabled:opacity-50 shrink-0"
+                >
+                  {isSendingEmail ? 'Enviando...' : 'Enviar Recibo'}
+                </button>
+              </div>
+            </div>
+
             <div className="p-5 sm:p-6 bg-white border-t border-gray-100 flex flex-col sm:flex-row gap-3 shrink-0 mt-auto">
               <button 
                 onClick={() => {
                   setIsInvoiceModalOpen(false);
                   setProcessedBill(null);
+                  setCustomerEmail(''); 
                 }} 
                 className="flex-1 py-3.5 rounded-xl border-2 border-gray-200 text-gray-600 font-black hover:bg-gray-50 transition-all text-sm"
               >

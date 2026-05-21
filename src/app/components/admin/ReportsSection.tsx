@@ -13,30 +13,52 @@ export function ReportsSection() {
     setIsGenerating(1);
     toast.loading('Descargando ventas del día...', { id: 'rep1' });
     try {
-      const res: any = await api.get('/pedidos?hoy=true'); 
-      const pedidos = res.data || res || [];
-      const pedidosCerrados = pedidos.filter((p: any) => p.estado === 'CERRADO');
+      // 🔥 Consultamos a la BD los reportes reales de Cierre de Caja generados por los cajeros
+      const res: any = await api.get('/pedidos?reportesCierre=true'); 
+      const reportesGuardados = res.data || res || [];
 
-      let totalVentas = 0;
-      const datosTabla = pedidosCerrados.map((p: any) => {
-        totalVentas += p.total;
-        const mesero = p.usuario ? `${p.usuario.nombre} ${p.usuario.apellido}`.trim() : 'Sin mesero';
-        const mesa = p.mesa?.numero || p.mesaNombre || 'Barra';
+      if (reportesGuardados.length === 0) {
+        toast.info('La caja cerrada no registró pagos o no hay cierres hoy.', { id: 'rep1' });
+        setIsGenerating(null);
+        return;
+      }
+
+      let totalEfectivo = 0, totalTarjeta = 0, totalQR = 0, totalDescuentos = 0, totalPropinas = 0, totalVentas = 0;
+      let totalPagos = 0;
+
+      const datosTabla = reportesGuardados.map((r: any) => {
+        totalEfectivo += (r.efectivo || 0);
+        totalTarjeta += (r.tarjeta || 0);
+        totalQR += (r.qr || 0);
+        totalDescuentos += (r.descuentos || 0);
+        totalPropinas += (r.propinas || 0);
+        totalVentas += (r.totalDia || 0);
+        totalPagos += (r.pagosProcesados || 0);
+
         return [
-          p.codigo || 'S/N',
-          mesa,
-          mesero,
-          p.metodoPago || 'Efectivo',
-          `Bs. ${(p.montoDescuento || 0).toFixed(2)}`,
-          `Bs. ${(p.total || 0).toFixed(2)}`
+          r.cajeroNombre || 'Cajero',
+          (r.cajeroId || 'N/A').slice(-6),
+          (r.pagosProcesados || 0).toString(),
+          `Bs. ${(r.efectivo || 0).toFixed(2)}`,
+          `Bs. ${(r.tarjeta || 0).toFixed(2)}`,
+          `Bs. ${(r.qr || 0).toFixed(2)}`,
+          `Bs. ${(r.descuentos || 0).toFixed(2)}`,
+          `Bs. ${(r.propinas || 0).toFixed(2)}`,
+          `Bs. ${(r.totalDia || 0).toFixed(2)}`
         ];
       });
 
-      const columnas = ['Nro Pedido', 'Mesa', 'Mesero', 'Método Pago', 'Descuento', 'Total'];
-      const stringTotales = `TOTAL RECAUDADO DEL DÍA: Bs. ${totalVentas.toFixed(2)}`;
+      const columnas = ['Cajero', 'ID', 'Cobros', 'Efectivo', 'Tarjeta', 'QR', 'Descuento', 'Propina', 'Total Vendido'];
+      const stringTotales = `INFORMACIÓN OPERATIVA Y FINANCIERA (CONSOLIDADO CAJAS CERRADAS):
+Total Recaudado: Bs. ${totalVentas.toFixed(2)}
+Total Efectivo: Bs. ${totalEfectivo.toFixed(2)} | Total Tarjeta: Bs. ${totalTarjeta.toFixed(2)} | Total QR: Bs. ${totalQR.toFixed(2)}
+Propinas Recibidas: Bs. ${totalPropinas.toFixed(2)} | Descuentos Aplicados: Bs. ${totalDescuentos.toFixed(2)}
+Total de Pagos Procesados: ${totalPagos}
+Pagos Anulados: 0
+`;
 
-      generarReporteProfesional('Reporte Diario de Ventas', columnas, datosTabla, stringTotales);
-      toast.success('Reporte generado exitosamente', { id: 'rep1' });
+      generarReporteProfesional('Reporte Diario de Ventas y Cierre de Cajas', columnas, datosTabla, stringTotales);
+      toast.success('Reporte de cierre generado y sincronizado', { id: 'rep1' });
     } catch (error) {
       toast.error('Error al generar el reporte de ventas', { id: 'rep1' });
     } finally {

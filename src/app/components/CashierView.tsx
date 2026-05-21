@@ -173,7 +173,9 @@ export function CashierView() {
     setIsSendingEmail(true);
     try {
       const pId = processedBill?.pedidoId || processedBill?._id;
-      if (!pId) return;
+      if (!pId) {
+        throw new Error('No se encontró el ID del pedido procesado.');
+      }
 
       // 1. Capturamos los datos EXACTOS que ves en la pantalla
       const nombrePantalla = processedBill.clienteNombre || 'Consumidor Final';
@@ -189,7 +191,8 @@ export function CashierView() {
       toast.success('¡Recibo enviado por correo!');
       setCustomerEmail(''); 
     } catch (error: any) {
-      toast.error(error.response?.data?.mensaje || 'Error al enviar el correo');
+      console.error('Error JS al enviar correo:', error);
+      toast.error(error.response?.data?.mensaje || error.message || 'Error al enviar el correo');
     } finally {
       setIsSendingEmail(false);
     }

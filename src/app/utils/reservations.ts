@@ -51,8 +51,7 @@ export const getCurrentActiveReservation = (
     return h * 60 + m
   }
 
-  const currentMinutes =
-    currentDateTime.getHours() * 60 + currentDateTime.getMinutes()
+  const currentMinutes = currentDateTime.getHours() * 60 + currentDateTime.getMinutes()
 
   return (
     tableReservations.find((res) => {

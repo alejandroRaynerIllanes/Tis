@@ -24,6 +24,7 @@ import jsPDF from "jspdf";
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { getStoredUser, api } from '../services/api'
+import { authService } from '../services/auth.service'
 import { useAppContext } from '../context/AppContext'
 
 // ─── COMPONENTE PRINCIPAL ───────────────────────────────────────────────────
@@ -195,7 +196,7 @@ export function CashierView() {
   }
 
   const handleLogout = () => {
-    localStorage.clear()
+    authService.logout()
     navigate('/', { replace: true })
   }
 
@@ -428,12 +429,14 @@ export function CashierView() {
     if (!currentUser) return;
     setIsProcessing(true);
     try {
-      await api.patch(`/usuarios/${currentUser.id || (currentUser as any)._id}/estado`, { estado: false });
-      toast.success('Caja cerrada exitosamente');
-      setIsRegisterClosed(true);
-      localStorage.removeItem('authToken');
+      const userId = currentUser.id || (currentUser as any)._id;
+      await api.patch(`/usuarios/${userId}/estado`, { estado: false });
+      toast.success('Caja inhabilitada. Un administrador debe volver a habilitarla.');
+      authService.logout();
+      navigate('/', { replace: true });
     } catch (error: any) {
-      toast.error(error.response?.data?.mensaje || 'Error al cerrar la caja');
+      console.error('Error cerrando caja:', error);
+      toast.error(error.response?.data?.mensaje || 'Error al cerrar la caja. Intenta de nuevo.');
     } finally {
       setIsProcessing(false);
     }

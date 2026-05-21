@@ -13,40 +13,92 @@ export function ReportsSection() {
     setIsGenerating(1);
     toast.loading('Descargando ventas del día...', { id: 'rep1' });
     try {
-      // 🔥 Consultamos a la BD los reportes reales de Cierre de Caja generados por los cajeros
-      const res: any = await api.get('/pedidos?reportesCierre=true'); 
-      const reportesGuardados = res.data || res || [];
+      // 🔥 Consultamos a la BD. Añadimos &hoy=true para que funcione el Fallback si el backend está desactualizado
+      const res: any = await api.get('/pedidos?reportesCierre=true&hoy=true'); 
+      const data = res.data || res || [];
 
-      if (reportesGuardados.length === 0) {
-        toast.info('La caja cerrada no registró pagos o no hay cierres hoy.', { id: 'rep1' });
+      if (data.length === 0) {
+        toast.info('No hay ventas registradas ni cierres el día de hoy.', { id: 'rep1' });
         setIsGenerating(null);
         return;
       }
 
       let totalEfectivo = 0, totalTarjeta = 0, totalQR = 0, totalDescuentos = 0, totalPropinas = 0, totalVentas = 0;
       let totalPagos = 0;
+      let datosTabla: any[][] = [];
 
-      const datosTabla = reportesGuardados.map((r: any) => {
-        totalEfectivo += (r.efectivo || 0);
-        totalTarjeta += (r.tarjeta || 0);
-        totalQR += (r.qr || 0);
-        totalDescuentos += (r.descuentos || 0);
-        totalPropinas += (r.propinas || 0);
-        totalVentas += (r.totalDia || 0);
-        totalPagos += (r.pagosProcesados || 0);
+      // Detectar si el backend nos devolvió Cierres de Caja (tiene cajeroNombre) o Pedidos normales
+      const isCierreCaja = data[0].cajeroNombre !== undefined;
 
-        return [
-          r.cajeroNombre || 'Cajero',
-          (r.cajeroId || 'N/A').slice(-6),
-          (r.pagosProcesados || 0).toString(),
-          `Bs. ${(r.efectivo || 0).toFixed(2)}`,
-          `Bs. ${(r.tarjeta || 0).toFixed(2)}`,
-          `Bs. ${(r.qr || 0).toFixed(2)}`,
-          `Bs. ${(r.descuentos || 0).toFixed(2)}`,
-          `Bs. ${(r.propinas || 0).toFixed(2)}`,
-          `Bs. ${(r.totalDia || 0).toFixed(2)}`
-        ];
-      });
+      if (isCierreCaja) {
+        // LÓGICA 1: Usar los reportes Z guardados reales (Backend compilado y sincronizado)
+        datosTabla = data.map((r: any) => {
+          totalEfectivo += (r.efectivo || 0);
+          totalTarjeta += (r.tarjeta || 0);
+          totalQR += (r.qr || 0);
+          totalDescuentos += (r.descuentos || 0);
+          totalPropinas += (r.propinas || 0);
+          totalVentas += (r.totalDia || 0);
+          totalPagos += (r.pagosProcesados || 0);
+
+          return [
+            r.cajeroNombre || 'Cajero',
+            (r.cajeroId || 'N/A').slice(-6),
+            (r.pagosProcesados || 0).toString(),
+            `Bs. ${(r.efectivo || 0).toFixed(2)}`,
+            `Bs. ${(r.tarjeta || 0).toFixed(2)}`,
+            `Bs. ${(r.qr || 0).toFixed(2)}`,
+            `Bs. ${(r.descuentos || 0).toFixed(2)}`,
+            `Bs. ${(r.propinas || 0).toFixed(2)}`,
+            `Bs. ${(r.totalDia || 0).toFixed(2)}`
+          ];
+        });
+      } else {
+        // LÓGICA 2: Fallback Inteligente. Agrupar los Pedidos crudos al vuelo (Backend antiguo sin compilar)
+        const pedidosCerrados = data.filter((p: any) => p.estado === 'CERRADO');
+        if (pedidosCerrados.length === 0) {
+          toast.info('No hay ventas cerradas el día de hoy.', { id: 'rep1' });
+          setIsGenerating(null);
+          return;
+        }
+
+        const statsPorCajero: Record<string, any> = {};
+
+        pedidosCerrados.forEach((p: any) => {
+          const cajero = p.cajeroAsignado ? `${p.cajeroAsignado.nombre} ${p.cajeroAsignado.apellido || ''}`.trim() : 'Cajero Principal';
+          const cajeroId = p.cajeroAsignado ? (p.cajeroAsignado._id || p.cajeroAsignado) : 'N/A';
+          
+          if (!statsPorCajero[cajero]) {
+            statsPorCajero[cajero] = { id: String(cajeroId), ventas: 0, efectivo: 0, tarjeta: 0, qr: 0, propinas: 0, descuentos: 0, total: 0 };
+          }
+
+          statsPorCajero[cajero].ventas += 1;
+          statsPorCajero[cajero].descuentos += (p.montoDescuento || 0);
+          statsPorCajero[cajero].propinas += (p.montoPropina || 0);
+          statsPorCajero[cajero].total += (p.total || 0);
+
+          if (p.metodoPago === 'Efectivo') { statsPorCajero[cajero].efectivo += (p.total || 0); totalEfectivo += (p.total || 0); }
+          if (p.metodoPago === 'Tarjeta') { statsPorCajero[cajero].tarjeta += (p.total || 0); totalTarjeta += (p.total || 0); }
+          if (p.metodoPago === 'QR') { statsPorCajero[cajero].qr += (p.total || 0); totalQR += (p.total || 0); }
+
+          totalDescuentos += (p.montoDescuento || 0);
+          totalPropinas += (p.montoPropina || 0);
+          totalVentas += (p.total || 0);
+          totalPagos += 1;
+        });
+
+        datosTabla = Object.keys(statsPorCajero).map(cajero => [
+          cajero,
+          statsPorCajero[cajero].id.slice(-6),
+          statsPorCajero[cajero].ventas.toString(),
+          `Bs. ${statsPorCajero[cajero].efectivo.toFixed(2)}`,
+          `Bs. ${statsPorCajero[cajero].tarjeta.toFixed(2)}`,
+          `Bs. ${statsPorCajero[cajero].qr.toFixed(2)}`,
+          `Bs. ${statsPorCajero[cajero].descuentos.toFixed(2)}`,
+          `Bs. ${statsPorCajero[cajero].propinas.toFixed(2)}`,
+          `Bs. ${statsPorCajero[cajero].total.toFixed(2)}`
+        ]);
+      }
 
       const columnas = ['Cajero', 'ID', 'Cobros', 'Efectivo', 'Tarjeta', 'QR', 'Descuento', 'Propina', 'Total Vendido'];
       const stringTotales = `INFORMACIÓN OPERATIVA Y FINANCIERA (CONSOLIDADO CAJAS CERRADAS):

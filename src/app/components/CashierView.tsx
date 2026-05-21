@@ -57,7 +57,7 @@ export function CashierView() {
       
       const [pendientesRes, cerradasRes]: any = await Promise.all([
         api.get('/pedidos/pendientes-cobro'),
-        api.get(`/pedidos?hoy=true&cajero=${cajeroId}`)
+        api.get(`/pedidos?hoy=true`) // Obtenemos todas las ventas del día para que el Z-Report sea exacto
       ])
       
       let pending = pendientesRes.data || pendientesRes || []

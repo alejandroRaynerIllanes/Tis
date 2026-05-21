@@ -3,6 +3,7 @@ import { ChefHat, Clock, Play, CheckCircle2, Flame, AlertCircle, LogOut, User } 
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router'
 import { getStoredUser, api } from '../services/api'
+import { authService } from '../services/auth.service'
 import { ordersService } from '../services/orders.service'
 import { useAppContext } from '../context/AppContext'
 
@@ -125,7 +126,7 @@ export function ChefView() {
 
   // Función para cerrar sesión
   const handleLogout = () => {
-    localStorage.clear()
+    authService.logout()
     navigate('/', { replace: true })
   }
 

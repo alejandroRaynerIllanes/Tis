@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { User, Lock, Eye, EyeOff, ChefHat, AlertCircle } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { authService } from '../services/auth.service'
-import { setToken, setStoredUser } from '../services/api'
 import { toast } from 'sonner'
 
 export function Login() {
@@ -43,13 +42,9 @@ export function Login() {
     setIsLoading(true)
 
     try {
-      // Obtenemos los datos completos (mejora de Gustavo)
-      const { role, token, user } = await authService.login(username.trim(), password)
-
-      // Guardamos la sesión usando las utilidades de la API
-      setToken(token)
-      setStoredUser(user)
-      localStorage.setItem('userRole', role)
+      // authService.login() ya persiste token, user y role en localStorage internamente.
+      // No es necesario volver a guardarlos aquí.
+      const { role } = await authService.login(username.trim(), password)
 
       redirectByRole(role)
     } catch (err: unknown) {

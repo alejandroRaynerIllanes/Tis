@@ -29,6 +29,7 @@ import { ReserveTableModal } from './ReserveTableModal'
 import { CancelReservationModal } from './CancelReservationModal'
 import { TableSidePanel } from './TableSidePanel'
 import { getStoredUser, setStoredUser, api } from '../services/api'
+import { authService } from '../services/auth.service'
 import { ordersService } from '../services/orders.service'
 import { WaiterHistoryModal } from './WaiterHistoryModal'
 // ─── Tipos y helpers ─────────────────────────────────────────────────────────
@@ -296,7 +297,7 @@ export function WaiterView({
   }, {} as Record<string, number>)
 
   const handleLogout = () => {
-    localStorage.clear()
+    authService.logout()
     navigate('/', { replace: true })
   }
 

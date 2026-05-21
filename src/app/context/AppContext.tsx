@@ -56,7 +56,7 @@ interface AppContextType {
   requestBill: (tableId: string) => void
   closeTable: (tableId: string) => void
   reserveTable: (tableId: string, info: Omit<ReservationInfo, 'id' | 'endTime'>) => void
-  cancelReservation: (tableId: string, reservationId: string) => void
+  cancelReservation: (tableId: string, reservationId: string) => Promise<void>
   getActiveReservation: (tableId: string) => ReservationInfo | null
   markNotificationAsRead: (id: string) => void
   clearNotifications: () => void
@@ -746,7 +746,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     )
   }
 
-  const cancelReservation = (tableId: string, reservationId: string) => {
+  const cancelReservation = async (tableId: string, reservationId: string): Promise<void> => {
+    // Bug fix: persistir la cancelación en el backend antes de actualizar estado local
+    try {
+      await reservationsService.delete(reservationId)
+    } catch (err) {
+      console.error('[cancelReservation] Error al eliminar reserva en el servidor:', err)
+    }
+
     setReservations((prev) => {
       const tableReservations = prev[tableId] || []
       const updatedReservations = tableReservations.filter((r) => r.id !== reservationId)
@@ -773,7 +780,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         delete next[tableId]
         return next
       })
-      // GUARDAR EN LA BASE DE DATOS
       updateTableStatus(tableId, 'Disponible')
     }
   }

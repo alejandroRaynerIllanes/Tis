@@ -30,5 +30,9 @@ export const reservationsService = {
 
   create: async (payload: CreateReservationPayload): Promise<ReservationResponse> => {
     return api.post<ReservationResponse>('/reservas', payload);
+  },
+
+  delete: async (id: string): Promise<void> => {
+    return api.delete<void>(`/reservas/${id}`);
   }
 };

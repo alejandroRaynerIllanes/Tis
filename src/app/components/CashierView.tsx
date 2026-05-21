@@ -24,6 +24,7 @@ import jsPDF from "jspdf";
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { getStoredUser, api } from '../services/api'
+import { authService } from '../services/auth.service'
 import { useAppContext } from '../context/AppContext'
 
 // ─── COMPONENTE PRINCIPAL ───────────────────────────────────────────────────
@@ -160,7 +161,7 @@ export function CashierView() {
   }, [socket, selectedBill, selectedMethod]); // Importante pasar las dependencias
 
   const handleLogout = () => {
-    localStorage.clear()
+    authService.logout()
     navigate('/', { replace: true })
   }
 
@@ -398,7 +399,7 @@ export function CashierView() {
       await api.patch(`/usuarios/${currentUser.id || (currentUser as any)._id}/estado`, { estado: false });
       toast.success('Caja cerrada exitosamente');
       setIsRegisterClosed(true);
-      localStorage.removeItem('authToken');
+      authService.logout();
     } catch (error: any) {
       toast.error(error.response?.data?.mensaje || 'Error al cerrar la caja');
     } finally {

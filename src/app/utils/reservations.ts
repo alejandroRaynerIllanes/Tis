@@ -45,12 +45,24 @@ export const getCurrentActiveReservation = (
   if (!tableReservations || tableReservations.length === 0) return null
 
   const currentDate = currentDateTime.toISOString().split('T')[0]
-  const currentTime = `${String(currentDateTime.getHours()).padStart(2, '0')}:${String(currentDateTime.getMinutes()).padStart(2, '0')}`
+
+  const toMinutes = (time: string) => {
+    const [h, m] = time.split(':').map(Number)
+    return h * 60 + m
+  }
+
+  const currentMinutes =
+    currentDateTime.getHours() * 60 + currentDateTime.getMinutes()
 
   return (
     tableReservations.find((res) => {
       if (res.date !== currentDate) return false
-      return timesOverlap(res.startTime, res.endTime, currentTime, currentTime)
+      // Bug fix: en lugar de timesOverlap(start, end, T, T) que siempre es false
+      // (T < T nunca se cumple), evaluamos directamente si el momento actual
+      // está dentro del rango [startTime, endTime)
+      const start = toMinutes(res.startTime)
+      const end = toMinutes(res.endTime)
+      return start <= currentMinutes && currentMinutes < end
     }) || null
   )
 }

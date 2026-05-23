@@ -1,5 +1,7 @@
 //src/app/services/reservations.service.ts
 import { api } from './api';
+import type { BackendTable } from './tables.service';
+import type { BackendUser } from './users.service';
 
 export interface CreateReservationPayload {
   tableId: string;
@@ -18,8 +20,8 @@ export interface ReservationResponse {
   date: string;
   time: string;
   vip: boolean;
-  mesa: any;
-  usuario: any;
+  mesa?: BackendTable | string;
+  usuario?: BackendUser | string;
   createdAt?: string;
 }
 

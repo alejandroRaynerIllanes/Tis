@@ -11,8 +11,8 @@ export interface BackendLocation {
 export const locationsService = {
   // Retorna datos adaptados para la interfaz visual
   getAll: async () => {
-    const data = await api.get<any[]>('/ubicaciones')
-    return data.map((d: any) => ({
+    const data = await api.get<BackendLocation[]>('/ubicaciones')
+    return data.map((d: BackendLocation) => ({
       ...d,
       id: d.id || d._id,
       name: d.nombre || d.name
@@ -20,7 +20,7 @@ export const locationsService = {
   },
 
   create: async (name: string) => {
-    const created = await api.post<any>('/ubicaciones', { nombre: name })
+    const created = await api.post<BackendLocation>('/ubicaciones', { nombre: name })
     return {
       ...created,
       id: created.id || created._id,
@@ -28,7 +28,7 @@ export const locationsService = {
     }
   },
 
-  update: (id: string, nombre: string) => api.put<any>(`/ubicaciones/${id}`, { nombre }),
+  update: (id: string, nombre: string) => api.put<BackendLocation>(`/ubicaciones/${id}`, { nombre }),
 
   remove: (id: string) => api.delete<{ mensaje: string }>(`/ubicaciones/${id}`)
 }

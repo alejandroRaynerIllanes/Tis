@@ -135,6 +135,13 @@ export function TableSidePanel({
     setIsSubmitting(true)
     try {
       await confirmOrder(tableId)
+
+      // Refrescar inmediatamente el pedido desde el backend para obtener el ID recién generado
+      try {
+        const res: any = await api.get(`/pedidos?mesa=${tableId}&activo=true`)
+        setBackendOrder((res.data || res || [])[0])
+      } catch (e) {}
+
       setViewingMenu(false)
       setShowSummary(false)
       toast.success(
@@ -323,9 +330,20 @@ export function TableSidePanel({
                 </div>
               ) : showSummary ? (
                 <div className="flex flex-col h-full">
-                  <div className="flex items-center gap-2 mb-4 text-[#4B2E2D]">
-                    <button onClick={() => setShowSummary(false)} className="p-1 hover:bg-black/5 rounded-full transition-colors"><ChevronLeft size={20} /></button>
-                    <h4 className="font-black text-lg">Resumen del Pedido</h4>
+                  <div className="flex justify-between items-center mb-4 text-[#4B2E2D]">
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => setShowSummary(false)} className="p-1 hover:bg-black/5 rounded-full transition-colors"><ChevronLeft size={20} /></button>
+                      <h4 className="font-black text-lg">Resumen del Pedido</h4>
+                    </div>
+                    {backendOrder ? (
+                      <span className="text-[10px] font-mono bg-gray-100 text-[#D0543A] font-bold px-2 py-1 rounded border border-gray-200 shadow-sm" title="ID del Pedido">
+                        {backendOrder.codigo || `PED-${String(backendOrder._id || backendOrder.id).slice(-4).toUpperCase()}`}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-mono bg-orange-50 text-orange-500 px-2 py-1 rounded border border-orange-200 shadow-sm" title="Se generará al enviar">
+                        ID: Pendiente
+                      </span>
+                    )}
                   </div>
                   <div className="space-y-3 pb-24 overflow-y-auto">
                     {activeOrder.map((item) => (
@@ -349,6 +367,17 @@ export function TableSidePanel({
                 </div>
               ) : (
                 <div className="space-y-3 pb-24 overflow-y-auto">
+                  {backendOrder ? (
+                    <div className="bg-gray-50 border border-gray-100 p-2.5 rounded-xl flex justify-between items-center text-xs shadow-sm mb-1">
+                      <span className="font-bold text-gray-500">ID de Seguimiento:</span>
+                      <span className="font-mono font-black text-[#D0543A]">{backendOrder.codigo || `PED-${String(backendOrder._id || backendOrder.id).slice(-4).toUpperCase()}`}</span>
+                    </div>
+                  ) : (
+                    <div className="bg-orange-50 border border-orange-100 p-2.5 rounded-xl flex justify-between items-center text-xs shadow-sm mb-1">
+                      <span className="font-bold text-orange-600">ID de Seguimiento:</span>
+                      <span className="font-mono font-bold text-orange-500">Aún no enviado a cocina</span>
+                    </div>
+                  )}
                   {activeOrder.map((item) => {
                     const isEditingNote = editingNote?.productId === item.product.id
                     return (

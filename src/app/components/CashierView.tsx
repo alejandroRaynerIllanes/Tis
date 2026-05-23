@@ -57,8 +57,8 @@ export function CashierView() {
       const cajeroId = currentUser?.id || (currentUser as any)?._id
       
       const [pendientesRes, cerradasRes]: any = await Promise.all([
-        api.get('/pedidos/pendientes-cobro'),
-        api.get(`/pedidos?hoy=true`) // Obtenemos todas las ventas del día para que el Z-Report sea exacto
+        api.get(`/pedidos/pendientes-cobro?cajero=${cajeroId}`),
+        api.get(`/pedidos?hoy=true&cajero=${cajeroId}`) // SOLUCIÓN BUG 2: Solo obtenemos las ventas de ESTE cajero específico
       ])
       
       let pending = pendientesRes.data || pendientesRes || []
@@ -445,7 +445,8 @@ export function CashierView() {
     setIsProcessing(true);
     try {
       const userId = currentUser.id || (currentUser as any)._id;
-      await api.patch(`/usuarios/${userId}/estado`, { estado: false });
+      // SOLUCIÓN BUG 1: Enviamos el "reporte" con los stats para que el backend cree el CierreCaja en MongoDB
+      await api.patch(`/usuarios/${userId}/estado`, { estado: false, reporte: stats });
       toast.success('Caja inhabilitada. Un administrador debe volver a habilitarla.');
       authService.logout();
       navigate('/', { replace: true });

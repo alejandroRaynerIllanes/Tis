@@ -185,23 +185,33 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         items.forEach((item: any) => {
           const newStatus = item.status || item.estado
           if (newStatus === 'Cuenta Solicitada' || newStatus === 'Esperando pago') {
-            toast.info('¡Atención: Cuenta Solicitada!', {
-              description: `La ${item.name || item.numero || 'Mesa'} está esperando para pagar.`,
-              duration: 8000,
-              icon: '💳'
-            })
-            setNotifications((prev) => [{
-              id: Date.now().toString() + Math.random(),
-              title: 'Cuenta Solicitada',
-              message: `La ${item.name || item.numero || 'Mesa'} está esperando para pagar.`,
-              time: new Date(),
-              read: false,
-              type: 'warning',
-              meta: {
-                tableId: item.id || item._id || item.numero,
-                actionType: 'process_payment'
+            setNotifications((prev) => {
+              const targetTableId = item.id || item._id || item.numero;
+              
+              // Evitar duplicar notificaciones idénticas no leídas para la misma mesa
+              if (prev.some(n => !n.read && n.meta?.tableId === targetTableId && n.title === 'Cuenta Solicitada')) {
+                return prev;
               }
-            }, ...prev])
+
+              toast.info('¡Atención: Cuenta Solicitada!', {
+                description: `La ${item.name || item.numero || 'Mesa'} está esperando para pagar.`,
+                duration: 8000,
+                icon: '💳'
+              })
+
+              return [{
+                id: Date.now().toString() + Math.random(),
+                title: 'Cuenta Solicitada',
+                message: `La ${item.name || item.numero || 'Mesa'} está esperando para pagar.`,
+                time: new Date(),
+                read: false,
+                type: 'warning',
+                meta: {
+                  tableId: targetTableId,
+                  actionType: 'process_payment'
+                }
+              }, ...prev]
+            })
           }
         })
 

@@ -649,6 +649,7 @@ export function CashierView() {
                         <p className="text-xs font-semibold text-gray-500 mt-1 flex items-center gap-1">
                           <User size={12} /> {waiterName} <span className="mx-1">•</span> <Clock size={12} /> {timeWaiting}
                         </p>
+                        <p className="text-[11px] font-black text-[#D96C4A] mt-1 tracking-tight" title="ID del Pedido">{bill.codigo || `PED-${String(bId).slice(-4).toUpperCase()}`}</p>
                       </div>
                     </div>
                     

@@ -49,7 +49,7 @@ function useTableFilters(tables: Table[]) {
     const fetchLocations = () => {
       locationsService.getAll()
         .then(data => {
-          const validNames = data.map((l: any) => (l.nombre || l.name || '').trim()).filter(Boolean)
+          const validNames = data.map(l => l.name?.trim() || '').filter(Boolean)
           setDbLocations(validNames)
         })
         .catch(() => {})
@@ -114,7 +114,7 @@ function useReservationManager(tables: Table[], reserveTable: any, cancelReserva
         return
       }
       
-      const result: any = await reserveTable(reservingTableId, {
+      const result = await reserveTable(reservingTableId, {
         location: formData.location,
         clientName: formData.clientName,
         guestCount: formData.guestCount,
@@ -216,7 +216,7 @@ export function useWaiterLogic() {
 
     try {
       const allOrders = await ordersService.getAll()
-      const tableOrder = allOrders.find((o: any) => (o.mesa?._id === activeTableId || o.mesa === activeTableId) && ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO', 'SERVIDO'].includes(o.estado))
+      const tableOrder = allOrders.find(o => (o.mesa?._id === activeTableId || o.mesa === activeTableId) && ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO', 'SERVIDO'].includes(o.estado))
       if (tableOrder) {
         await api.post(`/pagos/procesar-final/${tableOrder._id || tableOrder.id}`, {
           metodoPago: method,

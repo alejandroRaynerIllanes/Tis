@@ -30,21 +30,21 @@ export const getTableDisplayName = (table: Table) => {
   return tableWithFallbacks.name || tableWithFallbacks.nombre || tableWithFallbacks.numero
 }
 
-export function useWaiterLogic() {
-  const context = useAppContext()
-  const {
-    tables,
-    orders,
-    reservations,
-    closeTable,
-    reserveTable,
-    cancelReservation,
-    getActiveReservation,
-    updateTableStatus,
-    resetTableOrder
-  } = context
-
+// ─── Hook Interno 1: Gestión de Filtros y Ubicaciones ──────────────────────
+function useTableFilters(tables: Table[]) {
   const [dbLocations, setDbLocations] = useState<string[]>([])
+
+  const LOCATIONS = useMemo(() => {
+    const hasVipTables = tables.some(t => t.type === 'vip')
+    const baseLocations = ['Todas', ...Array.from(new Set(dbLocations)).sort()]
+    const cleanedLocations = baseLocations.filter(loc => loc.toLowerCase() !== 'zona vip' && loc.toLowerCase() !== 'vip')
+    if (hasVipTables) cleanedLocations.push('VIP')
+    return cleanedLocations
+  }, [tables, dbLocations])
+
+  const [activeLocation, setActiveLocation] = useState(LOCATIONS[0] || 'Todas')
+  const [stateFilter, setStateFilter] = useState<StateFilter>('all')
+
   useEffect(() => {
     const fetchLocations = () => {
       locationsService.getAll()
@@ -58,30 +58,6 @@ export function useWaiterLogic() {
     window.addEventListener('locations_updated', fetchLocations)
     return () => window.removeEventListener('locations_updated', fetchLocations)
   }, [])
-
-  const LOCATIONS = useMemo(
-    () => {
-      const hasVipTables = tables.some(t => t.type === 'vip')
-      const baseLocations = ['Todas', ...Array.from(new Set(dbLocations)).sort()]
-      // Eliminamos cualquier 'Zona VIP' repetida y unificamos bajo 'VIP'
-      const cleanedLocations = baseLocations.filter(loc => loc.toLowerCase() !== 'zona vip' && loc.toLowerCase() !== 'vip')
-      if (hasVipTables) {
-        cleanedLocations.push('VIP')
-      }
-      return cleanedLocations
-    },
-    [tables, dbLocations]
-  )
-
-  const [activeLocation, setActiveLocation] = useState(LOCATIONS[0] || 'Todas')
-  const [stateFilter, setStateFilter] = useState<StateFilter>('all')
-  const [menuPanelOpen, setMenuPanelOpen] = useState(false)
-  const [activeTableId, setActiveTableId] = useState<string | null>(null)
-  const [reservingTableId, setReservingTableId] = useState<string | null>(null)
-  const [viewingReservationsTableId, setViewingReservationsTableId] = useState<string | null>(null)
-  const [cancelingReservationTableId, setCancelingReservationTableId] = useState<string | null>(null)
-  const [cancelingReservationId, setCancelingReservationId] = useState<string | null>(null)
-  const [showPaymentModal, setShowPaymentModal] = useState(false)
 
   const filteredTables = useMemo(() => {
     return tables.filter((t) => {
@@ -107,19 +83,17 @@ export function useWaiterLogic() {
   }, [locationTables])
 
   const totalInLocation = locationTables.length
-  const activeTable = tables.find((t) => t.id === activeTableId)
-  const activeOrder = activeTableId ? orders[activeTableId] || [] : []
-  const orderTotal = activeOrder.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
+  
+  return { LOCATIONS, activeLocation, setActiveLocation, stateFilter, setStateFilter, filteredTables, tableCounts, totalInLocation }
+}
 
-  const handleTableClick = (e: MouseEvent<HTMLButtonElement | HTMLDivElement>, id: string) => {
-    e.stopPropagation()
-    const clickedTable = tables.find((t) => t.id === id)
-    if (clickedTable && clickedTable.status === 'Disponible') {
-      resetTableOrder(id)
-    }
-    setActiveTableId(id)
-    setMenuPanelOpen(true)
-  }
+// ─── Hook Interno 2: Gestión de Modales de Reserva ─────────────────────────
+function useReservationManager(tables: Table[], reserveTable: any, cancelReservation: any) {
+  const [reservingTableId, setReservingTableId] = useState<string | null>(null)
+  const [viewingReservationsTableId, setViewingReservationsTableId] = useState<string | null>(null)
+  const [cancelingReservationTableId, setCancelingReservationTableId] = useState<string | null>(null)
+  const [cancelingReservationId, setCancelingReservationId] = useState<string | null>(null)
+
 
   const openReserveModal = (e: MouseEvent<HTMLButtonElement>, tableId: string) => {
     e.stopPropagation()
@@ -134,6 +108,11 @@ export function useWaiterLogic() {
     try {
       const reservingTable = tables.find((t) => t.id === reservingTableId)
       const tableName = reservingTable?.name || 'Mesa'
+      
+      if (reservingTable && formData.guestCount > (reservingTable.capacity || 0)) {
+        toast.error(`La cantidad de personas supera la capacidad de la mesa (${reservingTable.capacity}).`)
+        return
+      }
       
       const result: any = await reserveTable(reservingTableId, {
         location: formData.location,
@@ -196,6 +175,39 @@ export function useWaiterLogic() {
     })
   }
 
+  return {
+    reservingTableId, viewingReservationsTableId, cancelingReservationTableId, cancelingReservationId,
+    openReserveModal, closeReserveModal, handleConfirmReservation, openReservationsListModal, closeReservationsListModal,
+    openCancelReservationModal, closeCancelReservationModal, handleConfirmCancelReservation
+  }
+}
+
+// ─── Hook Principal (Composición) ──────────────────────────────────────────
+export function useWaiterLogic() {
+  const context = useAppContext()
+  const { tables, orders, reservations, closeTable, reserveTable, cancelReservation, getActiveReservation, resetTableOrder } = context
+
+  const tableFilters = useTableFilters(tables)
+  const resManager = useReservationManager(tables, reserveTable, cancelReservation)
+
+  const [menuPanelOpen, setMenuPanelOpen] = useState(false)
+  const [activeTableId, setActiveTableId] = useState<string | null>(null)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+
+  const activeTable = tables.find((t) => t.id === activeTableId)
+  const activeOrder = activeTableId ? orders[activeTableId] || [] : []
+  const orderTotal = activeOrder.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
+
+  const handleTableClick = (e: MouseEvent<HTMLButtonElement | HTMLDivElement>, id: string) => {
+    e.stopPropagation()
+    const clickedTable = tables.find((t) => t.id === id)
+    if (clickedTable && clickedTable.status === 'Disponible') {
+      resetTableOrder(id)
+    }
+    setActiveTableId(id)
+    setMenuPanelOpen(true)
+  }
+
   const openPaymentModal = () => setShowPaymentModal(true)
   const closePaymentModal = () => setShowPaymentModal(false)
 
@@ -232,37 +244,19 @@ export function useWaiterLogic() {
   return {
     tables,
     reservations,
-    LOCATIONS,
-    activeLocation,
-    stateFilter,
     menuPanelOpen,
     activeTableId,
-    reservingTableId,
-    viewingReservationsTableId,
-    cancelingReservationTableId,
-    cancelingReservationId,
     showPaymentModal,
-    filteredTables,
-    tableCounts,
-    totalInLocation,
     activeTable,
     activeOrder,
     orderTotal,
-    setActiveLocation,
-    setStateFilter,
     handleTableClick,
-    openReserveModal,
-    closeReserveModal,
-    handleConfirmReservation,
-    openReservationsListModal,
-    closeReservationsListModal,
-    openCancelReservationModal,
-    closeCancelReservationModal,
-    handleConfirmCancelReservation,
     openPaymentModal,
     closePaymentModal,
     handleProcessPayment,
     handleCloseModal,
-    getActiveReservation
+    getActiveReservation,
+    ...tableFilters,
+    ...resManager
   }
 }

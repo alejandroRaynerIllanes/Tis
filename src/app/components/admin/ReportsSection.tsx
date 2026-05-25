@@ -13,30 +13,104 @@ export function ReportsSection() {
     setIsGenerating(1);
     toast.loading('Descargando ventas del día...', { id: 'rep1' });
     try {
-      const res: any = await api.get('/pedidos?hoy=true'); 
-      const pedidos = res.data || res || [];
-      const pedidosCerrados = pedidos.filter((p: any) => p.estado === 'CERRADO');
+      // 🔥 Consultamos a la BD. Añadimos &hoy=true para que funcione el Fallback si el backend está desactualizado
+      const res: any = await api.get('/pedidos?reportesCierre=true&hoy=true'); 
+      const data = res.data || res || [];
 
-      let totalVentas = 0;
-      const datosTabla = pedidosCerrados.map((p: any) => {
-        totalVentas += p.total;
-        const mesero = p.usuario ? `${p.usuario.nombre} ${p.usuario.apellido}`.trim() : 'Sin mesero';
-        const mesa = p.mesa?.numero || p.mesaNombre || 'Barra';
-        return [
-          p.codigo || 'S/N',
-          mesa,
-          mesero,
-          p.metodoPago || 'Efectivo',
-          `Bs. ${(p.montoDescuento || 0).toFixed(2)}`,
-          `Bs. ${(p.total || 0).toFixed(2)}`
-        ];
-      });
+      if (data.length === 0) {
+        toast.info('No hay ventas registradas ni cierres el día de hoy.', { id: 'rep1' });
+        setIsGenerating(null);
+        return;
+      }
 
-      const columnas = ['Nro Pedido', 'Mesa', 'Mesero', 'Método Pago', 'Descuento', 'Total'];
-      const stringTotales = `TOTAL RECAUDADO DEL DÍA: Bs. ${totalVentas.toFixed(2)}`;
+      let totalEfectivo = 0, totalTarjeta = 0, totalQR = 0, totalDescuentos = 0, totalPropinas = 0, totalVentas = 0;
+      let totalPagos = 0;
+      let datosTabla: any[][] = [];
 
-      generarReporteProfesional('Reporte Diario de Ventas', columnas, datosTabla, stringTotales);
-      toast.success('Reporte generado exitosamente', { id: 'rep1' });
+      // Detectar si el backend nos devolvió Cierres de Caja (tiene cajeroNombre) o Pedidos normales
+      const isCierreCaja = data[0].cajeroNombre !== undefined;
+
+      if (isCierreCaja) {
+        // LÓGICA 1: Usar los reportes Z guardados reales (Backend compilado y sincronizado)
+        datosTabla = data.map((r: any) => {
+          totalEfectivo += (r.efectivo || 0);
+          totalTarjeta += (r.tarjeta || 0);
+          totalQR += (r.qr || 0);
+          totalDescuentos += (r.descuentos || 0);
+          totalPropinas += (r.propinas || 0);
+          totalVentas += (r.totalDia || 0);
+          totalPagos += (r.pagosProcesados || 0);
+
+          return [
+            r.cajeroNombre || 'Cajero',
+            (r.cajeroId || 'N/A').slice(-6),
+            (r.pagosProcesados || 0).toString(),
+            `Bs. ${(r.efectivo || 0).toFixed(2)}`,
+            `Bs. ${(r.tarjeta || 0).toFixed(2)}`,
+            `Bs. ${(r.qr || 0).toFixed(2)}`,
+            `Bs. ${(r.descuentos || 0).toFixed(2)}`,
+            `Bs. ${(r.propinas || 0).toFixed(2)}`,
+            `Bs. ${(r.totalDia || 0).toFixed(2)}`
+          ];
+        });
+      } else {
+        // LÓGICA 2: Fallback Inteligente. Agrupar los Pedidos crudos al vuelo (Backend antiguo sin compilar)
+        const pedidosCerrados = data.filter((p: any) => p.estado === 'CERRADO');
+        if (pedidosCerrados.length === 0) {
+          toast.info('No hay ventas cerradas el día de hoy.', { id: 'rep1' });
+          setIsGenerating(null);
+          return;
+        }
+
+        const statsPorCajero: Record<string, any> = {};
+
+        pedidosCerrados.forEach((p: any) => {
+          const cajero = p.cajeroAsignado ? `${p.cajeroAsignado.nombre} ${p.cajeroAsignado.apellido || ''}`.trim() : 'Cajero Principal';
+          const cajeroId = p.cajeroAsignado ? (p.cajeroAsignado._id || p.cajeroAsignado) : 'N/A';
+          
+          if (!statsPorCajero[cajero]) {
+            statsPorCajero[cajero] = { id: String(cajeroId), ventas: 0, efectivo: 0, tarjeta: 0, qr: 0, propinas: 0, descuentos: 0, total: 0 };
+          }
+
+          statsPorCajero[cajero].ventas += 1;
+          statsPorCajero[cajero].descuentos += (p.montoDescuento || 0);
+          statsPorCajero[cajero].propinas += (p.montoPropina || 0);
+          statsPorCajero[cajero].total += (p.total || 0);
+
+          if (p.metodoPago === 'Efectivo') { statsPorCajero[cajero].efectivo += (p.total || 0); totalEfectivo += (p.total || 0); }
+          if (p.metodoPago === 'Tarjeta') { statsPorCajero[cajero].tarjeta += (p.total || 0); totalTarjeta += (p.total || 0); }
+          if (p.metodoPago === 'QR') { statsPorCajero[cajero].qr += (p.total || 0); totalQR += (p.total || 0); }
+
+          totalDescuentos += (p.montoDescuento || 0);
+          totalPropinas += (p.montoPropina || 0);
+          totalVentas += (p.total || 0);
+          totalPagos += 1;
+        });
+
+        datosTabla = Object.keys(statsPorCajero).map(cajero => [
+          cajero,
+          statsPorCajero[cajero].id.slice(-6),
+          statsPorCajero[cajero].ventas.toString(),
+          `Bs. ${statsPorCajero[cajero].efectivo.toFixed(2)}`,
+          `Bs. ${statsPorCajero[cajero].tarjeta.toFixed(2)}`,
+          `Bs. ${statsPorCajero[cajero].qr.toFixed(2)}`,
+          `Bs. ${statsPorCajero[cajero].descuentos.toFixed(2)}`,
+          `Bs. ${statsPorCajero[cajero].propinas.toFixed(2)}`,
+          `Bs. ${statsPorCajero[cajero].total.toFixed(2)}`
+        ]);
+      }
+
+      const columnas = ['Cajero', 'ID', 'Cobros', 'Efectivo', 'Tarjeta', 'QR', 'Descuento', 'Propina', 'Total Vendido'];
+      const stringTotales = `INFORMACIÓN OPERATIVA Y FINANCIERA (CONSOLIDADO CAJAS CERRADAS):
+Total Recaudado: Bs. ${totalVentas.toFixed(2)}
+Total Efectivo: Bs. ${totalEfectivo.toFixed(2)} | Total Tarjeta: Bs. ${totalTarjeta.toFixed(2)} | Total QR: Bs. ${totalQR.toFixed(2)}
+Propinas Recibidas: Bs. ${totalPropinas.toFixed(2)} | Descuentos Aplicados: Bs. ${totalDescuentos.toFixed(2)}
+Total de Pagos Procesados: ${totalPagos}
+Pagos Anulados: 0
+`;
+
+      generarReporteProfesional('Reporte Diario de Ventas y Cierre de Cajas', columnas, datosTabla, stringTotales);
+      toast.success('Reporte de cierre generado y sincronizado', { id: 'rep1' });
     } catch (error) {
       toast.error('Error al generar el reporte de ventas', { id: 'rep1' });
     } finally {

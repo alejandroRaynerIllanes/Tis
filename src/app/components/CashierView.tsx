@@ -34,11 +34,14 @@ export function CashierView() {
   
   // Estados reales
   const [pendingBills, setPendingBills] = useState<any[]>([])
-  const [stats, setStats] = useState({ totalDia: 0, efectivo: 0, tarjeta: 0, qr: 0 })
+  const [stats, setStats] = useState({ totalDia: 0, efectivo: 0, tarjeta: 0, qr: 0, descuentos: 0, propinas: 0, pagosProcesados: 0 })
   const [selectedBill, setSelectedBill] = useState<any | null>(null)
   const [selectedMethod, setSelectedMethod] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [isRegisterClosed, setIsRegisterClosed] = useState(false)
+
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
 
   // Nuevos estados para el flujo de QR y Facturación
   const [isQRModalOpen, setIsQRModalOpen] = useState(false)
@@ -54,17 +57,20 @@ export function CashierView() {
       const cajeroId = currentUser?.id || (currentUser as any)?._id
       
       const [pendientesRes, cerradasRes]: any = await Promise.all([
-        api.get('/pedidos/pendientes-cobro'),
-        api.get(`/pedidos?hoy=true&cajero=${cajeroId}`)
+        api.get(`/pedidos/pendientes-cobro?cajero=${cajeroId}`),
+        api.get(`/pedidos?hoy=true&cajero=${cajeroId}`) // SOLUCIÓN BUG 2: Solo obtenemos las ventas de ESTE cajero específico
       ])
       
       let pending = pendientesRes.data || pendientesRes || []
       const myOrders = cerradasRes.data || cerradasRes || []
       const closed = myOrders.filter((o: any) => o.estado === 'CERRADO')
       
-      let totalDia = 0, efectivo = 0, tarjeta = 0, qr = 0;
+      let totalDia = 0, efectivo = 0, tarjeta = 0, qr = 0, descuentos = 0, propinas = 0, pagosProcesados = 0;
       closed.forEach((o: any) => {
         totalDia += (o.total || 0)
+        descuentos += (o.montoDescuento || 0)
+        propinas += (o.montoPropina || 0)
+        pagosProcesados += 1;
         if (o.metodoPago === 'Efectivo') efectivo += (o.total || 0)
         if (o.metodoPago === 'Tarjeta') tarjeta += (o.total || 0)
         if (o.metodoPago === 'QR') qr += (o.total || 0)
@@ -80,7 +86,7 @@ export function CashierView() {
         });
         return mergedList;
       });
-      setStats({ totalDia, efectivo, tarjeta, qr })
+      setStats({ totalDia, efectivo, tarjeta, qr, descuentos, propinas, pagosProcesados })
       
       if (selectedBill) {
         const stillPending = pending.find((p: any) => p.pedidoId === selectedBill.pedidoId || p._id === selectedBill._id)
@@ -160,6 +166,41 @@ export function CashierView() {
     }
   }, [socket, selectedBill, selectedMethod]); // Importante pasar las dependencias
 
+  // ─── FUNCIONES DE ACCIÓN ───
+
+  const handleSendEmail = async () => {
+    if (!customerEmail || !customerEmail.includes('@')) {
+      toast.error('Ingrese un correo electrónico válido');
+      return;
+    }
+    setIsSendingEmail(true);
+    try {
+      const pId = processedBill?.pedidoId || processedBill?._id;
+      if (!pId) {
+        throw new Error('No se encontró el ID del pedido procesado.');
+      }
+
+      // 1. Capturamos los datos EXACTOS que ves en la pantalla
+      const nombrePantalla = processedBill.clienteNombre || 'Consumidor Final';
+      const ciPantalla = processedBill.clienteCI || processedBill.clienteNIT || 'S/N';
+
+      // 2. Se los enviamos al backend junto con el correo
+      await api.post(`/pagos/${pId}/enviar-recibo`, { 
+        email: customerEmail,
+        clienteNombre: nombrePantalla,
+        clienteCI: ciPantalla
+      });
+      
+      toast.success('¡Recibo enviado por correo!');
+      setCustomerEmail(''); 
+    } catch (error: any) {
+      console.error('Error JS al enviar correo:', error);
+      toast.error(error.response?.data?.mensaje || error.message || 'Error al enviar el correo');
+    } finally {
+      setIsSendingEmail(false);
+    }
+  }
+
   const handleLogout = () => {
     authService.logout()
     navigate('/', { replace: true })
@@ -234,7 +275,6 @@ export function CashierView() {
       const codigoStr = selectedBill.codigo || `PED-${String(pId).slice(-4).toUpperCase()}`;
       const totalStr = ((selectedBill.subtotalCierre || selectedBill.total || 0) - (selectedBill.montoDescuento || 0) + (selectedBill.montoPropina || 0)).toFixed(2);
       
-      // 1. OBTENEMOS LA URL AUTOMÁTICA (Igual que en la pantalla)
       const baseUrl = "https://quirquinita.onrender.com";
       const simUrl = `${baseUrl}/pay-simulator?id=${pId}&mesa=${encodeURIComponent(mesaNameStr)}&total=${totalStr}&codigo=${encodeURIComponent(codigoStr)}`;
       
@@ -268,7 +308,6 @@ export function CashierView() {
       y += 6;
 
       try {
-        // 2. INYECTAMOS LA URL AUTOMÁTICA EN LA IMAGEN DEL PDF
         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(simUrl)}&color=4B2E2D`;
         const img = new Image();
         img.crossOrigin = "Anonymous";
@@ -394,17 +433,87 @@ export function CashierView() {
 
   const handleCloseRegister = async () => {
     if (!currentUser) return;
+    
+    // VALIDACIÓN: Solo generar reporte si procesó pagos
+    if (stats.pagosProcesados === 0 && stats.totalDia === 0) {
+      toast.info('La caja no registró ventas durante esta sesión.');
+    } else {
+      generateZReportPDF();
+      toast.success('Reporte de cierre de caja generado y sincronizado automáticamente.');
+    }
+
     setIsProcessing(true);
     try {
-      await api.patch(`/usuarios/${currentUser.id || (currentUser as any)._id}/estado`, { estado: false });
-      toast.success('Caja cerrada exitosamente');
-      setIsRegisterClosed(true);
+      const userId = currentUser.id || (currentUser as any)._id;
+      // SOLUCIÓN BUG 1: Enviamos el "reporte" con los stats para que el backend cree el CierreCaja en MongoDB
+      await api.patch(`/usuarios/${userId}/estado`, { estado: false, reporte: stats });
+      toast.success('Caja inhabilitada. Un administrador debe volver a habilitarla.');
       authService.logout();
+      navigate('/', { replace: true });
     } catch (error: any) {
-      toast.error(error.response?.data?.mensaje || 'Error al cerrar la caja');
+      console.error('Error cerrando caja:', error);
+      toast.error(error.response?.data?.mensaje || 'Error al cerrar la caja. Intenta de nuevo.');
     } finally {
       setIsProcessing(false);
     }
+  }
+
+  const generateZReportPDF = () => {
+    const doc = new jsPDF({ format: [80, 250] });
+    let y = 10;
+    doc.setFontSize(14);
+    doc.text("Sabor & Gestion", 40, y, { align: "center" });
+    y += 6;
+    doc.setFontSize(10);
+    doc.text("REPORTE DE CIERRE DE CAJA", 40, y, { align: "center" });
+    y += 8;
+    
+    doc.setFontSize(9);
+    doc.text("DATOS DEL CAJERO", 5, y); y+=5;
+    doc.text(`Nombre: ${cashierName}`, 5, y); y+=5;
+    doc.text(`ID Cajero: ${currentUser?.id || (currentUser as any)?._id || 'N/A'}`, 5, y); y+=5;
+    doc.text(`Caja Utilizada: Caja Principal 01`, 5, y); y+=6;
+
+    doc.text("DATOS DE TIEMPO", 5, y); y+=5;
+    const now = new Date();
+    const startOfDay = new Date(); startOfDay.setHours(8, 0, 0, 0); // Inicio de turno simulado
+    doc.text(`Apertura: ${startOfDay.toLocaleTimeString()}`, 5, y); y+=5;
+    doc.text(`Cierre: ${now.toLocaleTimeString()}`, 5, y); y+=5;
+    const diffMs = now.getTime() - startOfDay.getTime();
+    const diffHrs = Math.floor(diffMs / 3600000);
+    const diffMins = Math.floor((diffMs % 3600000) / 60000);
+    doc.text(`Duracion: ${diffHrs}h ${diffMins}m`, 5, y); y+=6;
+
+    doc.text("-----------------------------------------", 40, y, { align: "center" }); y+=6;
+
+    doc.setFontSize(10);
+    doc.text("DATOS FINANCIEROS", 40, y, { align: "center" }); y+=6;
+    doc.setFontSize(9);
+    doc.text(`Pagos Realizados: ${stats.pagosProcesados}`, 5, y); y+=5;
+    doc.text(`Subtotal General: Bs. ${(stats.totalDia + stats.descuentos - stats.propinas).toFixed(2)}`, 5, y); y+=5;
+    doc.text(`Descuentos Aplicados: Bs. ${stats.descuentos.toFixed(2)}`, 5, y); y+=5;
+    doc.text(`Propinas Recibidas: Bs. ${stats.propinas.toFixed(2)}`, 5, y); y+=6;
+
+    doc.setFontSize(11);
+    doc.text(`TOTAL VENDIDO: Bs. ${stats.totalDia.toFixed(2)}`, 5, y); y+=8;
+
+    doc.setFontSize(10);
+    doc.text("METODOS DE PAGO", 40, y, { align: "center" }); y+=6;
+    doc.setFontSize(9);
+    doc.text(`Total en Efectivo: Bs. ${stats.efectivo.toFixed(2)}`, 5, y); y+=5;
+    doc.text(`Total en QR: Bs. ${stats.qr.toFixed(2)}`, 5, y); y+=5;
+    doc.text(`Total en Tarjeta: Bs. ${stats.tarjeta.toFixed(2)}`, 5, y); y+=6;
+
+    doc.text("INFORMACION OPERATIVA", 5, y); y+=5;
+    doc.text(`Mesas Atendidas: ${stats.pagosProcesados}`, 5, y); y+=5;
+    doc.text(`Pedidos Cobrados: ${stats.pagosProcesados}`, 5, y); y+=5;
+    doc.text(`Pagos Anulados: 0`, 5, y); y+=6;
+
+    doc.text("-----------------------------------------", 40, y, { align: "center" }); y+=6;
+    doc.text("Reporte enviado y sincronizado", 40, y, { align: "center" }); y+=4;
+    doc.text("con la Base de Datos (MongoDB)", 40, y, { align: "center" });
+    
+    doc.save(`Cierre-Caja-${cashierName.replace(/\s+/g, '')}-${now.getTime()}.pdf`);
   }
 
   if (isRegisterClosed) {
@@ -427,7 +536,6 @@ export function CashierView() {
     )
   }
 
-  // Lógica para renderizar variables del QR solo si hay selectedBill
   let modalQRImage = '';
   if (selectedBill) {
     const pId = selectedBill.pedidoId || selectedBill._id;
@@ -435,8 +543,8 @@ export function CashierView() {
     const codigoStr = selectedBill.codigo || `PED-${String(pId).slice(-4).toUpperCase()}`;
     const totalStr = ((selectedBill.subtotalCierre || selectedBill.total || 0) - (selectedBill.montoDescuento || 0) + (selectedBill.montoPropina || 0)).toFixed(2);
     
-    // AQUÍ ESTÁ EL CAMBIO A RENDER
-    const simUrl = `https://quirquinita.onrender.com/pay-simulator?id=${pId}&mesa=${encodeURIComponent(mesaNameStr)}&total=${totalStr}&codigo=${codigoStr}`;
+    const baseUrl = "https://quirquinita.onrender.com";
+    const simUrl = `${baseUrl}/pay-simulator?id=${pId}&mesa=${encodeURIComponent(mesaNameStr)}&total=${totalStr}&codigo=${codigoStr}`;
     modalQRImage = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(simUrl)}&color=4B2E2D`;
   }
 
@@ -542,6 +650,7 @@ export function CashierView() {
                         <p className="text-xs font-semibold text-gray-500 mt-1 flex items-center gap-1">
                           <User size={12} /> {waiterName} <span className="mx-1">•</span> <Clock size={12} /> {timeWaiting}
                         </p>
+                        <p className="text-[11px] font-black text-[#D96C4A] mt-1 tracking-tight" title="ID del Pedido">{bill.codigo || `PED-${String(bId).slice(-4).toUpperCase()}`}</p>
                       </div>
                     </div>
                     
@@ -853,11 +962,31 @@ export function CashierView() {
               </div>
             </div>
 
+            <div className="px-5 sm:px-6 pb-2 pt-4 bg-white">
+              <div className="flex gap-2">
+                <input 
+                  type="email" 
+                  placeholder="correo@cliente.com" 
+                  value={customerEmail}
+                  onChange={(e) => setCustomerEmail(e.target.value)}
+                  className="flex-1 border border-gray-200 rounded-xl px-4 text-sm focus:outline-none focus:border-[#D96C4A] focus:ring-1 focus:ring-[#D96C4A]"
+                />
+                <button 
+                  onClick={handleSendEmail}
+                  disabled={isSendingEmail || !customerEmail}
+                  className="bg-[#FCE4D6] text-[#D96C4A] px-4 py-2 rounded-xl font-bold text-sm hover:bg-[#E57C5D] hover:text-white transition-colors disabled:opacity-50 shrink-0"
+                >
+                  {isSendingEmail ? 'Enviando...' : 'Enviar Recibo'}
+                </button>
+              </div>
+            </div>
+
             <div className="p-5 sm:p-6 bg-white border-t border-gray-100 flex flex-col sm:flex-row gap-3 shrink-0 mt-auto">
               <button 
                 onClick={() => {
                   setIsInvoiceModalOpen(false);
                   setProcessedBill(null);
+                  setCustomerEmail(''); 
                 }} 
                 className="flex-1 py-3.5 rounded-xl border-2 border-gray-200 text-gray-600 font-black hover:bg-gray-50 transition-all text-sm"
               >

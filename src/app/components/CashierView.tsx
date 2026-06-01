@@ -20,7 +20,7 @@ import {
   X,
   FileText
 } from 'lucide-react'
-import jsPDF from "jspdf";
+import { generateQrPdf, generateReceiptPdf, generateZReportPdf } from '../utils/pdf.utils'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { getStoredUser, api } from '../services/api'
@@ -274,64 +274,15 @@ export function CashierView() {
       const mesaNameStr = selectedBill.mesaNombre || selectedBill.mesa?.numero || 'Mesa';
       const codigoStr = selectedBill.codigo || `PED-${String(pId).slice(-4).toUpperCase()}`;
       const totalStr = ((selectedBill.subtotalCierre || selectedBill.total || 0) - (selectedBill.montoDescuento || 0) + (selectedBill.montoPropina || 0)).toFixed(2);
-      
-      const baseUrl = "https://quirquinita.onrender.com";
-      const simUrl = `${baseUrl}/pay-simulator?id=${pId}&mesa=${encodeURIComponent(mesaNameStr)}&total=${totalStr}&codigo=${encodeURIComponent(codigoStr)}`;
-      
-      const doc = new jsPDF({ format: [80, 200] });
-      let y = 10;
-      doc.setFontSize(16);
-      doc.text("SABOR & GESTION", 40, y, { align: "center" });
-      y += 8;
-      doc.setFontSize(12);
-      doc.text("Pago con QR", 40, y, { align: "center" });
-      y += 5;
-      doc.setFontSize(10);
-      doc.text("Escanee para pagar desde su celular", 40, y, { align: "center" });
-      y += 8;
-      doc.text("-----------------------------------------", 40, y, { align: "center" });
-      y += 6;
-      
-      doc.text(`Mesa: ${mesaNameStr}`, 5, y);
-      y += 5;
-      doc.text(`Cliente: ${selectedBill.clienteNombre || 'Consumidor Final'}`, 5, y);
-      y += 5;
-      doc.text(`Pedido: ${codigoStr}`, 5, y);
-      y += 5;
-      
-      doc.setFontSize(12);
-      doc.text(`Total a pagar: Bs. ${totalStr}`, 5, y);
-      y += 8;
-      
-      doc.setFontSize(10);
-      doc.text("-----------------------------------------", 40, y, { align: "center" });
-      y += 6;
-
-      try {
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(simUrl)}&color=4B2E2D`;
-        const img = new Image();
-        img.crossOrigin = "Anonymous";
-        img.src = qrUrl;
-        await new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = reject;
-        });
-        doc.addImage(img, 'PNG', 15, y, 50, 50);
-        y += 55;
-      } catch (error) {
-        doc.text("[ QR NO DISPONIBLE ]", 40, y + 20, { align: "center" });
-        y += 55;
-      }
-
-      doc.setFontSize(8);
-      const splitMsg = doc.splitTextToSize("Escanee este codigo QR con su camara para acceder a la pasarela de pago simulada", 70);
-      doc.text(splitMsg, 40, y, { align: "center" });
-      y += 15;
-      doc.text("Gracias por su preferencia", 40, y, { align: "center" });
-
-      doc.save(`QR-Mesa-${mesaNameStr}.pdf`);
+      await generateQrPdf({
+        pedidoId: pId,
+        mesaNombre: mesaNameStr,
+        codigo: codigoStr,
+        totalStr,
+        clienteNombre: selectedBill.clienteNombre
+      });
     } catch (err) {
-      toast.error("Error al generar el PDF del QR");
+      toast.error('Error al generar el PDF del QR');
     } finally {
       setIsProcessing(false);
     }
@@ -339,96 +290,7 @@ export function CashierView() {
 
   const handleDownloadPDF = () => {
     if (!processedBill) return;
-    const doc = new jsPDF({ format: [80, 250] });
-    let y = 10;
-    doc.setFontSize(14);
-    doc.text("Sabor & Gestion", 40, y, { align: "center" });
-    y += 6;
-    doc.setFontSize(10);
-    doc.text("Comprobante de Pago", 40, y, { align: "center" });
-    y += 8;
-    doc.setFontSize(9);
-    doc.text(`Pedido: ${processedBill.codigo || `PED-${String(processedBill.pedidoId || processedBill._id).slice(-4).toUpperCase()}`}`, 40, y, { align: "center" });
-    y += 6;
-    doc.text("-----------------------------------------", 40, y, { align: "center" });
-    y += 6;
-    
-    const mesaName = processedBill.mesaNombre || processedBill.mesa?.numero || 'Barra';
-    const waiterName = processedBill.meseroNombre || (processedBill.usuario?.nombre ? `${processedBill.usuario.nombre} ${processedBill.usuario.apellido || ''}` : 'Mesero');
-    const locationName = processedBill.mesa?.ubicacion?.nombre || processedBill.mesa?.location || 'Principal';
-
-    doc.text(`Mesa: ${mesaName}`, 5, y);
-    y += 5;
-    doc.text(`Area/Sala: ${locationName}`, 5, y);
-    y += 5;
-    doc.text(`Mesero: ${waiterName}`, 5, y);
-    y += 5;
-    doc.text(`Cajero: ${cashierName}`, 5, y);
-    y += 6;
-    doc.text("-----------------------------------------", 40, y, { align: "center" });
-    y += 6;
-
-    doc.text(`Cliente: ${processedBill.clienteNombre || 'Consumidor Final'}`, 5, y);
-    y += 5;
-    if (processedBill.clienteCI || processedBill.clienteNIT) {
-      doc.text(`CI/NIT: ${processedBill.clienteCI || processedBill.clienteNIT || 'S/N'}`, 5, y);
-      y += 5;
-    }
-    doc.text("-----------------------------------------", 40, y, { align: "center" });
-    y += 6;
-
-    doc.text("CANT   DESCRIPCION       P.U   SUBT", 5, y);
-    y += 5;
-    (processedBill.items || processedBill.detalles || []).forEach((item: any) => {
-      const name = item.nombre || item.plato?.nombre || 'Plato';
-      const qty = item.cantidad || 1;
-      const pu = (item.precioUnitario || item.plato?.precio || 0).toFixed(2);
-      const sub = (item.subtotal || ((item.precioUnitario || item.plato?.precio || 0) * qty)).toFixed(2);
-      doc.text(`${qty}`, 5, y);
-      doc.text(`${name.substring(0, 12)}`, 15, y);
-      doc.text(`${pu}`, 55, y, { align: "right" });
-      doc.text(`Bs. ${sub}`, 75, y, { align: "right" });
-      y += 5;
-    });
-    
-    y += 3;
-    doc.text("-----------------------------------------", 40, y, { align: "center" });
-    y += 6;
-    
-    const subtotal = (processedBill.subtotalCierre || processedBill.total || 0).toFixed(2);
-    const discount = (processedBill.montoDescuento || 0).toFixed(2);
-    const tip = (processedBill.montoPropina || 0).toFixed(2);
-    const total = ((processedBill.subtotalCierre || processedBill.total || 0) - (processedBill.montoDescuento || 0) + (processedBill.montoPropina || 0)).toFixed(2);
-
-    doc.text(`Subtotal:`, 5, y);
-    doc.text(`Bs. ${subtotal}`, 75, y, { align: "right" });
-    y += 5;
-    if (Number(discount) > 0) {
-      doc.text(`Descuento:`, 5, y);
-      doc.text(`- Bs. ${discount}`, 75, y, { align: "right" });
-      y += 5;
-    }
-    if (Number(tip) > 0) {
-      doc.text(`Propina:`, 5, y);
-      doc.text(`+ Bs. ${tip}`, 75, y, { align: "right" });
-      y += 5;
-    }
-    
-    doc.setFontSize(12);
-    doc.text(`TOTAL FINAL:`, 5, y);
-    doc.text(`Bs. ${total}`, 75, y, { align: "right" });
-    y += 8;
-    
-    doc.setFontSize(10);
-    doc.text(`Metodo Pago: ${processedBill.paymentMethod || 'Efectivo'}`, 5, y);
-    y += 5;
-    
-    const now = new Date();
-    doc.text(`Fecha: ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`, 5, y);
-    y += 10;
-    
-    doc.text("¡Gracias por su preferencia!", 40, y, { align: "center" });
-    doc.save(`Factura-${processedBill.codigo || processedBill.pedidoId || 'Pago'}.pdf`);
+    generateReceiptPdf({ pedido: processedBill, cashierName });
   }
 
   const handleCloseRegister = async () => {
@@ -459,61 +321,11 @@ export function CashierView() {
   }
 
   const generateZReportPDF = () => {
-    const doc = new jsPDF({ format: [80, 250] });
-    let y = 10;
-    doc.setFontSize(14);
-    doc.text("Sabor & Gestion", 40, y, { align: "center" });
-    y += 6;
-    doc.setFontSize(10);
-    doc.text("REPORTE DE CIERRE DE CAJA", 40, y, { align: "center" });
-    y += 8;
-    
-    doc.setFontSize(9);
-    doc.text("DATOS DEL CAJERO", 5, y); y+=5;
-    doc.text(`Nombre: ${cashierName}`, 5, y); y+=5;
-    doc.text(`ID Cajero: ${currentUser?.id || (currentUser as any)?._id || 'N/A'}`, 5, y); y+=5;
-    doc.text(`Caja Utilizada: Caja Principal 01`, 5, y); y+=6;
-
-    doc.text("DATOS DE TIEMPO", 5, y); y+=5;
-    const now = new Date();
-    const startOfDay = new Date(); startOfDay.setHours(8, 0, 0, 0); // Inicio de turno simulado
-    doc.text(`Apertura: ${startOfDay.toLocaleTimeString()}`, 5, y); y+=5;
-    doc.text(`Cierre: ${now.toLocaleTimeString()}`, 5, y); y+=5;
-    const diffMs = now.getTime() - startOfDay.getTime();
-    const diffHrs = Math.floor(diffMs / 3600000);
-    const diffMins = Math.floor((diffMs % 3600000) / 60000);
-    doc.text(`Duracion: ${diffHrs}h ${diffMins}m`, 5, y); y+=6;
-
-    doc.text("-----------------------------------------", 40, y, { align: "center" }); y+=6;
-
-    doc.setFontSize(10);
-    doc.text("DATOS FINANCIEROS", 40, y, { align: "center" }); y+=6;
-    doc.setFontSize(9);
-    doc.text(`Pagos Realizados: ${stats.pagosProcesados}`, 5, y); y+=5;
-    doc.text(`Subtotal General: Bs. ${(stats.totalDia + stats.descuentos - stats.propinas).toFixed(2)}`, 5, y); y+=5;
-    doc.text(`Descuentos Aplicados: Bs. ${stats.descuentos.toFixed(2)}`, 5, y); y+=5;
-    doc.text(`Propinas Recibidas: Bs. ${stats.propinas.toFixed(2)}`, 5, y); y+=6;
-
-    doc.setFontSize(11);
-    doc.text(`TOTAL VENDIDO: Bs. ${stats.totalDia.toFixed(2)}`, 5, y); y+=8;
-
-    doc.setFontSize(10);
-    doc.text("METODOS DE PAGO", 40, y, { align: "center" }); y+=6;
-    doc.setFontSize(9);
-    doc.text(`Total en Efectivo: Bs. ${stats.efectivo.toFixed(2)}`, 5, y); y+=5;
-    doc.text(`Total en QR: Bs. ${stats.qr.toFixed(2)}`, 5, y); y+=5;
-    doc.text(`Total en Tarjeta: Bs. ${stats.tarjeta.toFixed(2)}`, 5, y); y+=6;
-
-    doc.text("INFORMACION OPERATIVA", 5, y); y+=5;
-    doc.text(`Mesas Atendidas: ${stats.pagosProcesados}`, 5, y); y+=5;
-    doc.text(`Pedidos Cobrados: ${stats.pagosProcesados}`, 5, y); y+=5;
-    doc.text(`Pagos Anulados: 0`, 5, y); y+=6;
-
-    doc.text("-----------------------------------------", 40, y, { align: "center" }); y+=6;
-    doc.text("Reporte enviado y sincronizado", 40, y, { align: "center" }); y+=4;
-    doc.text("con la Base de Datos (MongoDB)", 40, y, { align: "center" });
-    
-    doc.save(`Cierre-Caja-${cashierName.replace(/\s+/g, '')}-${now.getTime()}.pdf`);
+    generateZReportPdf({
+      cashierName,
+      cajeroId: currentUser?.id || (currentUser as any)?._id || 'N/A',
+      stats
+    });
   }
 
   if (isRegisterClosed) {
@@ -543,7 +355,7 @@ export function CashierView() {
     const codigoStr = selectedBill.codigo || `PED-${String(pId).slice(-4).toUpperCase()}`;
     const totalStr = ((selectedBill.subtotalCierre || selectedBill.total || 0) - (selectedBill.montoDescuento || 0) + (selectedBill.montoPropina || 0)).toFixed(2);
     
-    const baseUrl = "https://quirquinita.onrender.com";
+    const baseUrl = (import.meta as any).env.VITE_APP_URL || window.location.origin;
     const simUrl = `${baseUrl}/pay-simulator?id=${pId}&mesa=${encodeURIComponent(mesaNameStr)}&total=${totalStr}&codigo=${codigoStr}`;
     modalQRImage = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(simUrl)}&color=4B2E2D`;
   }

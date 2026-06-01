@@ -22,6 +22,7 @@ import { MouseEvent, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 import { TableStatus, Table, useAppContext } from '../context/AppContext'
+import { useNotifications } from '../context/NotificationsContext'
 import { useWaiterLogic, getTableDisplayName, getTableLocation, type StateFilter, type TableWithFallbacks } from '../hooks/useWaiterLogic'
 import { ReservationsListModal } from './ReservationsListModal'
 import { PreCuentaModal } from './PreCuentaModal'
@@ -222,7 +223,7 @@ export function WaiterView({
   } = waiterLogic
 
   const { loadInitialData } = useAppContext()
-  const { notifications, markNotificationAsRead, clearNotifications } = useAppContext()
+  const { notifications, markNotificationAsRead, clearNotifications } = useNotifications()
 
   useEffect(() => {
     loadInitialData()

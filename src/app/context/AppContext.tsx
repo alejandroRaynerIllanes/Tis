@@ -24,26 +24,14 @@ import {
 // Re-export types for backward compatibility
 export type { Product, ProductStatus, Table, TableStatus, OrderItem, ReservationInfo }
 
-export interface AppNotification {
-  id: string
-  title: string
-  message: string
-  time: Date
-  read: boolean
-  type: 'success' | 'warning'
-  meta?: {
-    pedidoId?: string
-    tableId?: string
-    actionType?: 'deliver_order' | 'process_payment'
-  }
-}
+import { AppNotification, useNotifications } from './NotificationsContext'
+export type { AppNotification }
 
 interface AppContextType {
   products: Product[]
   tables: Table[]
   orders: Record<string, OrderItem[]>
   reservations: Record<string, ReservationInfo[]>
-  notifications: AppNotification[]
   socket: any
   updateProductStatus: (id: string, status: ProductStatus) => void
   updateTableStatus: (id: string, status: TableStatus) => void
@@ -58,8 +46,6 @@ interface AppContextType {
   reserveTable: (tableId: string, info: Omit<ReservationInfo, 'id' | 'endTime'>) => void
   cancelReservation: (tableId: string, reservationId: string) => void
   getActiveReservation: (tableId: string) => ReservationInfo | null
-  markNotificationAsRead: (id: string) => void
-  clearNotifications: () => void
   setProducts: React.Dispatch<React.SetStateAction<Product[]>>
   setTables: React.Dispatch<React.SetStateAction<Table[]>>
   createTable: (payload: {
@@ -116,7 +102,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [tables, setTables] = useState<Table[]>([])
   const [orders, setOrders] = useState<Record<string, OrderItem[]>>({})
   const [reservations, setReservations] = useState<Record<string, ReservationInfo[]>>({})
-  const [notifications, setNotifications] = useState<AppNotification[]>([])
+  const { addNotification } = useNotifications()
   const [socketInstance, setSocketInstance] = useState<any>(null)
   const socketRef = useRef<any>(null)
 
@@ -185,33 +171,24 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         items.forEach((item: any) => {
           const newStatus = item.status || item.estado
           if (newStatus === 'Cuenta Solicitada' || newStatus === 'Esperando pago') {
-            setNotifications((prev) => {
-              const targetTableId = item.id || item._id || item.numero;
-              
-              // Evitar duplicar notificaciones idénticas no leídas para la misma mesa
-              if (prev.some(n => !n.read && n.meta?.tableId === targetTableId && n.title === 'Cuenta Solicitada')) {
-                return prev;
+            const targetTableId = item.id || item._id || item.numero;
+            const added = addNotification({
+              title: 'Cuenta Solicitada',
+              message: `La ${item.name || item.numero || 'Mesa'} está esperando para pagar.`,
+              type: 'warning',
+              meta: {
+                tableId: targetTableId,
+                actionType: 'process_payment'
               }
+            })
 
+            if (added) {
               toast.info('¡Atención: Cuenta Solicitada!', {
                 description: `La ${item.name || item.numero || 'Mesa'} está esperando para pagar.`,
                 duration: 8000,
                 icon: '💳'
               })
-
-              return [{
-                id: Date.now().toString() + Math.random(),
-                title: 'Cuenta Solicitada',
-                message: `La ${item.name || item.numero || 'Mesa'} está esperando para pagar.`,
-                time: new Date(),
-                read: false,
-                type: 'warning',
-                meta: {
-                  tableId: targetTableId,
-                  actionType: 'process_payment'
-                }
-              }, ...prev]
-            })
+            }
           }
         })
 
@@ -247,39 +224,40 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
       socket.on('mesas:alerta_listo', (payload: any) => {
         console.log('🔔 [WEBSOCKET] Alerta de pedido listo recibida en frontend:', payload);
-        toast.success('¡Pedido Listo para Recoger!', {
-          description: `El plato para la Mesa ${payload.mesaNombre || '?'} ya está terminado en cocina.`,
-          duration: 15000,
-          icon: '🔔',
-          action: {
-            label: '✔ Entendido',
-            onClick: () => { toast.dismiss() }
+        const added = addNotification({
+          title: 'Pedido Listo',
+          message: `El plato de la Mesa ${payload.mesaNombre || '?'} ya está terminado en cocina.`,
+          type: 'success',
+          meta: {
+            pedidoId: payload.pedidoId,
+            tableId: payload.mesaId,
+            actionType: 'deliver_order'
           }
         })
-        setNotifications((prev) => {
-          // Evitar duplicar notificaciones idénticas si el socket dispara dos veces rápido
-          if (prev.some(n => n.meta?.pedidoId === payload.pedidoId && n.title === 'Pedido Listo')) return prev;
-          return [{
-            id: Date.now().toString() + Math.random(),
-            title: 'Pedido Listo',
-            message: `El plato de la Mesa ${payload.mesaNombre || '?'} ya está terminado en cocina.`,
-            time: new Date(),
-            read: false,
-            type: 'success',
-            meta: {
-              pedidoId: payload.pedidoId,
-              tableId: payload.mesaId,
-              actionType: 'deliver_order'
+        if (added) {
+          toast.success('¡Pedido Listo para Recoger!', {
+            description: `El plato para la Mesa ${payload.mesaNombre || '?'} ya está terminado en cocina.`,
+            duration: 15000,
+            icon: '🔔',
+            action: {
+              label: '✔ Entendido',
+              onClick: () => { toast.dismiss() }
             }
-          }, ...prev]
-        })
+          })
+        }
       })
 
       socket.on('nueva_reserva', (r: any) => {
         const { tableId, resInfo } = normalizarReserva(r)
         setReservations((prev) => ({ ...prev, [tableId]: [...(prev[tableId] || []), resInfo] }))
-        toast.success('Nueva Reserva Asignada', { description: `${resInfo.clientName} ha reservado para las ${resInfo.startTime}`, duration: 10000, icon: '📅' })
-        setNotifications((prev) => [{ id: Date.now().toString() + Math.random(), title: 'Nueva Reserva', message: `El cliente ${resInfo.clientName} tiene una reserva asignada a las ${resInfo.startTime}.`, time: new Date(), read: false, type: 'success' }, ...prev])
+        const added = addNotification({
+          title: 'Nueva Reserva',
+          message: `El cliente ${resInfo.clientName} tiene una reserva asignada a las ${resInfo.startTime}.`,
+          type: 'success'
+        })
+        if (added) {
+          toast.success('Nueva Reserva Asignada', { description: `${resInfo.clientName} ha reservado para las ${resInfo.startTime}`, duration: 10000, icon: '📅' })
+        }
       })
 
       socket.on('reserva_eliminada', (payload: { id: string, tableId: string }) => {
@@ -414,14 +392,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [])
 
-  const markNotificationAsRead = (id: string) => {
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)))
-  }
-
-  const clearNotifications = () => {
-    setNotifications([])
-  }
-
   const updateProductStatus = (id: string, status: ProductStatus) => {
     setProducts(products.map((p) => (p.id === id ? { ...p, status } : p)))
   }
@@ -553,6 +523,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const removeOrderItem = (tableId: string, productId: string) => {
+    let orderBecameEmpty = false
+
     setOrders((prev) => {
       const tableOrder = prev[tableId] || []
       const updatedOrder = tableOrder
@@ -564,22 +536,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         })
         .filter((item) => item.quantity > 0)
 
-      if (updatedOrder.length === 0) {
-        setTimeout(() => {
-          setReservations((currentReservations) => {
-            // GUARDAR EN LA BASE DE DATOS
-            updateTableStatus(tableId, 'Disponible')
-
-            return currentReservations
-          })
-        }, 0)
-      }
+      orderBecameEmpty = updatedOrder.length === 0
 
       return {
         ...prev,
         [tableId]: updatedOrder
       }
     })
+
+    // Efecto secundario fuera del setter: se ejecuta tras la actualización de estado
+    if (orderBecameEmpty) {
+      updateTableStatus(tableId, 'Disponible')
+    }
   }
 
   const clearOrder = async (tableId: string) => {
@@ -598,14 +566,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return newOrders
     })
 
-    setTimeout(() => {
-      setReservations((currentReservations) => {
-        // GUARDAR EN LA BASE DE DATOS
-        updateTableStatus(tableId, 'Disponible')
-
-        return currentReservations
-      })
-    }, 0)
+    // Efecto secundario fuera del setter: actualizar estado de mesa en backend y UI
+    updateTableStatus(tableId, 'Disponible')
   }
 
   const resetTableOrder = (tableId: string) => {
@@ -801,7 +763,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     tables,
     orders,
     reservations,
-    notifications,
     socket: socketInstance,
     updateProductStatus,
     updateTableStatus,
@@ -816,8 +777,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     reserveTable,
     cancelReservation,
     getActiveReservation,
-    markNotificationAsRead,
-    clearNotifications,
     setProducts,
     setTables,
     createTable,

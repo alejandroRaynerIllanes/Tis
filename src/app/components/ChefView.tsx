@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router'
 import { getStoredUser, api } from '../services/api'
 import { ordersService } from '../services/orders.service'
 import { useAppContext } from '../context/AppContext'
+import { MOCK_INGREDIENTS, sharedIngredientsStore } from './admin/InventoryManagement'
 
 type OrderStatus = 'Pendiente' | 'En preparación' | 'Listo'
 
@@ -29,6 +30,7 @@ interface Order {
 
 export function ChefView() {
   const [orders, setOrders] = useState<Order[]>([])
+  const [ingredients, setIngredients] = useState<any[]>(sharedIngredientsStore.get())
   const navigate = useNavigate()
   const { socket } = useAppContext()
 
@@ -97,6 +99,12 @@ export function ChefView() {
       socket.off('cocina:actualizar_tablero', handleActualizarTablero)
     }
   }, [socket])
+
+  useEffect(() => {
+    return sharedIngredientsStore.subscribe(() => {
+      setIngredients(sharedIngredientsStore.get())
+    })
+  }, [])
 
   // Función para cambiar el estado del pedido
   const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
@@ -245,6 +253,31 @@ export function ChefView() {
           </button>
         </div>
       </header>
+
+      {/* Panel Estado de Ingredientes */}
+      {ingredients.length > 0 && (
+        <div className="px-6 sm:px-10 pt-5 pb-1 shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden">
+          <div className="flex items-center gap-3">
+            <div className="text-sm font-black text-[#4B2E2D] shrink-0 mr-2">
+              Estado de Ingredientes
+            </div>
+            {ingredients.map(ing => {
+              const isLowStock = ing.stock <= ing.minStock;
+              return (
+                    <div key={ing.id} className={`flex flex-col gap-1 px-4 py-2.5 rounded-xl border shrink-0 transition-colors shadow-sm ${isLowStock ? 'bg-red-50 border-red-200' : 'bg-white border-[#E0D0C5]'}`}>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full shadow-inner ${isLowStock ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`} />
+                        <span className="font-bold text-[#4B2E2D] text-sm leading-none">{ing.name}</span>
+                      </div>
+                      <div className={`text-xs font-black ml-4 ${isLowStock ? 'text-red-600' : 'text-gray-500'}`}>
+                        {ing.stock} <span className="font-bold opacity-80">{ing.unit}</span>
+                      </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Tablero Kanban */}
       <div className="flex-1 p-6 sm:p-10 grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8 overflow-y-auto lg:overflow-hidden">

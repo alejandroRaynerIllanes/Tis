@@ -14,6 +14,7 @@ import { UserManagement } from './admin/UserManagement'
 import { ReportsSection } from './admin/ReportsSection'
 import { VIPClients } from './VIPClients'
 import { ActiveWaitersSection } from './admin/ActiveWaitersSection'
+import { InventoryManagement } from './admin/InventoryManagement'
 import { useAppContext } from '../context/AppContext'
 
 export function Catalog() {
@@ -97,6 +98,8 @@ export function Catalog() {
           <VIPClients />
         ) : activeView === 'waiters' ? (
           <ActiveWaitersSection />
+        ) : activeView === 'inventory' ? (
+          <InventoryManagement />
         ) : null}
       </main>
     </div>

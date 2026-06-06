@@ -38,9 +38,7 @@ export function ProtectedRoute({
 
     // Si se especifican roles permitidos y el rol del usuario no coincide → no autorizado
     if (allowedRoles && allowedRoles.length > 0) {
-      const isRoleAllowed = allowedRoles.some(
-        (r) => r.toLowerCase() === normalizedRole
-      )
+      const isRoleAllowed = allowedRoles.some((r) => r.toLowerCase() === normalizedRole)
       if (!isRoleAllowed) {
         setIsAuthorized(false)
         setIsChecking(false)

@@ -172,22 +172,31 @@ export const generateQrPdf = async (params: QrPdfParams): Promise<void> => {
   let y = 10
 
   doc.setFontSize(16)
-  doc.text('SABOR & GESTION', 40, y, { align: 'center' }); y += 8
+  doc.text('SABOR & GESTION', 40, y, { align: 'center' })
+  y += 8
   doc.setFontSize(12)
-  doc.text('Pago con QR', 40, y, { align: 'center' }); y += 5
+  doc.text('Pago con QR', 40, y, { align: 'center' })
+  y += 5
   doc.setFontSize(10)
-  doc.text('Escanee para pagar desde su celular', 40, y, { align: 'center' }); y += 8
-  doc.text('-----------------------------------------', 40, y, { align: 'center' }); y += 6
+  doc.text('Escanee para pagar desde su celular', 40, y, { align: 'center' })
+  y += 8
+  doc.text('-----------------------------------------', 40, y, { align: 'center' })
+  y += 6
 
-  doc.text(`Mesa: ${mesaNombre}`, 5, y); y += 5
-  doc.text(`Cliente: ${clienteNombre}`, 5, y); y += 5
-  doc.text(`Pedido: ${codigo}`, 5, y); y += 5
+  doc.text(`Mesa: ${mesaNombre}`, 5, y)
+  y += 5
+  doc.text(`Cliente: ${clienteNombre}`, 5, y)
+  y += 5
+  doc.text(`Pedido: ${codigo}`, 5, y)
+  y += 5
 
   doc.setFontSize(12)
-  doc.text(`Total a pagar: Bs. ${totalStr}`, 5, y); y += 8
+  doc.text(`Total a pagar: Bs. ${totalStr}`, 5, y)
+  y += 8
 
   doc.setFontSize(10)
-  doc.text('-----------------------------------------', 40, y, { align: 'center' }); y += 6
+  doc.text('-----------------------------------------', 40, y, { align: 'center' })
+  y += 6
 
   try {
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(simUrl)}&color=4B2E2D`
@@ -206,8 +215,12 @@ export const generateQrPdf = async (params: QrPdfParams): Promise<void> => {
   }
 
   doc.setFontSize(8)
-  const splitMsg = doc.splitTextToSize('Escanee este codigo QR con su camara para acceder a la pasarela de pago simulada', 70)
-  doc.text(splitMsg, 40, y, { align: 'center' }); y += 15
+  const splitMsg = doc.splitTextToSize(
+    'Escanee este codigo QR con su camara para acceder a la pasarela de pago simulada',
+    70
+  )
+  doc.text(splitMsg, 40, y, { align: 'center' })
+  y += 15
   doc.text('Gracias por su preferencia', 40, y, { align: 'center' })
 
   doc.save(`QR-Mesa-${mesaNombre}.pdf`)
@@ -225,35 +238,62 @@ export const generateReceiptPdf = (params: ReceiptPdfParams): void => {
   let y = 10
 
   doc.setFontSize(14)
-  doc.text('Sabor & Gestion', 40, y, { align: 'center' }); y += 6
+  doc.text('Sabor & Gestion', 40, y, { align: 'center' })
+  y += 6
   doc.setFontSize(10)
-  doc.text('Comprobante de Pago', 40, y, { align: 'center' }); y += 8
+  doc.text('Comprobante de Pago', 40, y, { align: 'center' })
+  y += 8
   doc.setFontSize(9)
-  doc.text(`Pedido: ${pedido.codigo || `PED-${String(pedido.pedidoId || pedido._id).slice(-4).toUpperCase()}`}`, 40, y, { align: 'center' }); y += 6
-  doc.text('-----------------------------------------', 40, y, { align: 'center' }); y += 6
+  doc.text(
+    `Pedido: ${
+      pedido.codigo ||
+      `PED-${String(pedido.pedidoId || pedido._id)
+        .slice(-4)
+        .toUpperCase()}`
+    }`,
+    40,
+    y,
+    { align: 'center' }
+  )
+  y += 6
+  doc.text('-----------------------------------------', 40, y, { align: 'center' })
+  y += 6
 
   const mesaName = pedido.mesaNombre || pedido.mesa?.numero || 'Barra'
-  const waiterName = pedido.meseroNombre || (pedido.usuario?.nombre ? `${pedido.usuario.nombre} ${pedido.usuario.apellido || ''}` : 'Mesero')
+  const waiterName =
+    pedido.meseroNombre ||
+    (pedido.usuario?.nombre
+      ? `${pedido.usuario.nombre} ${pedido.usuario.apellido || ''}`
+      : 'Mesero')
   const locationName = pedido.mesa?.ubicacion?.nombre || pedido.mesa?.location || 'Principal'
 
-  doc.text(`Mesa: ${mesaName}`, 5, y); y += 5
-  doc.text(`Area/Sala: ${locationName}`, 5, y); y += 5
-  doc.text(`Mesero: ${waiterName}`, 5, y); y += 5
-  doc.text(`Cajero: ${cashierName}`, 5, y); y += 6
-  doc.text('-----------------------------------------', 40, y, { align: 'center' }); y += 6
+  doc.text(`Mesa: ${mesaName}`, 5, y)
+  y += 5
+  doc.text(`Area/Sala: ${locationName}`, 5, y)
+  y += 5
+  doc.text(`Mesero: ${waiterName}`, 5, y)
+  y += 5
+  doc.text(`Cajero: ${cashierName}`, 5, y)
+  y += 6
+  doc.text('-----------------------------------------', 40, y, { align: 'center' })
+  y += 6
 
-  doc.text(`Cliente: ${pedido.clienteNombre || 'Consumidor Final'}`, 5, y); y += 5
+  doc.text(`Cliente: ${pedido.clienteNombre || 'Consumidor Final'}`, 5, y)
+  y += 5
   if (pedido.clienteCI || pedido.clienteNIT) {
-    doc.text(`CI/NIT: ${pedido.clienteCI || pedido.clienteNIT || 'S/N'}`, 5, y); y += 5
+    doc.text(`CI/NIT: ${pedido.clienteCI || pedido.clienteNIT || 'S/N'}`, 5, y)
+    y += 5
   }
-  doc.text('-----------------------------------------', 40, y, { align: 'center' }); y += 6
+  doc.text('-----------------------------------------', 40, y, { align: 'center' })
+  y += 6
 
-  doc.text('CANT   DESCRIPCION       P.U   SUBT', 5, y); y += 5
+  doc.text('CANT   DESCRIPCION       P.U   SUBT', 5, y)
+  y += 5
   ;(pedido.items || pedido.detalles || []).forEach((item: any) => {
     const name = item.nombre || item.plato?.nombre || 'Plato'
     const qty = item.cantidad || 1
     const pu = (item.precioUnitario || item.plato?.precio || 0).toFixed(2)
-    const sub = (item.subtotal || ((item.precioUnitario || item.plato?.precio || 0) * qty)).toFixed(2)
+    const sub = (item.subtotal || (item.precioUnitario || item.plato?.precio || 0) * qty).toFixed(2)
     doc.text(`${qty}`, 5, y)
     doc.text(`${name.substring(0, 12)}`, 15, y)
     doc.text(`${pu}`, 55, y, { align: 'right' })
@@ -262,33 +302,44 @@ export const generateReceiptPdf = (params: ReceiptPdfParams): void => {
   })
 
   y += 3
-  doc.text('-----------------------------------------', 40, y, { align: 'center' }); y += 6
+  doc.text('-----------------------------------------', 40, y, { align: 'center' })
+  y += 6
 
   const subtotal = (pedido.subtotalCierre || pedido.total || 0).toFixed(2)
   const discount = (pedido.montoDescuento || 0).toFixed(2)
   const tip = (pedido.montoPropina || 0).toFixed(2)
-  const total = ((pedido.subtotalCierre || pedido.total || 0) - (pedido.montoDescuento || 0) + (pedido.montoPropina || 0)).toFixed(2)
+  const total = (
+    (pedido.subtotalCierre || pedido.total || 0) -
+    (pedido.montoDescuento || 0) +
+    (pedido.montoPropina || 0)
+  ).toFixed(2)
 
   doc.text('Subtotal:', 5, y)
-  doc.text(`Bs. ${subtotal}`, 75, y, { align: 'right' }); y += 5
+  doc.text(`Bs. ${subtotal}`, 75, y, { align: 'right' })
+  y += 5
   if (Number(discount) > 0) {
     doc.text('Descuento:', 5, y)
-    doc.text(`- Bs. ${discount}`, 75, y, { align: 'right' }); y += 5
+    doc.text(`- Bs. ${discount}`, 75, y, { align: 'right' })
+    y += 5
   }
   if (Number(tip) > 0) {
     doc.text('Propina:', 5, y)
-    doc.text(`+ Bs. ${tip}`, 75, y, { align: 'right' }); y += 5
+    doc.text(`+ Bs. ${tip}`, 75, y, { align: 'right' })
+    y += 5
   }
 
   doc.setFontSize(12)
   doc.text('TOTAL FINAL:', 5, y)
-  doc.text(`Bs. ${total}`, 75, y, { align: 'right' }); y += 8
+  doc.text(`Bs. ${total}`, 75, y, { align: 'right' })
+  y += 8
 
   doc.setFontSize(10)
-  doc.text(`Metodo Pago: ${pedido.paymentMethod || 'Efectivo'}`, 5, y); y += 5
+  doc.text(`Metodo Pago: ${pedido.paymentMethod || 'Efectivo'}`, 5, y)
+  y += 5
 
   const now = new Date()
-  doc.text(`Fecha: ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`, 5, y); y += 10
+  doc.text(`Fecha: ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`, 5, y)
+  y += 10
 
   doc.text('¡Gracias por su preferencia!', 40, y, { align: 'center' })
   doc.save(`Factura-${pedido.codigo || pedido.pedidoId || 'Pago'}.pdf`)
@@ -306,53 +357,85 @@ export const generateZReportPdf = (params: ZReportPdfParams): void => {
   let y = 10
 
   doc.setFontSize(14)
-  doc.text('Sabor & Gestion', 40, y, { align: 'center' }); y += 6
+  doc.text('Sabor & Gestion', 40, y, { align: 'center' })
+  y += 6
   doc.setFontSize(10)
-  doc.text('REPORTE DE CIERRE DE CAJA', 40, y, { align: 'center' }); y += 8
+  doc.text('REPORTE DE CIERRE DE CAJA', 40, y, { align: 'center' })
+  y += 8
 
   doc.setFontSize(9)
-  doc.text('DATOS DEL CAJERO', 5, y); y += 5
-  doc.text(`Nombre: ${cashierName}`, 5, y); y += 5
-  doc.text(`ID Cajero: ${cajeroId || 'N/A'}`, 5, y); y += 5
-  doc.text('Caja Utilizada: Caja Principal 01', 5, y); y += 6
+  doc.text('DATOS DEL CAJERO', 5, y)
+  y += 5
+  doc.text(`Nombre: ${cashierName}`, 5, y)
+  y += 5
+  doc.text(`ID Cajero: ${cajeroId || 'N/A'}`, 5, y)
+  y += 5
+  doc.text('Caja Utilizada: Caja Principal 01', 5, y)
+  y += 6
 
-  doc.text('DATOS DE TIEMPO', 5, y); y += 5
+  doc.text('DATOS DE TIEMPO', 5, y)
+  y += 5
   const now = new Date()
-  const startOfDay = new Date(); startOfDay.setHours(8, 0, 0, 0)
-  doc.text(`Apertura: ${startOfDay.toLocaleTimeString()}`, 5, y); y += 5
-  doc.text(`Cierre: ${now.toLocaleTimeString()}`, 5, y); y += 5
+  const startOfDay = new Date()
+  startOfDay.setHours(8, 0, 0, 0)
+  doc.text(`Apertura: ${startOfDay.toLocaleTimeString()}`, 5, y)
+  y += 5
+  doc.text(`Cierre: ${now.toLocaleTimeString()}`, 5, y)
+  y += 5
   const diffMs = now.getTime() - startOfDay.getTime()
   const diffHrs = Math.floor(diffMs / 3600000)
   const diffMins = Math.floor((diffMs % 3600000) / 60000)
-  doc.text(`Duracion: ${diffHrs}h ${diffMins}m`, 5, y); y += 6
+  doc.text(`Duracion: ${diffHrs}h ${diffMins}m`, 5, y)
+  y += 6
 
-  doc.text('-----------------------------------------', 40, y, { align: 'center' }); y += 6
+  doc.text('-----------------------------------------', 40, y, { align: 'center' })
+  y += 6
 
   doc.setFontSize(10)
-  doc.text('DATOS FINANCIEROS', 40, y, { align: 'center' }); y += 6
+  doc.text('DATOS FINANCIEROS', 40, y, { align: 'center' })
+  y += 6
   doc.setFontSize(9)
-  doc.text(`Pagos Realizados: ${stats.pagosProcesados}`, 5, y); y += 5
-  doc.text(`Subtotal General: Bs. ${(stats.totalDia + stats.descuentos - stats.propinas).toFixed(2)}`, 5, y); y += 5
-  doc.text(`Descuentos Aplicados: Bs. ${stats.descuentos.toFixed(2)}`, 5, y); y += 5
-  doc.text(`Propinas Recibidas: Bs. ${stats.propinas.toFixed(2)}`, 5, y); y += 6
+  doc.text(`Pagos Realizados: ${stats.pagosProcesados}`, 5, y)
+  y += 5
+  doc.text(
+    `Subtotal General: Bs. ${(stats.totalDia + stats.descuentos - stats.propinas).toFixed(2)}`,
+    5,
+    y
+  )
+  y += 5
+  doc.text(`Descuentos Aplicados: Bs. ${stats.descuentos.toFixed(2)}`, 5, y)
+  y += 5
+  doc.text(`Propinas Recibidas: Bs. ${stats.propinas.toFixed(2)}`, 5, y)
+  y += 6
 
   doc.setFontSize(11)
-  doc.text(`TOTAL VENDIDO: Bs. ${stats.totalDia.toFixed(2)}`, 5, y); y += 8
+  doc.text(`TOTAL VENDIDO: Bs. ${stats.totalDia.toFixed(2)}`, 5, y)
+  y += 8
 
   doc.setFontSize(10)
-  doc.text('METODOS DE PAGO', 40, y, { align: 'center' }); y += 6
+  doc.text('METODOS DE PAGO', 40, y, { align: 'center' })
+  y += 6
   doc.setFontSize(9)
-  doc.text(`Total en Efectivo: Bs. ${stats.efectivo.toFixed(2)}`, 5, y); y += 5
-  doc.text(`Total en QR: Bs. ${stats.qr.toFixed(2)}`, 5, y); y += 5
-  doc.text(`Total en Tarjeta: Bs. ${stats.tarjeta.toFixed(2)}`, 5, y); y += 6
+  doc.text(`Total en Efectivo: Bs. ${stats.efectivo.toFixed(2)}`, 5, y)
+  y += 5
+  doc.text(`Total en QR: Bs. ${stats.qr.toFixed(2)}`, 5, y)
+  y += 5
+  doc.text(`Total en Tarjeta: Bs. ${stats.tarjeta.toFixed(2)}`, 5, y)
+  y += 6
 
-  doc.text('INFORMACION OPERATIVA', 5, y); y += 5
-  doc.text(`Mesas Atendidas: ${stats.pagosProcesados}`, 5, y); y += 5
-  doc.text(`Pedidos Cobrados: ${stats.pagosProcesados}`, 5, y); y += 5
-  doc.text('Pagos Anulados: 0', 5, y); y += 6
+  doc.text('INFORMACION OPERATIVA', 5, y)
+  y += 5
+  doc.text(`Mesas Atendidas: ${stats.pagosProcesados}`, 5, y)
+  y += 5
+  doc.text(`Pedidos Cobrados: ${stats.pagosProcesados}`, 5, y)
+  y += 5
+  doc.text('Pagos Anulados: 0', 5, y)
+  y += 6
 
-  doc.text('-----------------------------------------', 40, y, { align: 'center' }); y += 6
-  doc.text('Reporte enviado y sincronizado', 40, y, { align: 'center' }); y += 4
+  doc.text('-----------------------------------------', 40, y, { align: 'center' })
+  y += 6
+  doc.text('Reporte enviado y sincronizado', 40, y, { align: 'center' })
+  y += 4
   doc.text('con la Base de Datos (MongoDB)', 40, y, { align: 'center' })
 
   doc.save(`Cierre-Caja-${cashierName.replace(/\s+/g, '')}-${now.getTime()}.pdf`)

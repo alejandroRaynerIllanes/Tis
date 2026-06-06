@@ -35,9 +35,11 @@ function useTableFilters(tables: Table[]) {
   const [dbLocations, setDbLocations] = useState<string[]>([])
 
   const LOCATIONS = useMemo(() => {
-    const hasVipTables = tables.some(t => t.type === 'vip')
+    const hasVipTables = tables.some((t) => t.type === 'vip')
     const baseLocations = ['Todas', ...Array.from(new Set(dbLocations)).sort()]
-    const cleanedLocations = baseLocations.filter(loc => loc.toLowerCase() !== 'zona vip' && loc.toLowerCase() !== 'vip')
+    const cleanedLocations = baseLocations.filter(
+      (loc) => loc.toLowerCase() !== 'zona vip' && loc.toLowerCase() !== 'vip'
+    )
     if (hasVipTables) cleanedLocations.push('VIP')
     return cleanedLocations
   }, [tables, dbLocations])
@@ -47,9 +49,10 @@ function useTableFilters(tables: Table[]) {
 
   useEffect(() => {
     const fetchLocations = () => {
-      locationsService.getAll()
-        .then(data => {
-          const validNames = data.map(l => l.name?.trim() || '').filter(Boolean)
+      locationsService
+        .getAll()
+        .then((data) => {
+          const validNames = data.map((l) => l.name?.trim() || '').filter(Boolean)
           setDbLocations(validNames)
         })
         .catch(() => {})
@@ -63,7 +66,8 @@ function useTableFilters(tables: Table[]) {
     return tables.filter((t) => {
       const isVIPLocation = activeLocation.toLowerCase() === 'vip'
       const tableLoc = getTableLocation(t).toLowerCase()
-      const locationMatch = activeLocation === 'Todas' || 
+      const locationMatch =
+        activeLocation === 'Todas' ||
         (isVIPLocation ? t.type === 'vip' : tableLoc === activeLocation.toLowerCase())
       return locationMatch && (stateFilter === 'all' || t.status === stateFilter)
     })
@@ -72,28 +76,45 @@ function useTableFilters(tables: Table[]) {
   const locationTables = useMemo(() => {
     return activeLocation === 'Todas'
       ? tables
-      : tables.filter((t) => activeLocation.toLowerCase() === 'vip' ? t.type === 'vip' : getTableLocation(t).toLowerCase() === activeLocation.toLowerCase())
+      : tables.filter((t) =>
+          activeLocation.toLowerCase() === 'vip'
+            ? t.type === 'vip'
+            : getTableLocation(t).toLowerCase() === activeLocation.toLowerCase()
+        )
   }, [tables, activeLocation])
 
   const tableCounts = useMemo(() => {
-    return locationTables.reduce((acc, t) => {
-      acc[t.status] = (acc[t.status] ?? 0) + 1
-      return acc
-    }, {} as Record<string, number>)
+    return locationTables.reduce(
+      (acc, t) => {
+        acc[t.status] = (acc[t.status] ?? 0) + 1
+        return acc
+      },
+      {} as Record<string, number>
+    )
   }, [locationTables])
 
   const totalInLocation = locationTables.length
-  
-  return { LOCATIONS, activeLocation, setActiveLocation, stateFilter, setStateFilter, filteredTables, tableCounts, totalInLocation }
+
+  return {
+    LOCATIONS,
+    activeLocation,
+    setActiveLocation,
+    stateFilter,
+    setStateFilter,
+    filteredTables,
+    tableCounts,
+    totalInLocation
+  }
 }
 
 // ─── Hook Interno 2: Gestión de Modales de Reserva ─────────────────────────
 function useReservationManager(tables: Table[], reserveTable: any, cancelReservation: any) {
   const [reservingTableId, setReservingTableId] = useState<string | null>(null)
   const [viewingReservationsTableId, setViewingReservationsTableId] = useState<string | null>(null)
-  const [cancelingReservationTableId, setCancelingReservationTableId] = useState<string | null>(null)
+  const [cancelingReservationTableId, setCancelingReservationTableId] = useState<string | null>(
+    null
+  )
   const [cancelingReservationId, setCancelingReservationId] = useState<string | null>(null)
-
 
   const openReserveModal = (e: MouseEvent<HTMLButtonElement>, tableId: string) => {
     e.stopPropagation()
@@ -108,12 +129,14 @@ function useReservationManager(tables: Table[], reserveTable: any, cancelReserva
     try {
       const reservingTable = tables.find((t) => t.id === reservingTableId)
       const tableName = reservingTable?.name || 'Mesa'
-      
+
       if (reservingTable && formData.guestCount > (reservingTable.capacity || 0)) {
-        toast.error(`La cantidad de personas supera la capacidad de la mesa (${reservingTable.capacity}).`)
+        toast.error(
+          `La cantidad de personas supera la capacidad de la mesa (${reservingTable.capacity}).`
+        )
         return
       }
-      
+
       const result = await reserveTable(reservingTableId, {
         location: formData.location,
         clientName: formData.clientName,
@@ -145,14 +168,21 @@ function useReservationManager(tables: Table[], reserveTable: any, cancelReserva
     }
   }
 
-  const openReservationsListModal = (e: MouseEvent<HTMLButtonElement | HTMLDivElement>, tableId: string) => {
+  const openReservationsListModal = (
+    e: MouseEvent<HTMLButtonElement | HTMLDivElement>,
+    tableId: string
+  ) => {
     e.stopPropagation()
     setViewingReservationsTableId(tableId)
   }
 
   const closeReservationsListModal = () => setViewingReservationsTableId(null)
 
-  const openCancelReservationModal = (e: MouseEvent<HTMLButtonElement>, tableId: string, reservationId: string) => {
+  const openCancelReservationModal = (
+    e: MouseEvent<HTMLButtonElement>,
+    tableId: string,
+    reservationId: string
+  ) => {
     e.stopPropagation()
     setCancelingReservationTableId(tableId)
     setCancelingReservationId(reservationId)
@@ -176,16 +206,34 @@ function useReservationManager(tables: Table[], reserveTable: any, cancelReserva
   }
 
   return {
-    reservingTableId, viewingReservationsTableId, cancelingReservationTableId, cancelingReservationId,
-    openReserveModal, closeReserveModal, handleConfirmReservation, openReservationsListModal, closeReservationsListModal,
-    openCancelReservationModal, closeCancelReservationModal, handleConfirmCancelReservation
+    reservingTableId,
+    viewingReservationsTableId,
+    cancelingReservationTableId,
+    cancelingReservationId,
+    openReserveModal,
+    closeReserveModal,
+    handleConfirmReservation,
+    openReservationsListModal,
+    closeReservationsListModal,
+    openCancelReservationModal,
+    closeCancelReservationModal,
+    handleConfirmCancelReservation
   }
 }
 
 // ─── Hook Principal (Composición) ──────────────────────────────────────────
 export function useWaiterLogic() {
   const context = useAppContext()
-  const { tables, orders, reservations, closeTable, reserveTable, cancelReservation, getActiveReservation, resetTableOrder } = context
+  const {
+    tables,
+    orders,
+    reservations,
+    closeTable,
+    reserveTable,
+    cancelReservation,
+    getActiveReservation,
+    resetTableOrder
+  } = context
 
   const tableFilters = useTableFilters(tables)
   const resManager = useReservationManager(tables, reserveTable, cancelReservation)
@@ -211,12 +259,20 @@ export function useWaiterLogic() {
   const openPaymentModal = () => setShowPaymentModal(true)
   const closePaymentModal = () => setShowPaymentModal(false)
 
-  const handleProcessPayment = async (method: string, discountPercent: number, tipPercent: number) => {
+  const handleProcessPayment = async (
+    method: string,
+    discountPercent: number,
+    tipPercent: number
+  ) => {
     if (!activeTableId) return
 
     try {
       const allOrders = await ordersService.getAll()
-      const tableOrder = allOrders.find(o => (o.mesa?._id === activeTableId || o.mesa === activeTableId) && ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO', 'SERVIDO'].includes(o.estado))
+      const tableOrder = allOrders.find(
+        (o) =>
+          (o.mesa?._id === activeTableId || o.mesa === activeTableId) &&
+          ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO', 'SERVIDO'].includes(o.estado)
+      )
       if (tableOrder) {
         await api.post(`/pagos/procesar-final/${tableOrder._id || tableOrder.id}`, {
           metodoPago: method,
@@ -224,7 +280,9 @@ export function useWaiterLogic() {
           porcentajePropina: tipPercent
         })
       }
-    } catch (e) { console.error('Error al procesar pago en BD', e) }
+    } catch (e) {
+      console.error('Error al procesar pago en BD', e)
+    }
 
     closeTable(activeTableId)
     setActiveTableId(null)

@@ -180,11 +180,7 @@ export function Login() {
                   border: '1px solid rgba(220,38,38,0.3)'
                 }}
               >
-                <AlertCircle
-                  size={18}
-                  className="shrink-0 mt-0.5"
-                  style={{ color: '#DC2626' }}
-                />
+                <AlertCircle size={18} className="shrink-0 mt-0.5" style={{ color: '#DC2626' }} />
                 <p className="text-sm font-medium" style={{ color: '#DC2626' }}>
                   {error}
                 </p>

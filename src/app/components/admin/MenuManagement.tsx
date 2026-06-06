@@ -290,9 +290,13 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
   const validateCategoryName = (name: string, currentEditingId: string | null) => {
     const trimmed = name.trim()
     if (!trimmed) return 'El nombre de la categoría es requerido. Ejemplo: "Bebidas"'
-    if (trimmed.length < 3 || /^(.)\1+$/.test(trimmed)) return 'Ingresa un nombre válido de al menos 3 caracteres.'
-    if (!/^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s]+$/.test(trimmed)) return 'El nombre solo debe contener letras y espacios. Ejemplo: "Postres"'
-    const isDuplicate = categories.some((cat) => cat.label.toLowerCase() === trimmed.toLowerCase() && cat.id !== currentEditingId)
+    if (trimmed.length < 3 || /^(.)\1+$/.test(trimmed))
+      return 'Ingresa un nombre válido de al menos 3 caracteres.'
+    if (!/^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s]+$/.test(trimmed))
+      return 'El nombre solo debe contener letras y espacios. Ejemplo: "Postres"'
+    const isDuplicate = categories.some(
+      (cat) => cat.label.toLowerCase() === trimmed.toLowerCase() && cat.id !== currentEditingId
+    )
     if (isDuplicate) return 'Ya existe una categoría con ese nombre. Por favor, elige otro.'
     return null
   }
@@ -310,7 +314,9 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
     try {
       if (categoryEditingId) {
         const updated = await categoriesService.update(categoryEditingId, nombreLimpio)
-        setCategories(categories.map((c) => c.id === categoryEditingId ? { ...c, label: updated.nombre } : c))
+        setCategories(
+          categories.map((c) => (c.id === categoryEditingId ? { ...c, label: updated.nombre } : c))
+        )
         toast.success('Categoría actualizada exitosamente.')
       } else {
         const created = await categoriesService.create(nombreLimpio)
@@ -440,7 +446,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
                               alt={dish.name}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                             />
-                          <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent opacity-60"></div>
+                            <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent opacity-60"></div>
                             <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full font-bold text-[#4B2E2D] shadow-sm">
                               {dish.price} Bs.
                             </div>
@@ -723,7 +729,9 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
                 className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none mb-2 ${categoryError ? 'border-red-500 focus:border-red-600 bg-red-50 text-red-900' : 'border-[#E57C5D] focus:border-[#D0543A] text-[#4B2E2D]'}`}
                 placeholder="Ej: Platos Especiales"
               />
-              {categoryError && <p className="text-red-500 text-xs font-bold mb-4 leading-tight">{categoryError}</p>}
+              {categoryError && (
+                <p className="text-red-500 text-xs font-bold mb-4 leading-tight">{categoryError}</p>
+              )}
               <div className="flex justify-end gap-4">
                 <button
                   disabled={!!categoryError || !categoryFormData.label.trim()}

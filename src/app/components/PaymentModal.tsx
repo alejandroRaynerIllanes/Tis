@@ -114,7 +114,10 @@ export function PaymentModal({
 
             <div className="space-y-2 mb-4">
               {activeOrder.map((item, index) => (
-                <div key={item.product.id || index} className="flex justify-between items-center text-sm">
+                <div
+                  key={item.product.id || index}
+                  className="flex justify-between items-center text-sm"
+                >
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-gray-400 w-6">{item.quantity}x</span>
                     <span className="font-medium text-[#4B2E2D]">{item.product.name}</span>
@@ -135,21 +138,26 @@ export function PaymentModal({
               {discountPercent > 0 && (
                 <div className="flex justify-between items-center text-sm text-green-600">
                   <span className="font-semibold">Descuento ({discountPercent}%)</span>
-                  <span className="font-bold">- Bs. {((orderTotal * discountPercent) / 100).toFixed(2)}</span>
+                  <span className="font-bold">
+                    - Bs. {((orderTotal * discountPercent) / 100).toFixed(2)}
+                  </span>
                 </div>
               )}
 
               {tipPercent > 0 && (
                 <div className="flex justify-between items-center text-sm text-[#D96C4A]">
                   <span className="font-semibold">Propina ({tipPercent}%)</span>
-                  <span className="font-bold">+ Bs. {((orderTotal * tipPercent) / 100).toFixed(2)}</span>
+                  <span className="font-bold">
+                    + Bs. {((orderTotal * tipPercent) / 100).toFixed(2)}
+                  </span>
                 </div>
               )}
 
               <div className="flex justify-between items-center pt-2 border-t border-gray-200">
                 <span className="font-black text-lg text-[#4B2E2D]">Total Final</span>
                 <span className="font-black text-2xl text-[#D96C4A]">
-                  Bs. {(orderTotal * (1 - discountPercent / 100) * (1 + tipPercent / 100)).toFixed(2)}
+                  Bs.{' '}
+                  {(orderTotal * (1 - discountPercent / 100) * (1 + tipPercent / 100)).toFixed(2)}
                 </span>
               </div>
             </div>
@@ -163,7 +171,14 @@ export function PaymentModal({
               </label>
               <div className="flex gap-2">
                 {[0, 5, 10, 15].map((percent) => (
-                  <button key={percent} onClick={() => setDiscountPercent(percent)} disabled={paymentProcessing} className={`flex-1 py-2 px-2 rounded-lg text-xs font-bold transition-all ${discountPercent === percent ? 'bg-green-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'} disabled:opacity-50`}>{percent}%</button>
+                  <button
+                    key={percent}
+                    onClick={() => setDiscountPercent(percent)}
+                    disabled={paymentProcessing}
+                    className={`flex-1 py-2 px-2 rounded-lg text-xs font-bold transition-all ${discountPercent === percent ? 'bg-green-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'} disabled:opacity-50`}
+                  >
+                    {percent}%
+                  </button>
                 ))}
               </div>
             </div>
@@ -174,7 +189,14 @@ export function PaymentModal({
               </label>
               <div className="flex gap-2">
                 {[0, 5, 10, 15].map((percent) => (
-                  <button key={percent} onClick={() => setTipPercent(percent)} disabled={paymentProcessing} className={`flex-1 py-2 px-2 rounded-lg text-xs font-bold transition-all ${tipPercent === percent ? 'bg-[#D96C4A] text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'} disabled:opacity-50`}>{percent}%</button>
+                  <button
+                    key={percent}
+                    onClick={() => setTipPercent(percent)}
+                    disabled={paymentProcessing}
+                    className={`flex-1 py-2 px-2 rounded-lg text-xs font-bold transition-all ${tipPercent === percent ? 'bg-[#D96C4A] text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'} disabled:opacity-50`}
+                  >
+                    {percent}%
+                  </button>
                 ))}
               </div>
             </div>
@@ -190,7 +212,12 @@ export function PaymentModal({
                 { id: 'qr', label: 'QR', icon: <QrCode size={20} /> },
                 { id: 'transferencia', label: 'Transferencia', icon: <Smartphone size={20} /> }
               ].map((method) => (
-                <button key={method.id} onClick={() => setSelectedPaymentMethod(method.id)} disabled={paymentProcessing} className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl font-bold transition-all ${selectedPaymentMethod === method.id ? 'bg-[#D96C4A] text-white shadow-lg ring-2 ring-[#D96C4A] ring-offset-2' : 'bg-gray-50 text-[#4B2E2D] hover:bg-gray-100 border border-gray-200'} disabled:opacity-50`}>
+                <button
+                  key={method.id}
+                  onClick={() => setSelectedPaymentMethod(method.id)}
+                  disabled={paymentProcessing}
+                  className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl font-bold transition-all ${selectedPaymentMethod === method.id ? 'bg-[#D96C4A] text-white shadow-lg ring-2 ring-[#D96C4A] ring-offset-2' : 'bg-gray-50 text-[#4B2E2D] hover:bg-gray-100 border border-gray-200'} disabled:opacity-50`}
+                >
                   {method.icon} <span className="text-sm">{method.label}</span>
                 </button>
               ))}
@@ -200,12 +227,27 @@ export function PaymentModal({
 
         {/* Footer */}
         <div className="p-6 bg-white border-t border-gray-200 flex flex-col-reverse sm:flex-row gap-3">
-          <button onClick={handleClose} disabled={paymentProcessing} className="flex-1 py-3.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold transition-all disabled:opacity-50">Cancelar</button>
-          <button onClick={handleProcess} disabled={!selectedPaymentMethod || paymentProcessing} className="flex-1 py-3.5 rounded-xl bg-[#D96C4A] hover:bg-[#C25838] text-white font-black shadow-lg shadow-[#D96C4A]/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+          <button
+            onClick={handleClose}
+            disabled={paymentProcessing}
+            className="flex-1 py-3.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold transition-all disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleProcess}
+            disabled={!selectedPaymentMethod || paymentProcessing}
+            className="flex-1 py-3.5 rounded-xl bg-[#D96C4A] hover:bg-[#C25838] text-white font-black shadow-lg shadow-[#D96C4A]/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             {paymentProcessing ? (
-              <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Procesando...</>
+              <>
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />{' '}
+                Procesando...
+              </>
             ) : (
-              <><CheckCircle2 size={20} /> Confirmar Pago</>
+              <>
+                <CheckCircle2 size={20} /> Confirmar Pago
+              </>
             )}
           </button>
         </div>

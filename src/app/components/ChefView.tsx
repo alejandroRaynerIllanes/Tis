@@ -35,17 +35,31 @@ export function ChefView() {
   const { socket } = useAppContext()
 
   const currentUser = getStoredUser()
-  const chefName = currentUser ? `${currentUser.nombre} ${currentUser.apellido || ''}`.trim() : 'Cocinero'
+  const chefName = currentUser
+    ? `${currentUser.nombre} ${currentUser.apellido || ''}`.trim()
+    : 'Cocinero'
 
   const formatOrder = (o: any): Order => ({
     // Si es un pedido antiguo sin código, generamos uno a partir del _id para que jamás se vea el hash largo
-    id: o.codigo || `PED-${String(o._id || '').slice(-4).toUpperCase()}`,
+    id:
+      o.codigo ||
+      `PED-${String(o._id || '')
+        .slice(-4)
+        .toUpperCase()}`,
     rawId: o._id,
     table: o.mesa?.numero || o.mesa?.name || 'Mesa ?',
     tableId: o.mesa?._id || o.mesa?.id || o.mesa,
     waiter: o.usuario?.nombre ? `${o.usuario.nombre} ${o.usuario.apellido || ''}`.trim() : 'Mesero',
-    time: new Date(o.fechaHora || o.createdAt || Date.now()).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-    status: o.estado === 'ABIERTO' ? 'Pendiente' : o.estado === 'EN_PREPARACION' ? 'En preparación' : 'Listo',
+    time: new Date(o.fechaHora || o.createdAt || Date.now()).toLocaleTimeString('es-ES', {
+      hour: '2-digit',
+      minute: '2-digit'
+    }),
+    status:
+      o.estado === 'ABIERTO'
+        ? 'Pendiente'
+        : o.estado === 'EN_PREPARACION'
+          ? 'En preparación'
+          : 'Listo',
     isVip: o.mesa?.tipo === 'vip' || o.vip,
     items: (o.detalles || []).map((d: any, idx: number) => ({
       id: d.plato?._id || String(idx),
@@ -60,7 +74,7 @@ export function ChefView() {
       try {
         const res: any = await api.get('/pedidos?activo=true')
         const activeOrders = res.data || res || []
-        
+
         setOrders(activeOrders.map(formatOrder))
       } catch (err) {
         console.error('Error fetching orders', err)
@@ -73,7 +87,7 @@ export function ChefView() {
     if (!socket) return
 
     const handleNuevoPedido = (o: any) => {
-      setOrders(prev => [formatOrder(o), ...prev])
+      setOrders((prev) => [formatOrder(o), ...prev])
       toast.info(`🔔 ¡Nuevo pedido recibido! (${o.codigo || 'Mesa'})`)
     }
 
@@ -81,11 +95,11 @@ export function ChefView() {
       // Si el pedido fue cancelado o cobrado, desaparece de la vista.
       // Si está en 'ENTREGADO' (Listo), se queda en la última columna hasta que se pague.
       if (['CANCELADO', 'CERRADO'].includes(o.estado)) {
-        setOrders(prev => prev.filter(ord => ord.rawId !== o._id))
+        setOrders((prev) => prev.filter((ord) => ord.rawId !== o._id))
       } else {
-        setOrders(prev => {
-          const exists = prev.find(ord => ord.rawId === o._id)
-          if (exists) return prev.map(ord => ord.rawId === o._id ? formatOrder(o) : ord)
+        setOrders((prev) => {
+          const exists = prev.find((ord) => ord.rawId === o._id)
+          if (exists) return prev.map((ord) => (ord.rawId === o._id ? formatOrder(o) : ord))
           return [formatOrder(o), ...prev]
         })
       }
@@ -94,7 +108,7 @@ export function ChefView() {
     socket.on('cocina:nuevo_pedido', handleNuevoPedido)
     socket.on('cocina:actualizar_tablero', handleActualizarTablero)
 
-    return () => { 
+    return () => {
       socket.off('cocina:nuevo_pedido', handleNuevoPedido)
       socket.off('cocina:actualizar_tablero', handleActualizarTablero)
     }
@@ -108,20 +122,35 @@ export function ChefView() {
 
   // Función para cambiar el estado del pedido
   const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
-    const order = orders.find(o => o.id === orderId)
+    const order = orders.find((o) => o.id === orderId)
     if (!order || !order.rawId) return
-    const backendStatus = newStatus === 'Pendiente' ? 'ABIERTO' : newStatus === 'En preparación' ? 'EN_PREPARACION' : 'ENTREGADO'
-    
+    const backendStatus =
+      newStatus === 'Pendiente'
+        ? 'ABIERTO'
+        : newStatus === 'En preparación'
+          ? 'EN_PREPARACION'
+          : 'ENTREGADO'
+
     try {
       await ordersService.updateStatus(order.rawId, backendStatus)
-      setOrders((prevOrders) => prevOrders.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)))
-      
+      setOrders((prevOrders) =>
+        prevOrders.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
+      )
+
       if (socket) {
         if (newStatus === 'Listo') {
-          socket.emit('pedido:listo', { pedidoId: order.rawId, mesaId: order.tableId, mesaNombre: order.table });
-          socket.emit('mesas:alerta_listo', { pedidoId: order.rawId, mesaId: order.tableId, mesaNombre: order.table });
+          socket.emit('pedido:listo', {
+            pedidoId: order.rawId,
+            mesaId: order.tableId,
+            mesaNombre: order.table
+          })
+          socket.emit('mesas:alerta_listo', {
+            pedidoId: order.rawId,
+            mesaId: order.tableId,
+            mesaNombre: order.table
+          })
         }
-        socket.emit('cocina:actualizar_tablero', { _id: order.rawId, estado: backendStatus });
+        socket.emit('cocina:actualizar_tablero', { _id: order.rawId, estado: backendStatus })
       }
 
       if (newStatus === 'En preparación') toast.success(`Pedido ${orderId} en preparación 🔥`)
@@ -238,7 +267,9 @@ export function ChefView() {
           <div>
             <h1 className="text-xl sm:text-3xl font-black text-[#4B2E2D]">Cocina (KDS)</h1>
             <p className="text-[#4B2E2D]/70 font-medium text-sm mt-1">
-              <span className="bg-white px-3 py-1 rounded-lg border border-[#E57C5D]/30 shadow-sm font-black text-[#D0543A]">👨‍🍳 Chef: {chefName}</span>
+              <span className="bg-white px-3 py-1 rounded-lg border border-[#E57C5D]/30 shadow-sm font-black text-[#D0543A]">
+                👨‍🍳 Chef: {chefName}
+              </span>
             </p>
           </div>
         </div>
@@ -281,7 +312,6 @@ export function ChefView() {
 
       {/* Tablero Kanban */}
       <div className="flex-1 p-6 sm:p-10 grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8 overflow-y-auto lg:overflow-hidden">
-        
         {/* Columna: Pendientes */}
         <div className="flex flex-col gap-4 overflow-hidden h-full">
           <div className="flex items-center justify-between pb-2 border-b-2 border-yellow-200 shrink-0">
@@ -293,7 +323,9 @@ export function ChefView() {
             </span>
           </div>
           <div className="flex-1 overflow-y-auto pr-2 space-y-4 pb-4">
-            {pendingOrders.map(order => <OrderCard key={order.id} order={order} />)}
+            {pendingOrders.map((order) => (
+              <OrderCard key={order.id} order={order} />
+            ))}
           </div>
         </div>
 
@@ -308,7 +340,9 @@ export function ChefView() {
             </span>
           </div>
           <div className="flex-1 overflow-y-auto pr-2 space-y-4 pb-4">
-            {prepOrders.map(order => <OrderCard key={order.id} order={order} />)}
+            {prepOrders.map((order) => (
+              <OrderCard key={order.id} order={order} />
+            ))}
           </div>
         </div>
 
@@ -323,10 +357,11 @@ export function ChefView() {
             </span>
           </div>
           <div className="flex-1 overflow-y-auto pr-2 space-y-4 pb-4">
-            {readyOrders.map(order => <OrderCard key={order.id} order={order} />)}
+            {readyOrders.map((order) => (
+              <OrderCard key={order.id} order={order} />
+            ))}
           </div>
         </div>
-
       </div>
     </div>
   )

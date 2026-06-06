@@ -28,7 +28,8 @@ export const locationsService = {
     }
   },
 
-  update: (id: string, nombre: string) => api.put<BackendLocation>(`/ubicaciones/${id}`, { nombre }),
+  update: (id: string, nombre: string) =>
+    api.put<BackendLocation>(`/ubicaciones/${id}`, { nombre }),
 
   remove: (id: string) => api.delete<{ mensaje: string }>(`/ubicaciones/${id}`)
 }

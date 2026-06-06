@@ -1,5 +1,13 @@
 //src/app/context/AppContext.tsx
-import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useRef } from 'react'
+import React, {
+  createContext,
+  useContext,
+  useState,
+  ReactNode,
+  useEffect,
+  useCallback,
+  useRef
+} from 'react'
 import { io } from 'socket.io-client'
 import { getToken, getStoredUser, api } from '../services/api'
 import { toast } from 'sonner'
@@ -67,7 +75,10 @@ const validarNombreMesa = (nombre: string): { valido: boolean; mensaje?: string 
   const nom = nombre.toLowerCase().trim()
 
   if (nombre.length > 25) {
-    return { valido: false, mensaje: 'El identificador de mesa no puede superar los 25 caracteres.' }
+    return {
+      valido: false,
+      mensaje: 'El identificador de mesa no puede superar los 25 caracteres.'
+    }
   }
 
   // 1. Caracteres especiales (solo letras, números y espacios)
@@ -82,14 +93,19 @@ const validarNombreMesa = (nombre: string): { valido: boolean; mensaje?: string 
   // 3. Ubicación válida
   const ubicaciones = ['interior', 'patio', 'terraza']
   if (!ubicaciones.some((ub) => nom.includes(ub))) {
-    return { valido: false, mensaje: 'El nombre debe incluir una ubicación válida (interior, patio, terraza).' }
+    return {
+      valido: false,
+      mensaje: 'El nombre debe incluir una ubicación válida (interior, patio, terraza).'
+    }
   }
   // 4. Validación numérica (máximo 3 dígitos, no mayor a 50)
   const numeros = nom.match(/\d+/g)
   if (numeros) {
     for (const numStr of numeros) {
-      if (numStr.length > 3) return { valido: false, mensaje: 'No se permiten más de 3 dígitos numéricos consecutivos.' }
-      if (parseInt(numStr, 10) > 50) return { valido: false, mensaje: 'El número de mesa no puede ser mayor a 50.' }
+      if (numStr.length > 3)
+        return { valido: false, mensaje: 'No se permiten más de 3 dígitos numéricos consecutivos.' }
+      if (parseInt(numStr, 10) > 50)
+        return { valido: false, mensaje: 'El número de mesa no puede ser mayor a 50.' }
     }
   }
   return { valido: true }
@@ -111,18 +127,28 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const normalizarMesa = (item: any): Table => {
     const rawStatus = item?.status || item?.estado || 'Libre'
     const status: TableStatus =
-      rawStatus === 'Libre' ? 'Disponible'
-      : rawStatus === 'Cuenta Solicitada' ? 'Esperando pago'
-      : rawStatus
+      rawStatus === 'Libre'
+        ? 'Disponible'
+        : rawStatus === 'Cuenta Solicitada'
+          ? 'Esperando pago'
+          : rawStatus
 
     return {
       id: (item?.id || item?._id)?.toString(),
       name: item?.name || item?.numero || '—',
       capacity: item?.capacity ?? item?.capacidad ?? 2,
-      location: typeof item?.ubicacion === 'object' ? item?.ubicacion?.nombre || item?.ubicacion?._id?.toString() || '' : item?.location || item?.ubicacion || '',
+      location:
+        typeof item?.ubicacion === 'object'
+          ? item?.ubicacion?.nombre || item?.ubicacion?._id?.toString() || ''
+          : item?.location || item?.ubicacion || '',
       type: item?.type || item?.tipo || 'normal',
       status,
-      locationId: item?.locationId || (typeof item?.ubicacion === 'object' ? item?.ubicacion?._id?.toString() : item?.ubicacion) || item?.location
+      locationId:
+        item?.locationId ||
+        (typeof item?.ubicacion === 'object'
+          ? item?.ubicacion?._id?.toString()
+          : item?.ubicacion) ||
+        item?.location
     } as any
   }
 
@@ -135,7 +161,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       // Actualizamos el token en la instancia existente por si el usuario cambió de sesión
       socketRef.current.auth = { token }
       if (!socketRef.current.connected) {
-        console.log('🔄 Forzando reconexión del socket...');
+        console.log('🔄 Forzando reconexión del socket...')
         socketRef.current.connect()
       }
       return
@@ -145,7 +171,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const socketUrl = baseApi.replace(/\/api\/?$/, '')
 
     try {
-      const socket = io(socketUrl, { 
+      const socket = io(socketUrl, {
         auth: { token },
         reconnection: true,
         reconnectionAttempts: Infinity,
@@ -171,7 +197,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         items.forEach((item: any) => {
           const newStatus = item.status || item.estado
           if (newStatus === 'Cuenta Solicitada' || newStatus === 'Esperando pago') {
-            const targetTableId = item.id || item._id || item.numero;
+            const targetTableId = item.id || item._id || item.numero
             const added = addNotification({
               title: 'Cuenta Solicitada',
               message: `La ${item.name || item.numero || 'Mesa'} está esperando para pagar.`,
@@ -204,9 +230,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 status: item.status || item.estado || existing.status,
                 name: item.name || item.numero || existing.name,
                 capacity: item.capacity || item.capacidad || existing.capacity,
-                location: item.location || (typeof item.ubicacion === 'object' ? item.ubicacion?.nombre : item.ubicacion) || existing.location,
+                location:
+                  item.location ||
+                  (typeof item.ubicacion === 'object' ? item.ubicacion?.nombre : item.ubicacion) ||
+                  existing.location,
                 type: item.type || item.tipo || existing.type,
-                locationId: item.locationId || (typeof item.ubicacion === 'object' ? item.ubicacion?._id?.toString() : item.ubicacion) || item.location || (existing as any).locationId
+                locationId:
+                  item.locationId ||
+                  (typeof item.ubicacion === 'object'
+                    ? item.ubicacion?._id?.toString()
+                    : item.ubicacion) ||
+                  item.location ||
+                  (existing as any).locationId
               } as any
             } else {
               next.push(normalizarMesa(item))
@@ -223,7 +258,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       })
 
       socket.on('mesas:alerta_listo', (payload: any) => {
-        console.log('🔔 [WEBSOCKET] Alerta de pedido listo recibida en frontend:', payload);
+        console.log('🔔 [WEBSOCKET] Alerta de pedido listo recibida en frontend:', payload)
         const added = addNotification({
           title: 'Pedido Listo',
           message: `El plato de la Mesa ${payload.mesaNombre || '?'} ya está terminado en cocina.`,
@@ -241,7 +276,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             icon: '🔔',
             action: {
               label: '✔ Entendido',
-              onClick: () => { toast.dismiss() }
+              onClick: () => {
+                toast.dismiss()
+              }
             }
           })
         }
@@ -256,14 +293,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           type: 'success'
         })
         if (added) {
-          toast.success('Nueva Reserva Asignada', { description: `${resInfo.clientName} ha reservado para las ${resInfo.startTime}`, duration: 10000, icon: '📅' })
+          toast.success('Nueva Reserva Asignada', {
+            description: `${resInfo.clientName} ha reservado para las ${resInfo.startTime}`,
+            duration: 10000,
+            icon: '📅'
+          })
         }
       })
 
-      socket.on('reserva_eliminada', (payload: { id: string, tableId: string }) => {
+      socket.on('reserva_eliminada', (payload: { id: string; tableId: string }) => {
         setReservations((prev) => {
           const currentTableRes = prev[payload.tableId] || []
-          return { ...prev, [payload.tableId]: currentTableRes.filter(r => r.id !== payload.id) }
+          return { ...prev, [payload.tableId]: currentTableRes.filter((r) => r.id !== payload.id) }
         })
       })
     } catch (err) {
@@ -280,12 +321,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     initSocket()
 
     try {
-      const [fetchedTables, fetchedProducts, fetchedOrders, fetchedReservations] = await Promise.all([
-        tablesService.getAll(),
-        platosService.getAll(),
-        api.get('/pedidos?activo=true').then((r: any) => r.data || r).catch(() => []), // Trae solo activos
-        reservationsService.getAll().catch(() => [])
-      ])
+      const [fetchedTables, fetchedProducts, fetchedOrders, fetchedReservations] =
+        await Promise.all([
+          tablesService.getAll(),
+          platosService.getAll(),
+          api
+            .get('/pedidos?activo=true')
+            .then((r: any) => r.data || r)
+            .catch(() => []), // Trae solo activos
+          reservationsService.getAll().catch(() => [])
+        ])
 
       if (Array.isArray(fetchedTables)) {
         setTables(fetchedTables.map(normalizarMesa))
@@ -298,8 +343,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           description: p.descripcion || p.description || '',
           price: p.precio || p.price || 0,
           image: p.imagenUrl || p.imagen || p.image || '',
-          category: typeof p.categoria === 'object' && p.categoria !== null ? p.categoria.nombre || p.categoria._id : p.categoria || 'General',
-          status: ((p.disponible === false || p.estado === false || p.estado === 'Inactivo') ? 'Agotado' : 'Disponible') as ProductStatus
+          category:
+            typeof p.categoria === 'object' && p.categoria !== null
+              ? p.categoria.nombre || p.categoria._id
+              : p.categoria || 'General',
+          status: (p.disponible === false || p.estado === false || p.estado === 'Inactivo'
+            ? 'Agotado'
+            : 'Disponible') as ProductStatus
         }))
         setProducts(formattedProducts)
       }
@@ -308,12 +358,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (Array.isArray(fetchedOrders)) {
         const activeOrders = fetchedOrders // Ya vienen filtrados por activo=true
         const ordersMap: Record<string, OrderItem[]> = {}
-        
+
         activeOrders.forEach((o: any) => {
           const tId = o.mesa?._id || o.mesa?.id || o.mesa
           if (!tId) return
           if (!ordersMap[tId]) ordersMap[tId] = []
-          
+
           o.detalles?.forEach((d: any) => {
             const productId = d.plato?._id || d.plato || 'unknown'
             const product: Product = {
@@ -325,15 +375,23 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
               category: d.plato?.categoria?.nombre || 'General',
               status: 'Disponible'
             }
-            
+
             // Evitar duplicación visual: si el plato ya está en la lista de esta mesa, solo sumamos la cantidad
-            const existingItem = ordersMap[tId].find(item => item.product.id === productId)
+            const existingItem = ordersMap[tId].find((item) => item.product.id === productId)
             if (existingItem) {
-              existingItem.quantity += (d.cantidad || 1)
-              if (d.observacion) existingItem.note = existingItem.note ? `${existingItem.note} | ${d.observacion}` : d.observacion
+              existingItem.quantity += d.cantidad || 1
+              if (d.observacion)
+                existingItem.note = existingItem.note
+                  ? `${existingItem.note} | ${d.observacion}`
+                  : d.observacion
               if (d.estado) (existingItem as any).estado = d.estado
             } else {
-              ordersMap[tId].push({ product, quantity: d.cantidad || 1, note: d.observacion || '', estado: d.estado || o.estado || 'PENDIENTE' } as any)
+              ordersMap[tId].push({
+                product,
+                quantity: d.cantidad || 1,
+                note: d.observacion || '',
+                estado: d.estado || o.estado || 'PENDIENTE'
+              } as any)
             }
           })
         })
@@ -459,7 +517,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     } catch (err) {
       console.error('Error creando mesa:', err)
       // Limpiamos el prefijo "Error: " si viene desde el interceptor de la API
-      const errMsg = ((err as any)?.response?.data?.mensaje || (err as any)?.message || 'Error al crear la mesa').replace(/^Error:\s*/, '')
+      const errMsg = (
+        (err as any)?.response?.data?.mensaje ||
+        (err as any)?.message ||
+        'Error al crear la mesa'
+      ).replace(/^Error:\s*/, '')
       toast.error(errMsg)
       throw err
     }
@@ -485,7 +547,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     } catch (err) {
       console.error('Error actualizando mesa:', err)
       // Limpiamos el prefijo "Error: "
-      const errMsg = ((err as any)?.response?.data?.mensaje || (err as any)?.message || 'Error al actualizar la mesa').replace(/^Error:\s*/, '')
+      const errMsg = (
+        (err as any)?.response?.data?.mensaje ||
+        (err as any)?.message ||
+        'Error al actualizar la mesa'
+      ).replace(/^Error:\s*/, '')
       toast.error(errMsg)
       throw err
     }
@@ -558,7 +624,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (tableOrder) {
         await ordersService.updateStatus(tableOrder._id || tableOrder.id, 'CANCELADO')
       }
-    } catch (e) { console.error('Error al cancelar pedido en BD', e) }
+    } catch (e) {
+      console.error('Error al cancelar pedido en BD', e)
+    }
 
     setOrders((prev) => {
       const newOrders = { ...prev }
@@ -608,7 +676,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           }
         }
 
-      // Intento 2: Fallback usando la función oficial
+        // Intento 2: Fallback usando la función oficial
         if (!userId) {
           const storedUser = getStoredUser()
           if (storedUser) {
@@ -621,7 +689,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
 
         // 2. Formatear payload según modelo IPedido / IDetallePedido
-        const total = tableOrder.reduce((sum, item) => sum + (item.product.price * item.quantity), 0)
+        const total = tableOrder.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
         const payload = {
           mesa: tableId,
           usuario: userId,
@@ -641,11 +709,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const existingOrder = tableOrders[0]
 
         if (existingOrder) {
-          const targetId = existingOrder._id || existingOrder.id;
+          const targetId = existingOrder._id || existingOrder.id
           if (!targetId) {
-            throw new Error("Error de sincronización: El pedido activo no tiene ID válido.");
+            throw new Error('Error de sincronización: El pedido activo no tiene ID válido.')
           }
-          
+
           // Si ya existe, lo actualizamos usando la nueva ruta
           await api.put(`/pedidos/${targetId}`, payload)
           // REPARACIÓN CRÍTICA: Forzar el cambio de color visual inmediatamente
@@ -675,7 +743,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     })
   }
 
-  const reserveTable = async (tableId: string, info: Omit<ReservationInfo, 'id' | 'endTime' | 'vip'>) => {
+  const reserveTable = async (
+    tableId: string,
+    info: Omit<ReservationInfo, 'id' | 'endTime' | 'vip'>
+  ) => {
     const table = tables.find((t) => t.id === tableId)
     const tableType = table?.type || 'normal'
     const isVipClient = tableType === 'vip'

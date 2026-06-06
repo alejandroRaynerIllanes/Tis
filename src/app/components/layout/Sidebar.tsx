@@ -11,7 +11,15 @@ import {
   Package
 } from 'lucide-react'
 
-export type AdminView = 'dashboard' | 'tables' | 'menu' | 'users' | 'reports' | 'vip-clients' | 'waiters' | 'inventory'
+export type AdminView =
+  | 'dashboard'
+  | 'tables'
+  | 'menu'
+  | 'users'
+  | 'reports'
+  | 'vip-clients'
+  | 'waiters'
+  | 'inventory'
 
 interface SidebarProps {
   activeView: AdminView

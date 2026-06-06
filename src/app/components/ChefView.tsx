@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router'
 import { getStoredUser, api } from '../services/api'
 import { ordersService } from '../services/orders.service'
 import { useAppContext } from '../context/AppContext'
-import { MOCK_INGREDIENTS, sharedIngredientsStore } from './admin/InventoryManagement'
+import { inventarioService, type Ingrediente } from '../services/inventario.service'
 
 type OrderStatus = 'Pendiente' | 'En preparación' | 'Listo'
 
@@ -30,7 +30,7 @@ interface Order {
 
 export function ChefView() {
   const [orders, setOrders] = useState<Order[]>([])
-  const [ingredients, setIngredients] = useState<any[]>(sharedIngredientsStore.get())
+  const [ingredients, setIngredients] = useState<Ingrediente[]>([])
   const navigate = useNavigate()
   const { socket } = useAppContext()
 
@@ -105,19 +105,35 @@ export function ChefView() {
       }
     }
 
+    const handleInventarioAlerta = (data: { ingrediente: string; stockActual: number; stockMinimo: number; estado: string }) => {
+      setIngredients((prev) =>
+        prev.map((ing) =>
+          ing.nombre === data.ingrediente
+            ? { ...ing, stockActual: data.stockActual, stockMinimo: data.stockMinimo, estado: data.estado as Ingrediente['estado'] }
+            : ing
+        )
+      )
+      if (data.estado === 'Bajo' || data.estado === 'Agotado') {
+        toast.warning(`⚠️ Stock ${data.estado.toLowerCase()}: ${data.ingrediente} (${data.stockActual} restantes)`)
+      }
+    }
+
     socket.on('cocina:nuevo_pedido', handleNuevoPedido)
     socket.on('cocina:actualizar_tablero', handleActualizarTablero)
+    socket.on('inventario:alerta', handleInventarioAlerta)
 
     return () => {
       socket.off('cocina:nuevo_pedido', handleNuevoPedido)
       socket.off('cocina:actualizar_tablero', handleActualizarTablero)
+      socket.off('inventario:alerta', handleInventarioAlerta)
     }
   }, [socket])
 
+  // Carga inicial: obtiene el estado real del inventario desde la API
   useEffect(() => {
-    return sharedIngredientsStore.subscribe(() => {
-      setIngredients(sharedIngredientsStore.get())
-    })
+    inventarioService.getInventarioEstado()
+      .then((data) => setIngredients(data))
+      .catch((err) => console.error('[ChefView] Error cargando inventario:', err))
   }, [])
 
   // Función para cambiar el estado del pedido
@@ -292,17 +308,26 @@ export function ChefView() {
             <div className="text-sm font-black text-[#4B2E2D] shrink-0 mr-2">
               Estado de Ingredientes
             </div>
-            {ingredients.map(ing => {
-              const isLowStock = ing.stock <= ing.minStock;
+            {ingredients.map((ing) => {
+              const isLowStock = ing.estado === 'Bajo' || ing.estado === 'Agotado'
               return (
-                    <div key={ing.id} className={`flex flex-col gap-1 px-4 py-2.5 rounded-xl border shrink-0 transition-colors shadow-sm ${isLowStock ? 'bg-red-50 border-red-200' : 'bg-white border-[#E0D0C5]'}`}>
-                      <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full shadow-inner ${isLowStock ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`} />
-                        <span className="font-bold text-[#4B2E2D] text-sm leading-none">{ing.name}</span>
-                      </div>
-                      <div className={`text-xs font-black ml-4 ${isLowStock ? 'text-red-600' : 'text-gray-500'}`}>
-                        {ing.stock} <span className="font-bold opacity-80">{ing.unit}</span>
-                      </div>
+                <div
+                  key={ing._id}
+                  className={`flex flex-col gap-1 px-4 py-2.5 rounded-xl border shrink-0 transition-colors shadow-sm ${isLowStock ? 'bg-red-50 border-red-200' : 'bg-white border-[#E0D0C5]'}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`w-2 h-2 rounded-full shadow-inner ${isLowStock ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`}
+                    />
+                    <span className="font-bold text-[#4B2E2D] text-sm leading-none">
+                      {ing.nombre}
+                    </span>
+                  </div>
+                  <div
+                    className={`text-xs font-black ml-4 ${isLowStock ? 'text-red-600' : 'text-gray-500'}`}
+                  >
+                    {ing.stockActual} <span className="font-bold opacity-80">{ing.unidad}</span>
+                  </div>
                 </div>
               )
             })}

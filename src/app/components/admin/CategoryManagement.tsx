@@ -7,8 +7,8 @@ import { categoriesService } from '../../services/categories.service'
 import { toast } from 'sonner'
 
 export interface BackendCategory {
-  _id: string;
-  nombre: string;
+  _id: string
+  nombre: string
 }
 
 export interface UICategory {
@@ -77,8 +77,7 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
       return 'El nombre solo debe contener letras y espacios. Ejemplo: "Postres"'
     }
     const isDuplicate = categories.some(
-      (cat) =>
-        cat.label.toLowerCase() === trimmed.toLowerCase() && cat.id !== currentEditingId
+      (cat) => cat.label.toLowerCase() === trimmed.toLowerCase() && cat.id !== currentEditingId
     )
     if (isDuplicate) {
       return 'Ya existe una categoría con ese nombre. Por favor, elige otro.'
@@ -248,7 +247,9 @@ export function CategoryManagement({ categories, setCategories }: CategoryManage
                   placeholder="Ej: Platos Especiales"
                 />
                 {categoryError ? (
-                  <p className="text-red-500 text-[11px] font-bold mt-2 leading-tight">{categoryError}</p>
+                  <p className="text-red-500 text-[11px] font-bold mt-2 leading-tight">
+                    {categoryError}
+                  </p>
                 ) : (
                   <p className="text-[#4B2E2D]/50 text-[11px] font-medium mt-2 leading-tight">
                     Ingresa un nombre único usando solo letras. Ejemplo: "Bebidas"

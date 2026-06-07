@@ -1,13 +1,17 @@
-import { CalendarDays, Clock, Users, X, XCircle, UserCheck, Crown } from 'lucide-react';
-import { MouseEvent } from 'react';
-import { ReservationInfo, Table } from '../context/AppContext';
+import { CalendarDays, Clock, Users, X, XCircle, UserCheck, Crown } from 'lucide-react'
+import { MouseEvent } from 'react'
+import { ReservationInfo, Table } from '../context/AppContext'
 
 interface ReservationsListModalProps {
-  viewingTableId: string | null;
-  tables: Table[];
-  reservations: Record<string, ReservationInfo[]>;
-  onClose: () => void;
-  onCancelReservation: (e: MouseEvent<HTMLButtonElement>, tableId: string, reservationId: string) => void;
+  viewingTableId: string | null
+  tables: Table[]
+  reservations: Record<string, ReservationInfo[]>
+  onClose: () => void
+  onCancelReservation: (
+    e: MouseEvent<HTMLButtonElement>,
+    tableId: string,
+    reservationId: string
+  ) => void
 }
 
 export function ReservationsListModal({
@@ -17,10 +21,10 @@ export function ReservationsListModal({
   onClose,
   onCancelReservation
 }: ReservationsListModalProps) {
-  if (!viewingTableId) return null;
+  if (!viewingTableId) return null
 
-  const viewingTable = tables.find(t => t.id === viewingTableId);
-  const tableReservations = reservations[viewingTableId] || [];
+  const viewingTable = tables.find((t) => t.id === viewingTableId)
+  const tableReservations = reservations[viewingTableId] || []
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
@@ -31,7 +35,6 @@ export function ReservationsListModal({
       />
       {/* Modal card */}
       <div className="relative z-10 w-full max-w-[500px] bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-
         {/* Header del modal */}
         <div className="bg-gradient-to-r from-[#6B3E2E] to-[#4B2E2D] px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -41,7 +44,8 @@ export function ReservationsListModal({
             <div>
               <h2 className="font-black text-white text-lg leading-tight">Reservas</h2>
               <p className="text-[#F5E6D3] text-xs font-semibold mt-0.5">
-                {viewingTable?.name} · {tableReservations.length} {tableReservations.length === 1 ? 'reserva' : 'reservas'}
+                {viewingTable?.name} · {tableReservations.length}{' '}
+                {tableReservations.length === 1 ? 'reserva' : 'reservas'}
               </p>
             </div>
           </div>
@@ -82,12 +86,14 @@ export function ReservationsListModal({
                   <div className="pr-8">
                     <div className="flex items-center gap-2 mb-2">
                       <UserCheck size={16} className="text-[#D96C4A]" strokeWidth={2.5} />
-                      <span className="font-black text-[#4B2E2D] text-base">{reservation.clientName}</span>
+                      <span className="font-black text-[#4B2E2D] text-base">
+                        {reservation.clientName}
+                      </span>
                       {reservation.vip && (
                         <Crown size={14} className="text-yellow-500" strokeWidth={2.5} />
                       )}
                     </div>
-                    
+
                     <div className="flex flex-wrap items-center gap-3 text-xs">
                       <span className="flex items-center gap-1.5 font-bold text-[#4B2E2D]/80">
                         <CalendarDays size={12} /> {reservation.date}
@@ -96,7 +102,8 @@ export function ReservationsListModal({
                         <Clock size={12} /> {reservation.startTime || (reservation as any).time}
                       </span>
                       <span className="flex items-center gap-1.5 font-bold text-[#4B2E2D]/80">
-                        <Users size={12} /> {reservation.guestCount} {reservation.guestCount === 1 ? 'persona' : 'personas'}
+                        <Users size={12} /> {reservation.guestCount}{' '}
+                        {reservation.guestCount === 1 ? 'persona' : 'personas'}
                       </span>
                     </div>
                   </div>
@@ -117,5 +124,5 @@ export function ReservationsListModal({
         </div>
       </div>
     </div>
-  );
+  )
 }

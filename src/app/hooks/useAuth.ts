@@ -24,10 +24,15 @@ export function useAuth() {
 
   const redirectByRole = useCallback(
     (role: string) => {
-      if (role === 'admin') {
+      const normalizedRole = role.toLowerCase()
+      if (normalizedRole === 'admin' || normalizedRole === 'administrador') {
         navigate('/catalog', { replace: true })
-      } else if (role === 'waiter') {
+      } else if (normalizedRole === 'waiter' || normalizedRole === 'mesero') {
         navigate('/waiter-view', { replace: true })
+      } else if (normalizedRole === 'chef' || normalizedRole === 'cocinero') {
+        navigate('/chef-view', { replace: true })
+      } else if (normalizedRole === 'cashier' || normalizedRole === 'cajero') {
+        navigate('/cashier-view', { replace: true })
       } else {
         navigate('/en-construccion', { replace: true })
       }

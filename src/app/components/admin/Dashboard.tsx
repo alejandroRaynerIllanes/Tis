@@ -200,7 +200,9 @@ export function Dashboard({ onOpenSidebar }: DashboardProps) {
             </div>
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-[#4B2E2D]/55 font-medium">Ticket promedio:</span>
-              <span className="text-xs font-bold text-[#D0543A]">Bs. {kpis.ordenesHoy > 0 ? (kpis.ventasHoy / kpis.ordenesHoy).toFixed(2) : '0.00'}</span>
+              <span className="text-xs font-bold text-[#D0543A]">
+                Bs. {kpis.ordenesHoy > 0 ? (kpis.ventasHoy / kpis.ordenesHoy).toFixed(2) : '0.00'}
+              </span>
             </div>
           </div>
 
@@ -212,7 +214,8 @@ export function Dashboard({ onOpenSidebar }: DashboardProps) {
                   Mesas Activas
                 </p>
                 <p className="text-2xl sm:text-3xl font-black text-[#4B2E2D] mt-1 leading-none">
-                  {kpis.mesasActivas || 0}<span className="text-base sm:text-lg font-bold text-[#4B2E2D]/35"></span>
+                  {kpis.mesasActivas || 0}
+                  <span className="text-base sm:text-lg font-bold text-[#4B2E2D]/35"></span>
                 </p>
               </div>
               <div className="w-11 h-11 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0 group-hover:bg-emerald-100 transition-colors">
@@ -233,9 +236,14 @@ export function Dashboard({ onOpenSidebar }: DashboardProps) {
             </div>
             <div className="flex items-center gap-2">
               <div className="flex-1 h-1.5 bg-[#4B2E2D]/8 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${kpis.ocupacionPorcentaje}%` }} />
+                <div
+                  className="h-full bg-emerald-500 rounded-full"
+                  style={{ width: `${kpis.ocupacionPorcentaje}%` }}
+                />
               </div>
-              <span className="text-xs font-bold text-emerald-600">{kpis.ocupacionPorcentaje || 0}% ocupación</span>
+              <span className="text-xs font-bold text-emerald-600">
+                {kpis.ocupacionPorcentaje || 0}% ocupación
+              </span>
             </div>
           </div>
         </div>
@@ -274,10 +282,12 @@ export function Dashboard({ onOpenSidebar }: DashboardProps) {
                         {dish.nombre}
                       </span>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="text-sm font-black text-[#4B2E2D]">{dish.cantidad} ventas</span>
-                          <span className="flex items-center gap-0.5 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100">
-                            <TrendingUp size={9} strokeWidth={2.5} />↑
-                          </span>
+                        <span className="text-sm font-black text-[#4B2E2D]">
+                          {dish.cantidad} ventas
+                        </span>
+                        <span className="flex items-center gap-0.5 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100">
+                          <TrendingUp size={9} strokeWidth={2.5} />↑
+                        </span>
                       </div>
                     </div>
                     <div className="h-1.5 bg-[#FCE4D6]/60 rounded-full overflow-hidden">
@@ -429,7 +439,7 @@ export function Dashboard({ onOpenSidebar }: DashboardProps) {
                         className={`px-2.5 lg:px-3 py-1 lg:py-1.5 rounded-full text-xs lg:text-sm font-bold ${
                           order.estado === 'Completada'
                             ? 'bg-green-100 text-green-700'
-                          : order.estado === 'En preparación'
+                            : order.estado === 'En preparación'
                               ? 'bg-orange-100 text-orange-700'
                               : 'bg-yellow-100 text-yellow-700'
                         }`}

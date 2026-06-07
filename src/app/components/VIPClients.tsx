@@ -192,23 +192,25 @@ export function VIPClients() {
 
   // Extraer clientes VIP directamente de las reservas activas (100% real)
   const dynamicVipClients = useMemo(() => {
-    const map = new Map();
-    Object.values(reservations).flat().forEach((r, idx) => {
-      if (r.vip && !map.has(r.clientName.toLowerCase())) {
-        map.set(r.clientName.toLowerCase(), {
-          id: r.id || idx,
-          name: r.clientName,
-          email: 'cliente@vip.com',
-          plan: 'VIP',
-          since: new Date().toISOString().split('T')[0],
-          orders: 1,
-          totalSpent: 'Bs. ---',
-          status: 'Activo'
-        })
-      }
-    });
-    return Array.from(map.values());
-  }, [reservations]);
+    const map = new Map()
+    Object.values(reservations)
+      .flat()
+      .forEach((r, idx) => {
+        if (r.vip && !map.has(r.clientName.toLowerCase())) {
+          map.set(r.clientName.toLowerCase(), {
+            id: r.id || idx,
+            name: r.clientName,
+            email: 'cliente@vip.com',
+            plan: 'VIP',
+            since: new Date().toISOString().split('T')[0],
+            orders: 1,
+            totalSpent: 'Bs. ---',
+            status: 'Activo'
+          })
+        }
+      })
+    return Array.from(map.values())
+  }, [reservations])
 
   const [activeTab, setActiveTab] = useState<
     'subscription' | 'clients' | 'priority' | 'management'

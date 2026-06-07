@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router'
 import { authService } from '../services/auth.service'
 import { setToken, setStoredUser } from '../services/api'
 import { toast } from 'sonner'
+import { useAuth } from '../hooks/useAuth'
 
 export function Login() {
   const [username, setUsername] = useState('')
@@ -12,22 +13,7 @@ export function Login() {
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const navigate = useNavigate()
-
-  // Centralizamos la redirección por rol para evitar repetición
-  const redirectByRole = (role: string) => {
-    const normalizedRole = role.toLowerCase()
-    if (normalizedRole === 'admin' || normalizedRole === 'administrador') {
-      navigate('/catalog', { replace: true })
-    } else if (normalizedRole === 'waiter' || normalizedRole === 'mesero') {
-      navigate('/waiter-view', { replace: true })
-    } else if (normalizedRole === 'chef' || normalizedRole === 'cocinero') {
-      navigate('/chef-view', { replace: true })
-    } else if (normalizedRole === 'cashier' || normalizedRole === 'cajero') {
-      navigate('/cashier-view', { replace: true })
-    } else {
-      navigate('/en-construccion', { replace: true })
-    }
-  }
+  const { redirectByRole } = useAuth()
 
   useEffect(() => {
     const userRole = localStorage.getItem('userRole')
@@ -194,11 +180,7 @@ export function Login() {
                   border: '1px solid rgba(220,38,38,0.3)'
                 }}
               >
-                <AlertCircle
-                  size={18}
-                  className="shrink-0 mt-0.5"
-                  style={{ color: '#DC2626' }}
-                />
+                <AlertCircle size={18} className="shrink-0 mt-0.5" style={{ color: '#DC2626' }} />
                 <p className="text-sm font-medium" style={{ color: '#DC2626' }}>
                   {error}
                 </p>

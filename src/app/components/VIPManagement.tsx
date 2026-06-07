@@ -33,36 +33,45 @@ export function VIPManagement() {
       try {
         const resOrders: any = await api.get('/pedidos?activo=true')
         const ordersData = resOrders.data || resOrders || []
-        const activeOrders = ordersData
-          .map((o: any) => ({
-            id: o.codigo || o._id,
-            tableId: o.mesa?._id || '?',
-            tableName: o.mesa?.numero || 'Mesa ?',
-            clientName: o.usuario?.nombre || 'Cliente',
-            isVip: o.mesa?.tipo === 'vip' || o.vip,
-            items: (o.detalles || []).map((d: any) => `${d.plato?.nombre} ×${d.cantidad}`),
-            time: new Date(o.fechaHora || o.createdAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-            estimatedTime: '15 min',
-            priority: (o.mesa?.tipo === 'vip' || o.vip) ? 'ALTA' : 'NORMAL',
-            status: o.estado === 'ABIERTO' ? 'Pendiente' : o.estado === 'EN_PREPARACION' ? 'En preparación' : 'Listo'
-          }))
+        const activeOrders = ordersData.map((o: any) => ({
+          id: o.codigo || o._id,
+          tableId: o.mesa?._id || '?',
+          tableName: o.mesa?.numero || 'Mesa ?',
+          clientName: o.usuario?.nombre || 'Cliente',
+          isVip: o.mesa?.tipo === 'vip' || o.vip,
+          items: (o.detalles || []).map((d: any) => `${d.plato?.nombre} ×${d.cantidad}`),
+          time: new Date(o.fechaHora || o.createdAt).toLocaleTimeString('es-ES', {
+            hour: '2-digit',
+            minute: '2-digit'
+          }),
+          estimatedTime: '15 min',
+          priority: o.mesa?.tipo === 'vip' || o.vip ? 'ALTA' : 'NORMAL',
+          status:
+            o.estado === 'ABIERTO'
+              ? 'Pendiente'
+              : o.estado === 'EN_PREPARACION'
+                ? 'En preparación'
+                : 'Listo'
+        }))
         setIncomingOrders(activeOrders)
 
         // Cargar clientes VIP reales desde la base de datos (Usuarios con rol 'Cliente')
         const resUsers: any = await api.get('/usuarios')
         const usersData = resUsers.data || resUsers || []
-        const vipClients = usersData.filter((u: any) => u.rol === 'Cliente').map((c: any) => ({
-          id: c._id || c.id,
-          name: `${c.nombre} ${c.apellido || ''}`.trim(),
-          email: c.email,
-          plan: 'VIP Premium',
-          status: c.estado ? 'Activo' : 'Inactivo',
-          visits: Math.floor(Math.random() * 15) + 1, // Simulado hasta tener módulo de lealtad
-          totalSpent: Math.floor(Math.random() * 2000) + 100, // Simulado
-          joinDate: c.createdAt || new Date(),
-          nextBilling: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-          avgTicket: 150
-        }))
+        const vipClients = usersData
+          .filter((u: any) => u.rol === 'Cliente')
+          .map((c: any) => ({
+            id: c._id || c.id,
+            name: `${c.nombre} ${c.apellido || ''}`.trim(),
+            email: c.email,
+            plan: 'VIP Premium',
+            status: c.estado ? 'Activo' : 'Inactivo',
+            visits: Math.floor(Math.random() * 15) + 1, // Simulado hasta tener módulo de lealtad
+            totalSpent: Math.floor(Math.random() * 2000) + 100, // Simulado
+            joinDate: c.createdAt || new Date(),
+            nextBilling: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            avgTicket: 150
+          }))
         setVipSubscribers(vipClients)
       } catch (error) {
         console.error('Error al cargar los datos VIP:', error)
@@ -115,7 +124,7 @@ export function VIPManagement() {
                 Suscriptores VIP
               </p>
               <p className="text-3xl font-black text-[#4B2E2D] mt-1 leading-none">
-            {vipSubscribers.length}
+                {vipSubscribers.length}
               </p>
             </div>
             <div className="w-11 h-11 rounded-xl bg-amber-400/15 flex items-center justify-center shrink-0">
@@ -479,7 +488,7 @@ export function VIPManagement() {
           </div>
 
           <div className="bg-white/10 rounded-lg px-3 py-1.5">
-        <span className="text-sm font-black text-white">{vipSubscribers.length} activos</span>
+            <span className="text-sm font-black text-white">{vipSubscribers.length} activos</span>
           </div>
         </div>
 

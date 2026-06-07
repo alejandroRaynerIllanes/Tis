@@ -22,7 +22,14 @@ import { MouseEvent, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 import { TableStatus, Table, useAppContext } from '../context/AppContext'
-import { useWaiterLogic, getTableDisplayName, getTableLocation, type StateFilter, type TableWithFallbacks } from '../hooks/useWaiterLogic'
+import { useNotifications } from '../context/NotificationsContext'
+import {
+  useWaiterLogic,
+  getTableDisplayName,
+  getTableLocation,
+  type StateFilter,
+  type TableWithFallbacks
+} from '../hooks/useWaiterLogic'
 import { ReservationsListModal } from './ReservationsListModal'
 import { PreCuentaModal } from './PreCuentaModal'
 import { ReserveTableModal } from './ReserveTableModal'
@@ -222,7 +229,7 @@ export function WaiterView({
   } = waiterLogic
 
   const { loadInitialData } = useAppContext()
-  const { notifications, markNotificationAsRead, clearNotifications } = useAppContext()
+  const { notifications, markNotificationAsRead, clearNotifications } = useNotifications()
 
   useEffect(() => {
     loadInitialData()
@@ -237,36 +244,49 @@ export function WaiterView({
 
   // Extraer el nombre real del mesero autenticado
   const currentUser = getStoredUser()
-  const waiterName = currentUser ? `${currentUser.nombre} ${currentUser.apellido || ''}`.trim() : 'Mesero'
-  const userLocation = (currentUser as any)?.zona || (currentUser as any)?.ubicacion || fetchedLocation
+  const waiterName = currentUser
+    ? `${currentUser.nombre} ${currentUser.apellido || ''}`.trim()
+    : 'Mesero'
+  const userLocation =
+    (currentUser as any)?.zona || (currentUser as any)?.ubicacion || fetchedLocation
 
   // Helper para normalizar nombres de zonas/ubicaciones y evitar problemas de mayúsculas/minúsculas/espacios
-  const normalizeZone = (z: string | null | undefined) => String(z || '').toLowerCase().trim()
+  const normalizeZone = (z: string | null | undefined) =>
+    String(z || '')
+      .toLowerCase()
+      .trim()
 
   // Identificar si el mesero es de la zona VIP
-  const isUserVipZone = normalizeZone(userLocation) === 'vip' || normalizeZone(userLocation) === 'zona vip'
+  const isUserVipZone =
+    normalizeZone(userLocation) === 'vip' || normalizeZone(userLocation) === 'zona vip'
 
   // Buscar la ubicación exacta en el sistema (con sus mayúsculas originales) que coincide con la zona del mesero
-  const matchedUserLocation = isUserVipZone ? 'VIP' : (LOCATIONS.find((loc: string) => normalizeZone(loc) === normalizeZone(userLocation)) || userLocation)
+  const matchedUserLocation = isUserVipZone
+    ? 'VIP'
+    : LOCATIONS.find((loc: string) => normalizeZone(loc) === normalizeZone(userLocation)) ||
+      userLocation
 
   // Respaldo dinámico: Si el backend no envió la zona al hacer login, la buscamos
   useEffect(() => {
     if (!isAdmin && !userLocation && (currentUser?.id || (currentUser as any)?._id)) {
-      api.get('/usuarios').then((res: any) => {
-        const targetId = currentUser?.id || (currentUser as any)?._id
-        const me = res.data.find((u: any) => u._id === targetId || u.id === targetId)
-       if (me && me.zona) {
-          setFetchedLocation(me.zona)
-          // Actualizamos la sesión localmente SIN crear llaves duplicadas (fantasmas)
-          const updatedUser = { ...(currentUser || {}), zona: me.zona, ubicacion: me.zona }
-          setStoredUser(updatedUser as any) // Usamos solo la función oficial
-        }
-      }).catch(() => {})
+      api
+        .get('/usuarios')
+        .then((res: any) => {
+          const targetId = currentUser?.id || (currentUser as any)?._id
+          const me = res.data.find((u: any) => u._id === targetId || u.id === targetId)
+          if (me && me.zona) {
+            setFetchedLocation(me.zona)
+            // Actualizamos la sesión localmente SIN crear llaves duplicadas (fantasmas)
+            const updatedUser = { ...(currentUser || {}), zona: me.zona, ubicacion: me.zona }
+            setStoredUser(updatedUser as any) // Usamos solo la función oficial
+          }
+        })
+        .catch(() => {})
     }
   }, [isAdmin, currentUser])
 
   // Filtrar ubicaciones según el rol (Los admin ven todo, los meseros solo su área asignada)
-  const displayLocations = isAdmin ? LOCATIONS : (matchedUserLocation ? [matchedUserLocation] : [])
+  const displayLocations = isAdmin ? LOCATIONS : matchedUserLocation ? [matchedUserLocation] : []
 
   // Si es mesero y tiene un área, forzar la selección de su área automáticamente
   useEffect(() => {
@@ -276,31 +296,40 @@ export function WaiterView({
   }, [isAdmin, matchedUserLocation, activeLocation, setActiveLocation])
 
   // Identificamos las mesas que le pertenecen a este mesero basado en su zona
-  const myAllowedTables = tables.filter(t => {
+  const myAllowedTables = tables.filter((t) => {
     if (isUserVipZone) {
-      return t.type === 'vip' || normalizeZone(getTableLocation(t)) === 'vip' || normalizeZone(getTableLocation(t)) === 'zona vip'
+      return (
+        t.type === 'vip' ||
+        normalizeZone(getTableLocation(t)) === 'vip' ||
+        normalizeZone(getTableLocation(t)) === 'zona vip'
+      )
     }
     return normalizeZone(getTableLocation(t)) === normalizeZone(userLocation)
   })
 
   // Filtro ESTRICTO final: Garantiza que un mesero NUNCA vea mesas que no le pertenecen
-  const finalFilteredTables = isAdmin 
-    ? filteredTables 
-    : myAllowedTables.filter(t => stateFilter === 'all' || t.status === stateFilter)
+  const finalFilteredTables = isAdmin
+    ? filteredTables
+    : myAllowedTables.filter((t) => stateFilter === 'all' || t.status === stateFilter)
 
   // Recalculamos los contadores para los meseros (así no dependen de la ubicación del hook)
   const customTotalInLocation = isAdmin ? totalInLocation : myAllowedTables.length
-  const customTableCounts = isAdmin ? tableCounts : myAllowedTables.reduce((acc, t) => {
-    acc[t.status] = (acc[t.status] || 0) + 1
-    return acc
-  }, {} as Record<string, number>)
+  const customTableCounts = isAdmin
+    ? tableCounts
+    : myAllowedTables.reduce(
+        (acc, t) => {
+          acc[t.status] = (acc[t.status] || 0) + 1
+          return acc
+        },
+        {} as Record<string, number>
+      )
 
   const handleLogout = () => {
     localStorage.clear()
     navigate('/', { replace: true })
   }
 
-  const unreadCount = notifications.filter(n => !n.read).length
+  const unreadCount = notifications.filter((n) => !n.read).length
 
   // 🚀 Función Inteligente para las Notificaciones
   const handleNotificationAction = async (e: React.MouseEvent, n: any) => {
@@ -309,14 +338,18 @@ export function WaiterView({
       try {
         await ordersService.updateStatus(n.meta.pedidoId, 'ENTREGADO')
         await loadInitialData()
-        toast.success('Pedido entregado al cliente', { description: 'Ya puedes solicitar la cuenta desde la mesa.' })
+        toast.success('Pedido entregado al cliente', {
+          description: 'Ya puedes solicitar la cuenta desde la mesa.'
+        })
       } catch (err) {
         console.error(err)
         // Fallback to SERVIDO if ENTREGADO is not accepted
         try {
           await ordersService.updateStatus(n.meta.pedidoId, 'SERVIDO')
           await loadInitialData()
-          toast.success('Pedido entregado al cliente', { description: 'Ya puedes solicitar la cuenta desde la mesa.' })
+          toast.success('Pedido entregado al cliente', {
+            description: 'Ya puedes solicitar la cuenta desde la mesa.'
+          })
         } catch (e2) {}
       }
     } else if (n.meta?.actionType === 'process_payment' && n.meta?.tableId) {
@@ -389,99 +422,152 @@ export function WaiterView({
               <ChefHat size={18} strokeWidth={2.5} className="text-white" />
             </div>
             <div className="flex flex-col items-start gap-0 leading-none">
-            <span className="font-black text-sm sm:text-[16px] text-[#4B2E2D] bg-white px-2.5 py-1 rounded-md shadow-sm flex items-center gap-2 whitespace-nowrap">
-              {waiterName}
-              {userLocation && (
-                <span className="bg-[#FCE4D6] text-[#D96C4A] text-[10px] px-1.5 py-0.5 rounded uppercase tracking-widest font-black border border-[#D96C4A]/20">
-                  {userLocation}
-                </span>
-              )}
-            </span>
+              <span className="font-black text-sm sm:text-[16px] text-[#4B2E2D] bg-white px-2.5 py-1 rounded-md shadow-sm flex items-center gap-2 whitespace-nowrap">
+                {waiterName}
+                {userLocation && (
+                  <span className="bg-[#FCE4D6] text-[#D96C4A] text-[10px] px-1.5 py-0.5 rounded uppercase tracking-widest font-black border border-[#D96C4A]/20">
+                    {userLocation}
+                  </span>
+                )}
+              </span>
             </div>
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2">
-          {/* 🔔 Centro de Notificaciones */}
-          <div className="relative">
-            <button 
-              onClick={() => setIsNotificationsOpen(!isNotificationsOpen)} 
-              className={`relative p-2 rounded-xl transition-colors mr-1 sm:mr-2 ${isNotificationsOpen ? 'bg-white/20 text-white' : 'bg-white/10 hover:bg-white/20 text-white/80 hover:text-white'}`}
-              title="Centro de Notificaciones"
-            >
-              <Bell size={18} />
-              {unreadCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 border-2 border-[#4B2E2D] rounded-full animate-pulse shadow-sm"></span>
-              )}
-            </button>
+            {/* 🔔 Centro de Notificaciones */}
+            <div className="relative">
+              <button
+                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                className={`relative p-2 rounded-xl transition-colors mr-1 sm:mr-2 ${isNotificationsOpen ? 'bg-white/20 text-white' : 'bg-white/10 hover:bg-white/20 text-white/80 hover:text-white'}`}
+                title="Centro de Notificaciones"
+              >
+                <Bell size={18} />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 border-2 border-[#4B2E2D] rounded-full animate-pulse shadow-sm"></span>
+                )}
+              </button>
 
-            {/* Panel Desplegable */}
-            {isNotificationsOpen && (
-              <div className="absolute right-0 mt-4 w-[340px] sm:w-[420px] bg-[#F8F9FA] rounded-3xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.4)] border border-gray-200 overflow-hidden z-[100] animate-in fade-in slide-in-from-top-4 duration-200 origin-top-right">
-                <div className="bg-gradient-to-r from-[#6B3E2E] to-[#4B2E2D] px-5 py-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Bell size={18} className="text-white/80" />
-                    <h3 className="font-black text-white text-base tracking-wide">Notificaciones</h3>
-                    {unreadCount > 0 && (
-                      <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm">{unreadCount} nuevas</span>
+              {/* Panel Desplegable */}
+              {isNotificationsOpen && (
+                <div className="absolute right-0 mt-4 w-[340px] sm:w-[420px] bg-[#F8F9FA] rounded-3xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.4)] border border-gray-200 overflow-hidden z-[100] animate-in fade-in slide-in-from-top-4 duration-200 origin-top-right">
+                  <div className="bg-gradient-to-r from-[#6B3E2E] to-[#4B2E2D] px-5 py-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Bell size={18} className="text-white/80" />
+                      <h3 className="font-black text-white text-base tracking-wide">
+                        Notificaciones
+                      </h3>
+                      {unreadCount > 0 && (
+                        <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm">
+                          {unreadCount} nuevas
+                        </span>
+                      )}
+                    </div>
+                    {notifications.length > 0 && (
+                      <button
+                        onClick={() => clearNotifications()}
+                        className="text-white/70 hover:text-white text-xs font-bold px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg transition-all active:scale-95"
+                      >
+                        Limpiar todas
+                      </button>
                     )}
                   </div>
-                  {notifications.length > 0 && (
-                    <button onClick={() => clearNotifications()} className="text-white/70 hover:text-white text-xs font-bold px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg transition-all active:scale-95">Limpiar todas</button>
-                  )}
-                </div>
-                <div className="max-h-[420px] overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-black/10 p-3">
-                  {notifications.length === 0 ? (
-                    <div className="p-10 flex flex-col items-center justify-center text-center">
-                      <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-3">
-                        <Bell size={24} className="text-gray-300" />
-                      </div>
-                      <p className="text-gray-500 font-bold text-sm">Tu bandeja está vacía</p>
-                      <p className="text-gray-400 text-xs mt-1">No tienes nuevas alertas por ahora.</p>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-2.5">
-                      {notifications.map(n => (
-                        <div key={n.id} onClick={() => markNotificationAsRead(n.id)} className={`relative p-4 rounded-2xl transition-all cursor-pointer group shadow-sm ${n.read ? 'bg-white hover:bg-gray-50 border border-gray-100' : 'bg-white border-2 border-[#D96C4A]/30 hover:shadow-md'}`}>
-                          {!n.read && <div className="absolute top-4 right-4 w-2.5 h-2.5 rounded-full bg-[#D96C4A] shadow-[0_0_8px_rgba(217,108,74,0.8)] animate-pulse" />}
-                          <div className="flex gap-3.5 items-start">
-                            <div className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 shadow-inner ${n.type === 'success' ? 'bg-gradient-to-br from-emerald-100 to-emerald-200 text-emerald-600' : 'bg-gradient-to-br from-amber-100 to-amber-200 text-amber-600'}`}>
-                              {n.type === 'success' ? <CheckCircle2 size={20} /> : <Receipt size={20} />}
-                            </div>
-                            <div className="flex-1 min-w-0 pr-4">
-                              <p className={`text-[15px] leading-tight mb-1 truncate ${n.read ? 'font-bold text-gray-500' : 'font-black text-[#4B2E2D]'}`}>{n.title}</p>
-                              <p className={`text-[13px] leading-relaxed mb-2.5 line-clamp-2 ${n.read ? 'text-gray-400 font-medium' : 'text-[#4B2E2D]/80 font-semibold'}`}>{n.message}</p>
-                              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider flex items-center gap-1"><Clock size={11} /> {new Date(n.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
-                            </div>
-                          </div>
-                          {!n.read && (
-                            <div className="mt-3.5 ml-[58px] flex flex-wrap gap-2">
-                              {n.meta?.actionType === 'deliver_order' && (
-                                <button onClick={(e) => handleNotificationAction(e, n)} className="text-[12px] font-black px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl shadow-md shadow-emerald-500/20 transition-all active:scale-95 flex items-center gap-1.5">
-                                  <ChefHat size={14} /> Entregar Pedido
-                                </button>
-                              )}
-                              {n.meta?.actionType === 'process_payment' && (
-                                <button onClick={(e) => handleNotificationAction(e, n)} className="text-[12px] font-black px-4 py-2 bg-[#D96C4A] hover:bg-[#C25838] text-white rounded-xl shadow-md shadow-[#D96C4A]/20 transition-all active:scale-95 flex items-center gap-1.5">
-                                  <Receipt size={14} /> Ver mesa
-                                </button>
-                              )}
-                              <button onClick={(e) => { e.stopPropagation(); markNotificationAsRead(n.id); }} className="text-[12px] font-bold px-3 py-2 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-xl transition-all active:scale-95">
-                                Ocultar
-                              </button>
-                            </div>
-                          )}
+                  <div className="max-h-[420px] overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-black/10 p-3">
+                    {notifications.length === 0 ? (
+                      <div className="p-10 flex flex-col items-center justify-center text-center">
+                        <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-3">
+                          <Bell size={24} className="text-gray-300" />
                         </div>
-                      ))}
-                    </div>
-                  )}
+                        <p className="text-gray-500 font-bold text-sm">Tu bandeja está vacía</p>
+                        <p className="text-gray-400 text-xs mt-1">
+                          No tienes nuevas alertas por ahora.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-2.5">
+                        {notifications.map((n) => (
+                          <div
+                            key={n.id}
+                            onClick={() => markNotificationAsRead(n.id)}
+                            className={`relative p-4 rounded-2xl transition-all cursor-pointer group shadow-sm ${n.read ? 'bg-white hover:bg-gray-50 border border-gray-100' : 'bg-white border-2 border-[#D96C4A]/30 hover:shadow-md'}`}
+                          >
+                            {!n.read && (
+                              <div className="absolute top-4 right-4 w-2.5 h-2.5 rounded-full bg-[#D96C4A] shadow-[0_0_8px_rgba(217,108,74,0.8)] animate-pulse" />
+                            )}
+                            <div className="flex gap-3.5 items-start">
+                              <div
+                                className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 shadow-inner ${n.type === 'success' ? 'bg-gradient-to-br from-emerald-100 to-emerald-200 text-emerald-600' : 'bg-gradient-to-br from-amber-100 to-amber-200 text-amber-600'}`}
+                              >
+                                {n.type === 'success' ? (
+                                  <CheckCircle2 size={20} />
+                                ) : (
+                                  <Receipt size={20} />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0 pr-4">
+                                <p
+                                  className={`text-[15px] leading-tight mb-1 truncate ${n.read ? 'font-bold text-gray-500' : 'font-black text-[#4B2E2D]'}`}
+                                >
+                                  {n.title}
+                                </p>
+                                <p
+                                  className={`text-[13px] leading-relaxed mb-2.5 line-clamp-2 ${n.read ? 'text-gray-400 font-medium' : 'text-[#4B2E2D]/80 font-semibold'}`}
+                                >
+                                  {n.message}
+                                </p>
+                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                                  <Clock size={11} />{' '}
+                                  {new Date(n.time).toLocaleTimeString([], {
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </p>
+                              </div>
+                            </div>
+                            {!n.read && (
+                              <div className="mt-3.5 ml-[58px] flex flex-wrap gap-2">
+                                {n.meta?.actionType === 'deliver_order' && (
+                                  <button
+                                    onClick={(e) => handleNotificationAction(e, n)}
+                                    className="text-[12px] font-black px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl shadow-md shadow-emerald-500/20 transition-all active:scale-95 flex items-center gap-1.5"
+                                  >
+                                    <ChefHat size={14} /> Entregar Pedido
+                                  </button>
+                                )}
+                                {n.meta?.actionType === 'process_payment' && (
+                                  <button
+                                    onClick={(e) => handleNotificationAction(e, n)}
+                                    className="text-[12px] font-black px-4 py-2 bg-[#D96C4A] hover:bg-[#C25838] text-white rounded-xl shadow-md shadow-[#D96C4A]/20 transition-all active:scale-95 flex items-center gap-1.5"
+                                  >
+                                    <Receipt size={14} /> Ver mesa
+                                  </button>
+                                )}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    markNotificationAsRead(n.id)
+                                  }}
+                                  className="text-[12px] font-bold px-3 py-2 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-xl transition-all active:scale-95"
+                                >
+                                  Ocultar
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
 
-          <button onClick={() => setIsHistoryOpen(true)} className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors text-white/80 hover:text-white mr-1 sm:mr-2" title="Historial Diario">
-            <History size={18} />
-          </button>
+            <button
+              onClick={() => setIsHistoryOpen(true)}
+              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors text-white/80 hover:text-white mr-1 sm:mr-2"
+              title="Historial Diario"
+            >
+              <History size={18} />
+            </button>
 
             {isAdmin && (
               <button
@@ -525,7 +611,7 @@ export function WaiterView({
             {/* Spacer for proper left scroll padding */}
             <div className="w-1 sm:w-2 shrink-0" aria-hidden="true" />
             <div className="flex gap-1.5 sm:gap-2 items-center shrink-0">
-          {displayLocations.map((loc, index) => (
+              {displayLocations.map((loc, index) => (
                 <button
                   key={loc || index}
                   onClick={() => setActiveLocation(loc)}
@@ -578,7 +664,9 @@ export function WaiterView({
                     }
                   `}
                   >
-                    {f.key === 'all' ? customTotalInLocation : customTableCounts[f.key as TableStatus] || 0}
+                    {f.key === 'all'
+                      ? customTotalInLocation
+                      : customTableCounts[f.key as TableStatus] || 0}
                   </span>
                 </button>
               ))}
@@ -770,7 +858,7 @@ export function WaiterView({
                 </div>
                 <h3 className="text-2xl font-black text-white mb-2">No hay mesas visibles</h3>
                 <p className="text-white/70 font-medium max-w-md">
-                  {!userLocation 
+                  {!userLocation
                     ? 'Aún no tienes una zona asignada. Por favor, pide al administrador que te asigne una ubicación (ej: Terraza).'
                     : `No se encontraron mesas registradas en tu zona asignada (${userLocation}).`}
                 </p>
@@ -782,12 +870,12 @@ export function WaiterView({
         {/* ────────────────────────────────────────────────────────────
             PANEL DERECHO — Detalle de Mesa y Carta Digital (MODAL)
         ──────────────────────────────────────────────────────────── */}
-      <TableSidePanel
-        isOpen={menuPanelOpen && !!activeTableId}
-        tableId={activeTableId}
-        onClose={handleCloseModal}
-        onOpenPayment={openPaymentModal}
-      />
+        <TableSidePanel
+          isOpen={menuPanelOpen && !!activeTableId}
+          tableId={activeTableId}
+          onClose={handleCloseModal}
+          onOpenPayment={openPaymentModal}
+        />
       </main>
 
       {/* ══════════════════════════════════════════════════════════════
@@ -806,7 +894,11 @@ export function WaiterView({
       <CancelReservationModal
         isOpen={!!(cancelingReservationTableId && cancelingReservationId)}
         table={tables.find((t) => t.id === cancelingReservationTableId) || null}
-        reservation={(reservations[cancelingReservationTableId || ''] || []).find((r) => r.id === cancelingReservationId) || null}
+        reservation={
+          (reservations[cancelingReservationTableId || ''] || []).find(
+            (r) => r.id === cancelingReservationId
+          ) || null
+        }
         onClose={closeCancelReservationModal}
         onConfirm={handleConfirmCancelReservation}
       />
@@ -835,10 +927,7 @@ export function WaiterView({
         onCancelReservation={openCancelReservationModal}
       />
 
-      <WaiterHistoryModal 
-        isOpen={isHistoryOpen} 
-        onClose={() => setIsHistoryOpen(false)} 
-      />
+      <WaiterHistoryModal isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} />
     </div>
   )
 }

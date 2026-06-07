@@ -37,7 +37,8 @@ export const tablesService = {
   update: (id: string, payload: TablePayload) => api.put<BackendTable>(`/mesas/${id}`, payload),
 
   // 🔥 Mantener esto (muy importante)
-  updateState: (id: string, estado: string) => api.patch<BackendTable>(`/mesas/${id}/estado`, { estado }),
+  updateState: (id: string, estado: string) =>
+    api.patch<BackendTable>(`/mesas/${id}/estado`, { estado }),
 
-  remove: (id: string) => api.delete<{ mensaje: string, mesa?: BackendTable }>(`/mesas/${id}`)
+  remove: (id: string) => api.delete<{ mensaje: string; mesa?: BackendTable }>(`/mesas/${id}`)
 }

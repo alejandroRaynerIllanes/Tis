@@ -35,9 +35,7 @@ export function CancelReservationModal({
               <XCircle size={20} className="text-white" strokeWidth={2.2} />
             </div>
             <div>
-              <h2 className="font-black text-white text-lg leading-tight">
-                Cancelar reserva
-              </h2>
+              <h2 className="font-black text-white text-lg leading-tight">Cancelar reserva</h2>
               <p className="text-[#F5E6D3] text-xs font-semibold mt-0.5">
                 {table?.name}
                 {reservation ? ` · ${reservation.clientName}` : ''}
@@ -66,9 +64,7 @@ export function CancelReservationModal({
                 <div className="mt-3 p-3 bg-[#FFF5F0] rounded-xl border border-[#FCE4D6] text-left space-y-1.5">
                   <div className="flex items-center gap-2 text-[#4B2E2D]">
                     <UserCheck size={13} strokeWidth={2.5} />
-                    <span className="text-sm font-black">
-                      {reservation.clientName}
-                    </span>
+                    <span className="text-sm font-black">{reservation.clientName}</span>
                     {reservation.vip && (
                       <Crown size={12} className="text-yellow-500" strokeWidth={2.5} />
                     )}

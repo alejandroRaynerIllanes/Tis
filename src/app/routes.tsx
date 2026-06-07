@@ -1,24 +1,46 @@
-// src/app/routes.tsx
 import { createBrowserRouter, Outlet } from 'react-router'
-import { Login } from './components/Login'
-import { Catalog } from './components/Catalog'
-import { WaiterView } from './components/WaiterView'
-import { NotFound } from './components/NotFound'
-import { UserManagement } from './components/admin/UserManagement'
-import { ChefView } from './components/ChefView'
-import { CashierView } from './components/CashierView'
-import { UnderConstruction } from './components/UnderConstruction'
+import { lazy, Suspense } from 'react'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { AppProvider } from './context/AppContext'
+import { NotificationsProvider } from './context/NotificationsContext'
 import { Toaster } from 'sonner'
-import { PaymentSimulator } from './components/PaymentSimulator'
+
+const Login = lazy(() => import('./components/Login').then((m) => ({ default: m.Login })))
+const Catalog = lazy(() => import('./components/Catalog').then((m) => ({ default: m.Catalog })))
+const WaiterView = lazy(() =>
+  import('./components/WaiterView').then((m) => ({ default: m.WaiterView }))
+)
+const NotFound = lazy(() => import('./components/NotFound').then((m) => ({ default: m.NotFound })))
+const UserManagement = lazy(() =>
+  import('./components/admin/UserManagement').then((m) => ({ default: m.UserManagement }))
+)
+const ChefView = lazy(() => import('./components/ChefView').then((m) => ({ default: m.ChefView })))
+const CashierView = lazy(() =>
+  import('./components/CashierView').then((m) => ({ default: m.CashierView }))
+)
+const UnderConstruction = lazy(() =>
+  import('./components/UnderConstruction').then((m) => ({ default: m.UnderConstruction }))
+)
+const PaymentSimulator = lazy(() =>
+  import('./components/PaymentSimulator').then((m) => ({ default: m.PaymentSimulator }))
+)
 
 function RootLayout() {
   return (
-    <AppProvider>
-      <Outlet />
-      <Toaster position="bottom-right" richColors />
-    </AppProvider>
+    <NotificationsProvider>
+      <AppProvider>
+        <Suspense
+          fallback={
+            <div className="flex items-center justify-center min-h-screen bg-gray-50 text-gray-500 font-medium">
+              Cargando módulo...
+            </div>
+          }
+        >
+          <Outlet />
+        </Suspense>
+        <Toaster position="bottom-right" richColors />
+      </AppProvider>
+    </NotificationsProvider>
   )
 }
 
@@ -27,10 +49,20 @@ export const router = createBrowserRouter([
     path: '/',
     element: <RootLayout />,
     errorElement: (
-      <AppProvider>
-        <NotFound />
-        <Toaster position="bottom-right" richColors />
-      </AppProvider>
+      <NotificationsProvider>
+        <AppProvider>
+          <Suspense
+            fallback={
+              <div className="flex items-center justify-center min-h-screen bg-gray-50 text-gray-500 font-medium">
+                Cargando módulo...
+              </div>
+            }
+          >
+            <NotFound />
+          </Suspense>
+          <Toaster position="bottom-right" richColors />
+        </AppProvider>
+      </NotificationsProvider>
     ),
     children: [
       {

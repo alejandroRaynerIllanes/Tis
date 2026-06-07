@@ -93,7 +93,10 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
 
   const handleOpenEditTableModal = (table: any) => {
     setTableEditingId(table.id)
-    const locId = table.locationId || locations.find(l => l.name === getTableLocation(table))?.id || (locations.length > 0 ? locations[0].id : 'interior')
+    const locId =
+      table.locationId ||
+      locations.find((l) => l.name === getTableLocation(table))?.id ||
+      (locations.length > 0 ? locations[0].id : 'interior')
     setTableFormData({
       number: String(getTableDisplayName(table)),
       capacity: table.capacity || 2,
@@ -111,7 +114,8 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
     if (!/^[a-záéíóúñ0-9\s]+$/i.test(nom)) return 'No se permiten símbolos especiales.'
     if (!nom.includes('mesa')) return 'Debe incluir la palabra "mesa".'
     const ubs = ['interior', 'patio', 'terraza']
-    if (!ubs.some(ub => nom.includes(ub))) return 'Debe incluir una ubicación válida (interior, patio, terraza).'
+    if (!ubs.some((ub) => nom.includes(ub)))
+      return 'Debe incluir una ubicación válida (interior, patio, terraza).'
     const nums = nom.match(/\d+/g)
     if (nums) {
       for (const n of nums) {
@@ -123,8 +127,11 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
     const isDuplicate = tables.some(
       (t) =>
         !isDeletedTable(t as any) &&
-        String(getTableDisplayName(t as any)).toLowerCase().trim() === nom &&
-        t.id !== currentEditingId && (t as any)._id !== currentEditingId
+        String(getTableDisplayName(t as any))
+          .toLowerCase()
+          .trim() === nom &&
+        t.id !== currentEditingId &&
+        (t as any)._id !== currentEditingId
     )
     if (isDuplicate) return 'El nombre de la mesa ya está en uso. Intenta con otro nombre.'
 
@@ -194,7 +201,8 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
     const nom = name.trim()
     if (!nom) return 'El nombre de la ubicación es requerido.'
     if (nom.length < 3) return 'Mínimo 3 caracteres.'
-    if (!/^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s]+$/.test(nom)) return 'Solo letras y espacios. Sin números ni símbolos.'
+    if (!/^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s]+$/.test(nom))
+      return 'Solo letras y espacios. Sin números ni símbolos.'
     return null
   }
 
@@ -210,13 +218,15 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
         const updated = await locationsService.update(locationEditingId, locationFormData.name)
         setLocations((prev) =>
           prev.map((loc) =>
-            loc.id === locationEditingId || loc._id === locationEditingId ? { ...loc, name: updated.nombre || updated.name } : loc
+            loc.id === locationEditingId || loc._id === locationEditingId
+              ? { ...loc, name: updated.nombre || updated.name }
+              : loc
           )
         )
       } else {
         const created = await locationsService.create(locationFormData.name)
         setLocations((prev) => [
-          ...prev, 
+          ...prev,
           { id: created.id || created._id, name: created.nombre || created.name }
         ])
       }
@@ -237,7 +247,11 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
       console.log('[FRONTEND] ✅ Eliminado en backend. Actualizando UI...')
       // Ahora podemos usar (prev) de forma segura para garantizar que la UI se limpie inmediatamente
       setLocations((prev) => prev.filter((loc) => loc.id !== locationId && loc._id !== locationId))
-      setTables((prevTables: any[]) => prevTables.filter((t: any) => t.locationId !== locationId && getTableLocation(t) !== locationId))
+      setTables((prevTables: any[]) =>
+        prevTables.filter(
+          (t: any) => t.locationId !== locationId && getTableLocation(t) !== locationId
+        )
+      )
       setLocationToDelete(null)
       window.dispatchEvent(new Event('locations_updated'))
       toast.success('Ubicación eliminada.')
@@ -294,7 +308,9 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
                   className={`w-full px-4 py-3 rounded-xl border-2 focus:outline-none transition-all ${tableError ? 'border-red-500 focus:border-red-600 bg-red-50' : 'border-[#E57C5D] focus:border-[#D0543A]'}`}
                   placeholder="Ej: Mesa Interior 1"
                 />
-                {tableError && <p className="text-red-500 text-xs font-bold mt-1.5">{tableError}</p>}
+                {tableError && (
+                  <p className="text-red-500 text-xs font-bold mt-1.5">{tableError}</p>
+                )}
               </div>
 
               <div>
@@ -404,14 +420,17 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
                 </button>
                 <div className="space-y-3 max-h-[400px] overflow-y-auto">
                   {locations.map((loc, index) => {
-                    const tablesCount = tables.filter(
-                      (t: any) => {
-                        if (isDeletedTable(t)) return false
-                        const isVipLocation = loc.name.toLowerCase() === 'vip' || loc.name.toLowerCase() === 'zona vip'
-                        if (isVipLocation && t.type === 'vip') return true
-                        return t.locationId === loc.id || t.locationId === loc._id || getTableLocation(t) === loc.name
-                      }
-                    ).length
+                    const tablesCount = tables.filter((t: any) => {
+                      if (isDeletedTable(t)) return false
+                      const isVipLocation =
+                        loc.name.toLowerCase() === 'vip' || loc.name.toLowerCase() === 'zona vip'
+                      if (isVipLocation && t.type === 'vip') return true
+                      return (
+                        t.locationId === loc.id ||
+                        t.locationId === loc._id ||
+                        getTableLocation(t) === loc.name
+                      )
+                    }).length
                     return (
                       <div
                         key={loc.id || loc._id || index}
@@ -439,7 +458,10 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
                               e.preventDefault()
                               e.stopPropagation()
                               const targetId = loc.id || loc._id
-                              console.log('[UI] 🎯 Seleccionando ubicación para eliminar. ID:', targetId)
+                              console.log(
+                                '[UI] 🎯 Seleccionando ubicación para eliminar. ID:',
+                                targetId
+                              )
                               setLocationToDelete(targetId)
                             }}
                             className="p-2 text-[#4B2E2D]/50 hover:text-[#D0543A] hover:bg-[#D0543A]/10 rounded-lg transition-all"
@@ -465,7 +487,9 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
                   className={`w-full px-4 py-3 rounded-xl border-2 focus:outline-none transition-all mb-2 ${locationError ? 'border-red-500 focus:border-red-600 bg-red-50' : 'border-[#E57C5D] focus:border-[#D0543A]'}`}
                   placeholder="Ej: Terraza..."
                 />
-                {locationError && <p className="text-red-500 text-xs font-bold mb-4">{locationError}</p>}
+                {locationError && (
+                  <p className="text-red-500 text-xs font-bold mb-4">{locationError}</p>
+                )}
                 <div className="flex justify-end gap-4">
                   <button
                     type="button"
@@ -530,7 +554,10 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
                 type="button"
                 onClick={(e) => {
                   e.preventDefault()
-                  console.log('[MODAL] 🛑 Confirmación clickeada. Ejecutando para ID:', locationToDelete)
+                  console.log(
+                    '[MODAL] 🛑 Confirmación clickeada. Ejecutando para ID:',
+                    locationToDelete
+                  )
                   if (locationToDelete) {
                     handleDeleteLocation(locationToDelete)
                   } else {

@@ -423,8 +423,9 @@ export function CashierView() {
     doc.text(`Metodo Pago: ${processedBill.paymentMethod || 'Efectivo'}`, 5, y);
     y += 5;
     
-    const now = new Date();
-    doc.text(`Fecha: ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`, 5, y);
+    // Usamos la fecha exacta del comprobante generado por el backend
+    const fechaBackend = processedBill.fecha ? new Date(processedBill.fecha) : new Date();
+    doc.text(`Fecha: ${fechaBackend.toLocaleDateString('es-BO')} ${fechaBackend.toLocaleTimeString('es-BO')}`, 5, y);
     y += 10;
     
     doc.text("¡Gracias por su preferencia!", 40, y, { align: "center" });

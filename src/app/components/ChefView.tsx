@@ -105,6 +105,12 @@ export function ChefView() {
       }
     }
 
+    const handleInventarioActualizado = () => {
+      inventarioService.getInventarioEstado()
+        .then((data) => setIngredients(data))
+        .catch((err) => console.error('[ChefView] Error recargando inventario:', err))
+    }
+
     const handleInventarioAlerta = (data: { ingrediente: string; stockActual: number; stockMinimo: number; estado: string }) => {
       setIngredients((prev) =>
         prev.map((ing) =>
@@ -121,11 +127,13 @@ export function ChefView() {
     socket.on('cocina:nuevo_pedido', handleNuevoPedido)
     socket.on('cocina:actualizar_tablero', handleActualizarTablero)
     socket.on('inventario:alerta', handleInventarioAlerta)
+    socket.on('inventario:actualizado', handleInventarioActualizado)
 
     return () => {
       socket.off('cocina:nuevo_pedido', handleNuevoPedido)
       socket.off('cocina:actualizar_tablero', handleActualizarTablero)
       socket.off('inventario:alerta', handleInventarioAlerta)
+      socket.off('inventario:actualizado', handleInventarioActualizado)
     }
   }, [socket])
 
@@ -148,7 +156,7 @@ export function ChefView() {
           : 'ENTREGADO'
 
     try {
-      await ordersService.updateStatus(order.rawId, backendStatus)
+      const response: any = await ordersService.updateStatus(order.rawId, backendStatus)
       setOrders((prevOrders) =>
         prevOrders.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
       )
@@ -169,8 +177,32 @@ export function ChefView() {
         socket.emit('cocina:actualizar_tablero', { _id: order.rawId, estado: backendStatus })
       }
 
-      if (newStatus === 'En preparación') toast.success(`Pedido ${orderId} en preparación 🔥`)
-      else if (newStatus === 'Listo') toast.success(`¡Pedido ${orderId} listo para entregar! ✅`)
+      if (newStatus === 'En preparación') {
+        toast.success(`Pedido ${orderId} en preparación 🔥`)
+      } else if (newStatus === 'Listo') {
+        const descontados = response?.ingredientesDescontados || response?.data?.ingredientesDescontados || []
+        if (descontados.length > 0) {
+          toast.success('Inventario actualizado', {
+            description: (
+              <div className="mt-1">
+                <p className="font-medium text-sm mb-1">Pedido preparado correctamente. Se descontó:</p>
+                <ul className="text-xs space-y-0.5 opacity-90">
+                  {descontados.map((d: any, i: number) => (
+                    <li key={i}>• {d.nombre}: -{d.cantidad} {d.unidad || ''}</li>
+                  ))}
+                </ul>
+              </div>
+            ),
+            duration: 6000
+          })
+        } else {
+          toast.success(`¡Pedido ${orderId} listo para entregar! ✅`)
+        }
+        // Sincronización proactiva adicional
+        inventarioService.getInventarioEstado()
+          .then((data) => setIngredients(data))
+          .catch((err) => console.error('[ChefView] Error recargando inventario:', err))
+      }
     } catch (e) {
       toast.error('Error al actualizar el estado en el servidor.')
     }

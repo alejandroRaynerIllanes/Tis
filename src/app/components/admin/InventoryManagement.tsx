@@ -3,48 +3,73 @@ import {
   Package,
   BookOpen,
   AlertTriangle,
-  ArrowRightLeft,
   Plus
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { inventarioService, type Ingrediente } from '../../services/inventario.service'
+import { useAppContext } from '../../context/AppContext'
 
 // ─── Sub-componentes ──────────────────────────────────────────────────────────
 import { IngredientsGrid } from './inventory/IngredientsGrid'
 import { StockEntryModal } from './inventory/StockEntryModal'
 import { StockAlertsTab } from './inventory/StockAlertsTab'
-import { MovementsTab } from './inventory/MovementsTab'
 import { RecipesTab } from './inventory/RecipesTab'
 import { DeleteConfirmModal } from './inventory/DeleteConfirmModal'
+import { IngredientModal } from './inventory/IngredientModal'
 
 // ─── Componente Orquestador ────────────────────────────────────────────────────
 
-type ActiveTab = 'ingredientes' | 'recetas' | 'alertas' | 'movimientos'
+type ActiveTab = 'ingredientes' | 'recetas' | 'alertas'
 
 export function InventoryManagement() {
+  const { socket } = useAppContext()
   const [activeTab, setActiveTab] = useState<ActiveTab>('ingredientes')
   const [searchTerm, setSearchTerm] = useState('')
 
   // ─── Estado de ingredientes (fuente de verdad del orquestador) ───
   const [ingredients, setIngredients] = useState<Ingrediente[]>([])
+  const [alerts, setAlerts] = useState<Ingrediente[]>([])
+  const [recipes, setRecipes] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  const fetchIngredients = async () => {
+  const fetchInventoryData = async () => {
     try {
       setIsLoading(true)
-      const data = await inventarioService.getInventarioEstado()
-      setIngredients(data)
+      const [estadoData, alertasData, recetasData] = await Promise.all([
+        inventarioService.getInventarioEstado(),
+        inventarioService.getAlertas().catch(() => []),
+        inventarioService.getRecetas().catch(() => [])
+      ])
+      setIngredients(estadoData)
+      setAlerts(alertasData)
+      setRecipes(recetasData)
     } catch (err) {
       console.error('[InventoryManagement] Error cargando inventario:', err)
-      toast.error('No se pudo cargar el inventario.')
+      toast.error('No se pudo cargar la información del inventario.')
     } finally {
       setIsLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchIngredients()
+    fetchInventoryData()
   }, [])
+
+  useEffect(() => {
+    if (!socket) return
+
+    const handleActualizacion = () => {
+      fetchInventoryData()
+    }
+
+    socket.on('inventario:actualizado', handleActualizacion)
+    socket.on('inventario:alerta', handleActualizacion)
+
+    return () => {
+      socket.off('inventario:actualizado', handleActualizacion)
+      socket.off('inventario:alerta', handleActualizacion)
+    }
+  }, [socket])
 
   // ─── Estado del modal de entrada de stock ───
   const [isStockModalOpen, setIsStockModalOpen] = useState(false)
@@ -55,27 +80,40 @@ export function InventoryManagement() {
     setIsStockModalOpen(true)
   }
 
+  // ─── Estado del modal de Ingredientes (Crear/Editar) ───
+  const [isIngredientModalOpen, setIsIngredientModalOpen] = useState(false)
+  const [ingredientToEdit, setIngredientToEdit] = useState<Ingrediente | null>(null)
+
+  const openIngredientModal = (ingrediente?: Ingrediente) => {
+    setIngredientToEdit(ingrediente || null)
+    setIsIngredientModalOpen(true)
+  }
+
   // ─── Estado del modal de eliminación ───
   const [ingredientToDelete, setIngredientToDelete] = useState<string | null>(null)
 
-  const handleDeleteIngredient = () => {
+  const handleDeleteIngredient = async () => {
     if (ingredientToDelete) {
-      setIngredients((prev) => prev.filter((i) => i._id !== ingredientToDelete))
-      setIngredientToDelete(null)
+      try {
+        await inventarioService.eliminarIngrediente(ingredientToDelete)
+        toast.success('Ingrediente eliminado correctamente.')
+        await fetchInventoryData()
+      } catch (error) {
+        toast.error('No se pudo eliminar el ingrediente.')
+      } finally {
+        setIngredientToDelete(null)
+      }
     }
   }
 
   // ─── Derivados ───
-  const lowStockIngredients = ingredients.filter(
-    (i) => i.estado === 'Bajo' || i.estado === 'Agotado'
-  )
+  const lowStockIngredients = alerts
 
   // ─── Tabs config ───
   const TABS = [
     { key: 'ingredientes' as const, label: 'Ingredientes', icon: <Package size={14} /> },
     { key: 'recetas' as const, label: 'Recetas (Escandallos)', icon: <BookOpen size={14} /> },
-    { key: 'alertas' as const, label: 'Alertas de Stock', icon: <AlertTriangle size={14} /> },
-    { key: 'movimientos' as const, label: 'Movimientos', icon: <ArrowRightLeft size={14} /> }
+    { key: 'alertas' as const, label: 'Alertas de Stock', icon: <AlertTriangle size={14} /> }
   ]
 
   return (
@@ -90,12 +128,12 @@ export function InventoryManagement() {
             </h1>
             <p className="text-[#4B2E2D]/70 font-medium mt-2">Gestión de stock y recetas</p>
           </div>
-          {(activeTab === 'ingredientes' || activeTab === 'recetas') && (
+          {(activeTab === 'ingredientes') && (
             <button
-              onClick={() => activeTab === 'ingredientes' ? openStockModal() : undefined}
+              onClick={() => openIngredientModal()}
               className="flex items-center gap-2 bg-[#D0543A] text-white px-6 py-3.5 rounded-xl font-bold shadow-lg shadow-[#D0543A]/30 hover:bg-[#b5462f] hover:shadow-xl hover:-translate-y-0.5 transition-all active:scale-[0.98]"
             >
-              <Plus size={20} strokeWidth={3} /> Nuevo Registro
+              <Plus size={20} strokeWidth={3} /> Nuevo Ingrediente
             </button>
           )}
         </div>
@@ -138,10 +176,11 @@ export function InventoryManagement() {
             onSearchChange={setSearchTerm}
             onRegisterEntry={openStockModal}
             onDeleteRequest={setIngredientToDelete}
+            onEditRequest={openIngredientModal}
           />
         )}
 
-        {activeTab === 'recetas' && <RecipesTab ingredients={ingredients} />}
+      {activeTab === 'recetas' && <RecipesTab ingredients={ingredients} recipes={recipes} onRefresh={fetchInventoryData} />}
 
         {activeTab === 'alertas' && (
           <StockAlertsTab
@@ -149,8 +188,6 @@ export function InventoryManagement() {
             onRegisterEntry={openStockModal}
           />
         )}
-
-        {activeTab === 'movimientos' && <MovementsTab />}
       </div>
 
       {/* ── Modales globales ── */}
@@ -159,13 +196,20 @@ export function InventoryManagement() {
         ingredients={ingredients}
         preselectedId={preselectedIngId}
         onClose={() => setIsStockModalOpen(false)}
-        onSuccess={fetchIngredients}
+        onSuccess={fetchInventoryData}
       />
 
       <DeleteConfirmModal
         ingredientId={ingredientToDelete}
         onConfirm={handleDeleteIngredient}
         onCancel={() => setIngredientToDelete(null)}
+      />
+
+      <IngredientModal
+        isOpen={isIngredientModalOpen}
+        ingredientToEdit={ingredientToEdit}
+        onClose={() => setIsIngredientModalOpen(false)}
+        onSuccess={fetchInventoryData}
       />
     </>
   )

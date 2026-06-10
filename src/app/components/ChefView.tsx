@@ -105,6 +105,12 @@ export function ChefView() {
       }
     }
 
+    const handleInventarioActualizado = () => {
+      inventarioService.getInventarioEstado()
+        .then((data) => setIngredients(data))
+        .catch((err) => console.error('[ChefView] Error recargando inventario:', err))
+    }
+
     const handleInventarioAlerta = (data: { ingrediente: string; stockActual: number; stockMinimo: number; estado: string }) => {
       setIngredients((prev) =>
         prev.map((ing) =>
@@ -121,11 +127,13 @@ export function ChefView() {
     socket.on('cocina:nuevo_pedido', handleNuevoPedido)
     socket.on('cocina:actualizar_tablero', handleActualizarTablero)
     socket.on('inventario:alerta', handleInventarioAlerta)
+    socket.on('inventario:actualizado', handleInventarioActualizado)
 
     return () => {
       socket.off('cocina:nuevo_pedido', handleNuevoPedido)
       socket.off('cocina:actualizar_tablero', handleActualizarTablero)
       socket.off('inventario:alerta', handleInventarioAlerta)
+      socket.off('inventario:actualizado', handleInventarioActualizado)
     }
   }, [socket])
 
@@ -148,7 +156,7 @@ export function ChefView() {
           : 'ENTREGADO'
 
     try {
-      await ordersService.updateStatus(order.rawId, backendStatus)
+      const response: any = await ordersService.updateStatus(order.rawId, backendStatus)
       setOrders((prevOrders) =>
         prevOrders.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
       )
@@ -169,8 +177,32 @@ export function ChefView() {
         socket.emit('cocina:actualizar_tablero', { _id: order.rawId, estado: backendStatus })
       }
 
-      if (newStatus === 'En preparación') toast.success(`Pedido ${orderId} en preparación 🔥`)
-      else if (newStatus === 'Listo') toast.success(`¡Pedido ${orderId} listo para entregar! ✅`)
+      if (newStatus === 'En preparación') {
+        toast.success(`Pedido ${orderId} en preparación 🔥`)
+      } else if (newStatus === 'Listo') {
+        const descontados = response?.ingredientesDescontados || response?.data?.ingredientesDescontados || []
+        if (descontados.length > 0) {
+          toast.success('Inventario actualizado', {
+            description: (
+              <div className="mt-1">
+                <p className="font-medium text-sm mb-1">Pedido preparado correctamente. Se descontó:</p>
+                <ul className="text-xs space-y-0.5 opacity-90">
+                  {descontados.map((d: any, i: number) => (
+                    <li key={i}>• {d.nombre}: -{d.cantidad} {d.unidad || ''}</li>
+                  ))}
+                </ul>
+              </div>
+            ),
+            duration: 6000
+          })
+        } else {
+          toast.success(`¡Pedido ${orderId} listo para entregar! ✅`)
+        }
+        // Sincronización proactiva adicional
+        inventarioService.getInventarioEstado()
+          .then((data) => setIngredients(data))
+          .catch((err) => console.error('[ChefView] Error recargando inventario:', err))
+      }
     } catch (e) {
       toast.error('Error al actualizar el estado en el servidor.')
     }
@@ -272,6 +304,10 @@ export function ChefView() {
   const prepOrders = orders.filter((o) => o.status === 'En preparación')
   const readyOrders = orders.filter((o) => o.status === 'Listo')
 
+  const stockCritico = ingredients.filter((ing) => ing.stockActual <= 0)
+  const stockBajo = ingredients.filter((ing) => ing.stockActual > 0 && ing.stockActual <= ing.stockMinimo)
+  const disponibles = ingredients.filter((ing) => ing.stockActual > ing.stockMinimo)
+
   return (
     <div className="h-[100dvh] bg-[#FCE4D6]/30 flex flex-col overflow-hidden">
       {/* Cabecera */}
@@ -303,34 +339,82 @@ export function ChefView() {
 
       {/* Panel Estado de Ingredientes */}
       {ingredients.length > 0 && (
-        <div className="px-6 sm:px-10 pt-5 pb-1 shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden">
-          <div className="flex items-center gap-3">
-            <div className="text-sm font-black text-[#4B2E2D] shrink-0 mr-2">
-              Estado de Ingredientes
-            </div>
-            {ingredients.map((ing) => {
-              const isLowStock = ing.estado === 'Bajo' || ing.estado === 'Agotado'
-              return (
-                <div
-                  key={ing._id}
-                  className={`flex flex-col gap-1 px-4 py-2.5 rounded-xl border shrink-0 transition-colors shadow-sm ${isLowStock ? 'bg-red-50 border-red-200' : 'bg-white border-[#E0D0C5]'}`}
-                >
-                  <div className="flex items-center gap-2">
-                    <div
-                      className={`w-2 h-2 rounded-full shadow-inner ${isLowStock ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`}
-                    />
-                    <span className="font-bold text-[#4B2E2D] text-sm leading-none">
-                      {ing.nombre}
-                    </span>
-                  </div>
-                  <div
-                    className={`text-xs font-black ml-4 ${isLowStock ? 'text-red-600' : 'text-gray-500'}`}
-                  >
-                    {ing.stockActual} <span className="font-bold opacity-80">{ing.unidad}</span>
-                  </div>
+        <div className="px-6 sm:px-10 pt-5 pb-4 shrink-0 overflow-y-auto max-h-[35vh] border-b border-[#E57C5D]/20 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-black/10">
+          <div className="flex flex-col gap-6">
+            {stockCritico.length > 0 && (
+              <div>
+                <h3 className="text-sm font-black text-red-700 mb-3 flex items-center gap-2">
+                  🔴 Stock Crítico ({stockCritico.length})
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                  {stockCritico.map((ing) => (
+                    <div key={ing._id} className="bg-red-50 border border-red-200 rounded-xl p-4 shadow-sm flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-[#4B2E2D] text-sm leading-tight line-clamp-1" title={ing.nombre}>{ing.nombre}</span>
+                        <div className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-inner animate-pulse shrink-0" />
+                      </div>
+                      <div className="flex items-end justify-between mt-1">
+                        <span className="text-xs font-semibold text-red-800/60">Stock:</span>
+                        <div className="text-right">
+                          <span className="text-lg font-black text-red-600">{ing.stockActual}</span>
+                          <span className="text-xs font-bold text-red-600/80 ml-1">{ing.unidad}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              )
-            })}
+              </div>
+            )}
+
+            {stockBajo.length > 0 && (
+              <div>
+                <h3 className="text-sm font-black text-amber-700 mb-3 flex items-center gap-2">
+                  🟡 Stock Bajo ({stockBajo.length})
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                  {stockBajo.map((ing) => (
+                    <div key={ing._id} className="bg-amber-50 border border-amber-200 rounded-xl p-4 shadow-sm flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-[#4B2E2D] text-sm leading-tight line-clamp-1" title={ing.nombre}>{ing.nombre}</span>
+                        <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-inner shrink-0" />
+                      </div>
+                      <div className="flex items-end justify-between mt-1">
+                        <span className="text-xs font-semibold text-amber-800/60">Stock:</span>
+                        <div className="text-right">
+                          <span className="text-lg font-black text-amber-600">{ing.stockActual}</span>
+                          <span className="text-xs font-bold text-amber-600/80 ml-1">{ing.unidad}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {disponibles.length > 0 && (
+              <div>
+                <h3 className="text-sm font-black text-emerald-700 mb-3 flex items-center gap-2">
+                  🟢 Disponibles ({disponibles.length})
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                  {disponibles.map((ing) => (
+                    <div key={ing._id} className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 shadow-sm flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-[#4B2E2D] text-sm leading-tight line-clamp-1" title={ing.nombre}>{ing.nombre}</span>
+                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-inner shrink-0" />
+                      </div>
+                      <div className="flex items-end justify-between mt-1">
+                        <span className="text-xs font-semibold text-emerald-800/60">Stock:</span>
+                        <div className="text-right">
+                          <span className="text-lg font-black text-emerald-600">{ing.stockActual}</span>
+                          <span className="text-xs font-bold text-emerald-600/80 ml-1">{ing.unidad}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

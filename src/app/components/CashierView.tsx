@@ -26,6 +26,7 @@ import { toast } from 'sonner'
 import { getStoredUser, api } from '../services/api'
 import { authService } from '../services/auth.service'
 import { useAppContext } from '../context/AppContext'
+import { tablesService } from '../services/tables.service'
 
 // ─── COMPONENTE PRINCIPAL ───────────────────────────────────────────────────
 
@@ -95,18 +96,39 @@ export function CashierView() {
       setPendingBills((prev) => {
         const mergedList = [...pending]
         prev.forEach((localItem) => {
+          const localId = localItem.pedidoId || localItem._id
           const existeEnFetch = mergedList.find(
-            (fetchItem) =>
-              (fetchItem.pedidoId || fetchItem._id) === (localItem.pedidoId || localItem._id)
+            (fetchItem) => (fetchItem.pedidoId || fetchItem._id) === localId
           )
+
+          const yaProcesadoDb = closed.some((c: any) => (c.pedidoId || c._id) === localId)
+          const yaProcesadoLocal =
+            localItem.estado === 'CERRADO' ||
+            localItem.estado === 'PAGADO' ||
+            localItem.estadoPago === 'Pagado' ||
+            localItem.estadoPago === 'Procesado' ||
+            localItem.paymentStatus === 'completed' ||
+            localItem.paymentStatus === 'paid'
+
           if (
             !existeEnFetch &&
+            !yaProcesadoDb &&
+            !yaProcesadoLocal &&
             (localItem.estado === 'CUENTA_SOLICITADA' || localItem.paymentStatus === 'pending')
           ) {
             mergedList.unshift(localItem)
           }
         })
-        return mergedList
+        return mergedList.filter((item: any) => {
+          return !(
+            item.estado === 'CERRADO' ||
+            item.estado === 'PAGADO' ||
+            item.estadoPago === 'Pagado' ||
+            item.estadoPago === 'Procesado' ||
+            item.paymentStatus === 'paid' ||
+            item.paymentStatus === 'completed'
+          )
+        })
       })
       setStats({ totalDia, efectivo, tarjeta, qr, descuentos, propinas, pagosProcesados })
 
@@ -136,16 +158,13 @@ export function CashierView() {
         pedido.cajeroAsignado === (currentUser as any)?._id ||
         !pedido.cajeroAsignado
       ) {
-        toast.info(
-          `¡Nueva cuenta recibida de la ${pedido.mesa?.numero || pedido.mesaNombre || 'Mesa'}!`
-        )
-
         setPendingBills((prev: any[]) => {
-          const existe = prev.some((p) => (p.pedidoId || p._id) === (pedido.pedidoId || pedido._id))
-          if (existe)
-            return prev.map((p) =>
-              (p.pedidoId || p._id) === (pedido.pedidoId || pedido._id) ? pedido : p
-            )
+          const existe = prev.some((p) => p._id === pedido._id || p.pedidoId === (pedido.pedidoId || pedido._id))
+          if (existe) return prev
+
+          toast.info(
+            `¡Nueva cuenta recibida de la ${pedido.mesa?.numero || pedido.mesaNombre || 'Mesa'}!`
+          )
           return [pedido, ...prev]
         })
       }
@@ -167,15 +186,63 @@ export function CashierView() {
       })
     }
 
+    const handlePagoCompletado = (payload: any) => {
+      const paidId = payload.pedidoId || payload._id || payload.id
+      if (!paidId) return
+
+      setPendingBills((prev) =>
+        prev.filter((bill) => bill._id !== paidId && bill.pedidoId !== paidId)
+      )
+
+      setSelectedBill((prev: any) => {
+        if (prev && (prev._id === paidId || prev.pedidoId === paidId)) {
+          return null
+        }
+        return prev
+      })
+
+      fetchDashboardData()
+    }
+
+    const handleMesasUpdated = (payload: any) => {
+      const items = Array.isArray(payload) ? payload : [payload]
+      items.forEach((item: any) => {
+        if (item.status === 'Disponible' || item.estado === 'Libre') {
+          const tId = item.id || item._id || item.tableId
+          
+          setPendingBills((prev) =>
+            prev.filter((bill) => {
+              const billTableId = bill.mesaId || bill.mesa?._id || bill.mesa
+              return billTableId !== tId
+            })
+          )
+
+          setSelectedBill((prev: any) => {
+            if (prev) {
+              const prevTableId = prev.mesaId || prev.mesa?._id || prev.mesa
+              if (prevTableId === tId) return null
+            }
+            return prev
+          })
+        }
+      })
+    }
+
     const handleActualizarTablero = () => fetchDashboardData()
 
     socket.on('caja:nueva_cuenta', handleNuevaCuenta)
+    socket.on('caja:solicitud_pago', handleCuentaSolicitada)
     socket.on('cuenta:solicitada', handleCuentaSolicitada)
+    socket.on('mesas:pago_completado', handlePagoCompletado)
+    socket.on('mesas:updated', handleMesasUpdated)
     socket.on('cocina:actualizar_tablero', handleActualizarTablero)
 
     return () => {
       socket.off('caja:nueva_cuenta', handleNuevaCuenta)
+      socket.off('caja:solicitud_pago', handleCuentaSolicitada)
       socket.off('cuenta:solicitada', handleCuentaSolicitada)
+      socket.off('mesas:pago_completado', handlePagoCompletado)
+      socket.off('mesas:updated', handleMesasUpdated)
       socket.off('cocina:actualizar_tablero', handleActualizarTablero)
     }
   }, [socket])
@@ -265,15 +332,23 @@ export function CashierView() {
         })
       }
 
+      const tableId = selectedBill.mesaId || selectedBill.mesa?._id || selectedBill.mesa
+      if (tableId) {
+        await tablesService.updateState(tableId, 'Disponible')
+        console.log('[PAGO] mesa liberada', tableId)
+      }
+      console.log('[PAGO] pedido cerrado', pId)
+      console.log('[PAGO] estado mesa actualizado en BD')
+
       toast.success(
         `Pago procesado con éxito para ${selectedBill.mesaNombre || selectedBill.mesa?.numero || 'Mesa'}`,
         { description: 'Se liberó la mesa.' }
       )
 
-      const tableId = selectedBill.mesaId || selectedBill.mesa?._id || selectedBill.mesa
       if (socket) {
         socket.emit('mesas:updated', { tableId, status: 'Disponible' })
         socket.emit('cocina:actualizar_tablero')
+        socket.emit('mesas:pago_completado', { pedidoId: pId, tableId })
       }
 
       setProcessedBill({
@@ -285,9 +360,11 @@ export function CashierView() {
       setPendingBills((prev) => prev.filter((p) => (p.pedidoId || p._id) !== pId))
       setSelectedBill(null)
       setSelectedMethod(null)
+
+      await fetchDashboardData()
+
       setIsQRModalOpen(false)
       setIsInvoiceModalOpen(true)
-      fetchDashboardData()
     } catch (error: any) {
       toast.error(error.response?.data?.mensaje || error.message || 'Error al procesar el pago')
     } finally {

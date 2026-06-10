@@ -122,7 +122,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [socketInstance, setSocketInstance] = useState<any>(null)
   const socketRef = useRef<any>(null)
 
-  const getTableId = (table: any) => table?.id || table?._id
+  const getTableId = (table: any) => table?.id || table?._id || table?.tableId || table?.mesaId?.toString()
 
   const normalizarMesa = (item: any): Table => {
     const rawStatus = item?.status || item?.estado || 'Libre'
@@ -225,9 +225,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             const index = next.findIndex((t: any) => getTableId(t) === itemId)
             if (index !== -1) {
               const existing = next[index]
+              const rawStatus = item.status || item.estado || existing.status
+              const normalizedStatus = rawStatus === 'Libre' ? 'Disponible' :
+                                       rawStatus === 'Cuenta Solicitada' ? 'Esperando pago' :
+                                       rawStatus
+              
               next[index] = {
                 ...existing,
-                status: item.status || item.estado || existing.status,
+                status: normalizedStatus,
                 name: item.name || item.numero || existing.name,
                 capacity: item.capacity || item.capacidad || existing.capacity,
                 location:
@@ -333,7 +338,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         ])
 
       if (Array.isArray(fetchedTables)) {
-        setTables(fetchedTables.map(normalizarMesa))
+        setTables((current) => {
+          return fetchedTables.map((ft) => {
+            const norm = normalizarMesa(ft)
+            const existing = current.find((t) => getTableId(t) === getTableId(norm))
+            // Evitar sobrescribir un estado optimista 'Disponible' con caché vieja 'Esperando pago'
+            if (existing && existing.status === 'Disponible' && norm.status === 'Esperando pago') {
+              return existing
+            }
+            return norm
+          })
+        })
       }
 
       if (Array.isArray(fetchedProducts)) {
@@ -418,6 +433,19 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     loadInitialData()
   }, [loadInitialData])
+
+  // Sincronizar pago completado mediante evento websocket
+  useEffect(() => {
+    if (!socketInstance) return
+
+    const handlePagoCompletado = (payload: any) => {
+      console.log('Pago completado recibido en AppContext, refrescando datos...', payload)
+      loadInitialData()
+    }
+
+    socketInstance.on('mesas:pago_completado', handlePagoCompletado)
+    return () => socketInstance.off('mesas:pago_completado', handlePagoCompletado)
+  }, [socketInstance, loadInitialData])
 
   const normalizarReserva = (r: any) => {
     const tId = r.mesa?._id || r.mesa?.id || r.mesa || ''

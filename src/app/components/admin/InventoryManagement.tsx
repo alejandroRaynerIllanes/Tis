@@ -263,6 +263,7 @@ export function InventoryManagement() {
       <IngredientModal
         isOpen={isIngredientModalOpen}
         ingredientToEdit={ingredientToEdit}
+        ingredients={ingredients}
         onClose={() => setIsIngredientModalOpen(false)}
         onSuccess={fetchInventoryData}
       />

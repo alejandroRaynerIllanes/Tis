@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { X, Plus, Trash2 } from 'lucide-react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
+import { X, Plus, Trash2, ChevronDown, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { inventarioService, type Ingrediente } from '../../../services/inventario.service'
 
@@ -15,6 +15,82 @@ interface RecipeEditorModalProps {
 interface RecipeRow {
   ingrediente: string
   cantidadNecesaria: number | ''
+}
+
+interface SearchableSelectProps {
+  value: string
+  onChange: (val: string) => void
+  options: Ingrediente[]
+  disabled?: boolean
+}
+
+function SearchableSelect({ value, onChange, options, disabled }: SearchableSelectProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  const selectedOption = options.find((o) => o._id === value)
+
+  const filteredOptions = useMemo(() => {
+    if (!searchTerm) return options
+    const lowerTerm = searchTerm.toLowerCase()
+    return options.filter((o) => o.nombre.toLowerCase().includes(lowerTerm))
+  }, [searchTerm, options])
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsOpen(false)
+      }
+    }
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      document.addEventListener('keydown', handleEscape)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [isOpen])
+
+  return (
+    <div className="relative w-full" ref={containerRef}>
+      <button
+        type="button"
+        onClick={() => {
+          if (disabled) return
+          if (!isOpen) setSearchTerm('')
+          setIsOpen(!isOpen)
+        }}
+        disabled={disabled}
+        className={`w-full flex items-center justify-between px-3 py-2.5 bg-white border border-gray-200 rounded-lg font-bold focus:outline-none focus:ring-2 focus:ring-[#D0543A] transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${selectedOption ? 'text-[#4B2E2D]' : 'text-gray-500'}`}
+      >
+        <span className="truncate">{selectedOption ? selectedOption.nombre : 'Seleccione ingrediente...'}</span>
+        <ChevronDown size={16} className="text-gray-400 shrink-0 ml-2" />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-[60] w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+          <div className="p-2 border-b border-gray-100 relative bg-gray-50">
+            <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input type="text" autoFocus placeholder="Buscar ingrediente..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-8 pr-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D0543A] text-[#4B2E2D] font-medium" />
+          </div>
+          <ul className="max-h-48 overflow-y-auto p-1">
+            {filteredOptions.length === 0 ? (
+              <li className="px-3 py-4 text-center text-sm font-medium text-gray-400">No se encontraron ingredientes</li>
+            ) : (
+              filteredOptions.map((opt) => (<li key={opt._id}><button type="button" onClick={() => { onChange(opt._id); setIsOpen(false); }} className={`w-full text-left px-3 py-2.5 text-sm font-bold rounded-lg transition-colors ${value === opt._id ? 'bg-[#FCE4D6] text-[#D0543A]' : 'text-[#4B2E2D] hover:bg-gray-50'}`}>{opt.nombre}</button></li>))
+            )}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function RecipeEditorModal({ isOpen, onClose, dish, recipe, ingredients, onSuccess }: RecipeEditorModalProps) {
@@ -124,18 +200,12 @@ export function RecipeEditorModal({ isOpen, onClose, dish, recipe, ingredients, 
                 return (
                   <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-100 rounded-xl">
                     <div className="flex-1">
-                      <select
-                        required
+                      <SearchableSelect
                         value={row.ingrediente}
-                        onChange={(e) => handleRowChange(idx, 'ingrediente', e.target.value)}
-                        className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg font-bold text-[#4B2E2D] focus:outline-none focus:ring-2 focus:ring-[#D0543A] appearance-none"
+                        onChange={(val) => handleRowChange(idx, 'ingrediente', val)}
+                        options={ingredients}
                         disabled={isLoading}
-                      >
-                        <option value="" disabled>Seleccione ingrediente...</option>
-                        {ingredients.map(i => (
-                          <option key={i._id} value={i._id}>{i.nombre}</option>
-                        ))}
-                      </select>
+                      />
                     </div>
                     <div className="w-24 shrink-0 relative">
                       <input

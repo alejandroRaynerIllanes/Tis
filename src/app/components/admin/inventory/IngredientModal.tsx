@@ -6,11 +6,15 @@ import { inventarioService, type Ingrediente } from '../../../services/inventari
 interface IngredientModalProps {
   isOpen: boolean
   ingredientToEdit?: Ingrediente | null
+  ingredients: Ingrediente[]
   onClose: () => void
   onSuccess: () => Promise<void>
 }
 
-export function IngredientModal({ isOpen, ingredientToEdit, onClose, onSuccess }: IngredientModalProps) {
+const normalizeIngredientName = (name: string) =>
+  name.trim().toLowerCase().replace(/\s+/g, ' ')
+
+export function IngredientModal({ isOpen, ingredientToEdit, ingredients, onClose, onSuccess }: IngredientModalProps) {
   const [formData, setFormData] = useState<{
     nombre: string
     stockActual: number | ''
@@ -53,6 +57,19 @@ export function IngredientModal({ isOpen, ingredientToEdit, onClose, onSuccess }
     if (!formData.unidad.trim()) return toast.error('La unidad es requerida.')
     if (formData.stockActual === '' || formData.stockActual < 0) return toast.error('El stock actual no puede ser negativo.')
     if (formData.stockMinimo === '' || formData.stockMinimo < 0) return toast.error('El stock mínimo no puede ser negativo.')
+
+    const normalizedInput = normalizeIngredientName(formData.nombre)
+
+    const isDuplicate = ingredients.some((ing) => {
+      const sameName = normalizeIngredientName(ing.nombre) === normalizedInput
+      const differentId = ingredientToEdit ? ing._id !== ingredientToEdit._id : true
+      return sameName && differentId
+    })
+
+    if (isDuplicate) {
+      toast.error('Ya existe un ingrediente con ese nombre.')
+      return
+    }
 
     setIsLoading(true)
     try {

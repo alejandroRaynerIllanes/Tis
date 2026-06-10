@@ -3,7 +3,8 @@ import {
   Package,
   BookOpen,
   AlertTriangle,
-  Plus
+  Plus,
+  ArrowUpRight
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { inventarioService, type Ingrediente } from '../../services/inventario.service'
@@ -12,7 +13,6 @@ import { useAppContext } from '../../context/AppContext'
 // ─── Sub-componentes ──────────────────────────────────────────────────────────
 import { IngredientsGrid } from './inventory/IngredientsGrid'
 import { StockEntryModal } from './inventory/StockEntryModal'
-import { StockAlertsTab } from './inventory/StockAlertsTab'
 import { RecipesTab } from './inventory/RecipesTab'
 import { DeleteConfirmModal } from './inventory/DeleteConfirmModal'
 import { IngredientModal } from './inventory/IngredientModal'
@@ -28,20 +28,25 @@ export function InventoryManagement() {
 
   // ─── Estado de ingredientes (fuente de verdad del orquestador) ───
   const [ingredients, setIngredients] = useState<Ingrediente[]>([])
-  const [alerts, setAlerts] = useState<Ingrediente[]>([])
   const [recipes, setRecipes] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   const fetchInventoryData = async () => {
     try {
       setIsLoading(true)
-      const [estadoData, alertasData, recetasData] = await Promise.all([
+      const [estadoData, recetasData] = await Promise.all([
         inventarioService.getInventarioEstado(),
-        inventarioService.getAlertas().catch(() => []),
         inventarioService.getRecetas().catch(() => [])
       ])
-      setIngredients(estadoData)
-      setAlerts(alertasData)
+      
+      const calculatedIngredients = estadoData.map(ing => {
+        let estado: Ingrediente['estado'] = 'Disponible';
+        if (ing.stockActual <= 0) estado = 'Agotado';
+        else if (ing.stockActual <= ing.stockMinimo) estado = 'Bajo';
+        return { ...ing, estado };
+      });
+
+      setIngredients(calculatedIngredients)
       setRecipes(recetasData)
     } catch (err) {
       console.error('[InventoryManagement] Error cargando inventario:', err)
@@ -107,7 +112,7 @@ export function InventoryManagement() {
   }
 
   // ─── Derivados ───
-  const lowStockIngredients = alerts
+  const lowStockIngredients = ingredients.filter(ing => ing.estado === 'Agotado' || ing.estado === 'Bajo')
 
   // ─── Tabs config ───
   const TABS = [
@@ -183,10 +188,60 @@ export function InventoryManagement() {
       {activeTab === 'recetas' && <RecipesTab ingredients={ingredients} recipes={recipes} onRefresh={fetchInventoryData} />}
 
         {activeTab === 'alertas' && (
-          <StockAlertsTab
-            lowStockIngredients={lowStockIngredients}
-            onRegisterEntry={openStockModal}
-          />
+          <div className="space-y-6">
+            <div className="bg-white rounded-2xl shadow-xl px-8 py-6 border border-transparent flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <h2 className="text-2xl font-bold text-[#4B2E2D]">Alertas de Stock</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {lowStockIngredients.length === 0 ? (
+                <div className="col-span-full text-center py-10 text-[#4B2E2D]/50 font-bold bg-white rounded-2xl shadow-sm border border-[#FCE4D6]">
+                  No hay alertas de stock en este momento.
+                </div>
+              ) : (
+                lowStockIngredients.map((ing) => {
+                  const isAgotado = ing.estado === 'Agotado';
+                  return (
+                    <div key={ing._id} className={`bg-white rounded-3xl p-6 shadow-md border hover:shadow-xl transition-all flex flex-col ${isAgotado ? 'border-red-400' : 'border-orange-400'}`}>
+                      <div className="flex justify-between items-start mb-5">
+                        <h3 className="text-xl font-black text-[#4B2E2D]">{ing.nombre}</h3>
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${isAgotado ? 'bg-red-50 text-red-500' : 'bg-orange-50 text-orange-500'}`}>
+                          <AlertTriangle size={16} strokeWidth={2.5} />
+                        </div>
+                      </div>
+                      <div className="space-y-3 mb-6 flex-1">
+                        <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                          <span className="text-sm font-semibold text-gray-500">Unidad</span>
+                          <span className="text-sm font-bold text-[#4B2E2D]">{ing.unidadMedida || ing.unidad}</span>
+                        </div>
+                        <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                          <span className="text-sm font-semibold text-gray-500">Stock actual</span>
+                          <span className={`text-lg font-black ${isAgotado ? 'text-red-500' : 'text-orange-500'}`}>{ing.stockActual}</span>
+                        </div>
+                        <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                          <span className="text-sm font-semibold text-gray-500">Stock mínimo</span>
+                          <span className="text-sm font-bold text-[#4B2E2D]">{ing.stockMinimo}</span>
+                        </div>
+                        <div className="flex justify-between items-center pt-1">
+                          <span className="text-sm font-semibold text-gray-500">Estado</span>
+                          <span className={`text-xs font-black px-3 py-1 rounded-full ${isAgotado ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'}`}>
+                            {isAgotado ? 'Stock Crítico' : 'Stock Bajo'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="mt-auto">
+                        <button
+                          onClick={() => openStockModal(ing)}
+                          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#FCE4D6] hover:bg-[#F5C9B0] text-[#D0543A] font-bold text-sm transition-colors"
+                        >
+                          <ArrowUpRight size={16} /> Registrar Entrada
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
         )}
       </div>
 

@@ -33,6 +33,10 @@ export function useAuth() {
         navigate('/chef-view', { replace: true })
       } else if (normalizedRole === 'cashier' || normalizedRole === 'cajero') {
         navigate('/cashier-view', { replace: true })
+      } else if (normalizedRole === 'delivery' || normalizedRole === 'repartidor') {
+        navigate('/delivery', { replace: true })
+      } else if (normalizedRole === 'cliente') {
+        navigate('/', { replace: true })
       } else {
         navigate('/en-construccion', { replace: true })
       }

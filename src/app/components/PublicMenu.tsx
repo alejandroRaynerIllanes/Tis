@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { ShoppingCart, Search, Plus, Minus, X, User, LogOut, Loader2, ArrowRight, ChefHat, Trash2, ChevronLeft, MapPin, Bike, QrCode, Banknote, Info, Clock } from 'lucide-react'
+import { ShoppingCart, Search, Plus, Minus, X, User, LogOut, Loader2, ArrowRight, ChefHat, Trash2, ChevronLeft, MapPin, Bike, QrCode, Banknote, Info, Clock, Navigation } from 'lucide-react'
 import { platosService } from '../services/platos.service'
 import { categoriesService } from '../services/categories.service'
 import { api, getStoredUser, getToken, setToken, setStoredUser } from '../services/api'
@@ -29,6 +29,7 @@ export function PublicMenu() {
   const [billingInfo, setBillingInfo] = useState({ name: '', phone: '', email: '' })
   const [paymentMethod, setPaymentMethod] = useState<'QR' | 'Efectivo'>('QR')
 
+  const [pinPos, setPinPos] = useState<{ x: number; y: number } | null>(null)
   const [showAuthModal, setShowAuthModal] = useState<'login' | 'register' | null>(null)
   const [authLoading, setAuthLoading] = useState(false)
 
@@ -45,8 +46,10 @@ export function PublicMenu() {
   })
 
   const navigate = useNavigate()
-  const user = getStoredUser()
-  const token = getToken()
+  
+  // 🔥 FIX: Usamos estados reactivos para que el menú se actualice instantáneamente al loguearse
+  const [currentUser, setCurrentUser] = useState(getStoredUser())
+  const [userToken, setUserToken] = useState(getToken())
 
   useEffect(() => {
     const fetchData = async () => {
@@ -88,15 +91,15 @@ export function PublicMenu() {
   useEffect(() => {
     if (isCartOpen) {
       setCheckoutStep(0)
-      if (user) {
+      if (currentUser) {
         setBillingInfo({
-          name: user.nombre || '',
-          phone: (user as any).telefono || '',
-          email: user.email || ''
+          name: currentUser.nombre || '',
+          phone: (currentUser as any).telefono || '',
+          email: currentUser.email || ''
         })
       }
     }
-  }, [isCartOpen, user])
+  }, [isCartOpen, currentUser])
 
   const addToCart = (product: any) => {
     if (product.disponible === false || product.estado === 'Agotado' || product.estado === false) {
@@ -134,29 +137,69 @@ export function PublicMenu() {
   const cartTotal = cart.reduce((sum, item) => sum + (item.product.precio || item.product.price) * item.quantity, 0)
 
   const handleCheckoutClick = () => {
-    if (!token) {
+    if (!userToken) {
       setShowAuthModal('login')
       return
     }
     setCheckoutStep(1)
   }
 
-  const handleMapClick = () => {
-    // Simulamos la elección de un punto en el mapa y calculamos la distancia
-    const simDist = (Math.random() * 4 + 1).toFixed(1)
-    const dist = parseFloat(simDist)
-    const time = Math.round(10 + dist * 4) // 10 min base + 4 min por km
-    const cost = Math.round(5 + dist * 2) // 5 Bs base + 2 Bs por km
+  const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Mapa Interactivo: Calculamos dónde dio clic y fijamos el Pin visualmente
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    setPinPos({ x, y })
     
+    // Centro del mapa es el restaurante
+    const center_x = rect.width / 2
+    const center_y = rect.height / 2
+    
+    // Distancia visual escalada a Km reales (30 pixels = ~1 Km)
+    const distPixels = Math.sqrt(Math.pow(x - center_x, 2) + Math.pow(y - center_y, 2))
+    const distKm = Math.max(0.5, (distPixels / 30)).toFixed(1)
+    const dist = parseFloat(distKm)
+
+    const time = Math.round(10 + dist * 5)
+    const cost = Math.max(5, Math.round(dist * 3))
+
     setDeliveryInfo(prev => ({
       ...prev,
       distance: dist,
       time: time,
       cost: cost,
-      lat: -17.3895 + (Math.random() * 0.05),
-      lng: -66.1568 + (Math.random() * 0.05)
+      lat: -17.3895 + ((y - center_y) * -0.0005),
+      lng: -66.1568 + ((x - center_x) * 0.0005)
     }))
-    toast.success('Ubicación fijada en el mapa')
+  }
+
+  const handleGetLocation = () => {
+    if ('geolocation' in navigator) {
+      toast.info('Obteniendo ubicación GPS...')
+      navigator.geolocation.getCurrentPosition((position) => {
+        const lat = position.coords.latitude
+        const lng = position.coords.longitude
+        
+        // Distancia real contra Cochabamba (Restaurante) usando Haversine
+        const R = 6371; 
+        const dLat = (lat - -17.3895) * Math.PI / 180;
+        const dLon = (lng - -66.1568) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(-17.3895 * Math.PI / 180) * Math.cos(lat * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        let dist = parseFloat(Math.max(0.5, R * c).toFixed(1));
+
+        const time = Math.round(10 + dist * 5)
+        const cost = Math.max(5, Math.round(dist * 3))
+
+        setDeliveryInfo(prev => ({ ...prev, lat, lng, distance: dist, time, cost }))
+        setPinPos({ x: 150, y: 100 }) // Pin al centro
+        toast.success('¡Ubicación real obtenida!')
+      }, () => {
+        toast.error('Activa los permisos de ubicación en tu navegador.')
+      })
+    } else {
+      toast.error('Geolocalización no soportada.')
+    }
   }
 
   const processCheckout = async () => {
@@ -200,6 +243,10 @@ export function PublicMenu() {
       const { role, token, user } = await authService.login(loginForm.email, loginForm.password)
       setToken(token)
       setStoredUser(user)
+      
+      // Actualizar vista inmediatamente
+      setUserToken(token)
+      setCurrentUser(user as any)
       localStorage.setItem('userRole', role)
       
       const roleLower = role.toLowerCase()
@@ -242,10 +289,14 @@ export function PublicMenu() {
       const { role, token, user } = await authService.login(registerForm.email, registerForm.password)
       setToken(token)
       setStoredUser(user)
+      
+      // Actualizar vista inmediatamente
+      setUserToken(token)
+      setCurrentUser(user as any)
       localStorage.setItem('userRole', role)
       setShowAuthModal(null)
     } catch (err: any) {
-      toast.error(err.response?.data?.mensaje || 'Error en el registro')
+      toast.error(err.message || 'Error en el registro') // Mostrar el error real (ej: Correo duplicado)
     } finally {
       setAuthLoading(false)
     }
@@ -299,13 +350,13 @@ export function PublicMenu() {
                 </span>
               )}
             </button>
-            {token ? (
+            {userToken ? (
               <div className="flex items-center gap-3">
                 <button onClick={() => navigate('/perfil')} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
                   <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#4B2E2D] to-[#6B3E2E] text-white flex items-center justify-center font-black text-sm shadow-sm border border-[#E0D0C5]">
-                    {user?.nombre?.charAt(0).toUpperCase() || 'U'}
+                    {currentUser?.nombre?.charAt(0).toUpperCase() || 'U'}
                   </div>
-                  <span className="text-sm font-bold text-[#4B2E2D] hidden sm:block">{user?.nombre}</span>
+                  <span className="text-sm font-bold text-[#4B2E2D] hidden sm:block">{currentUser?.nombre}</span>
                 </button>
                 <button onClick={() => { localStorage.clear(); navigate(0) }} className="p-2 text-gray-400 hover:text-red-500 transition-colors" title="Cerrar Sesión">
                   <LogOut size={20} />
@@ -439,7 +490,7 @@ export function PublicMenu() {
                   <span className="text-2xl font-black text-[#4B2E2D]">Bs. {cartTotal.toFixed(2)}</span>
                 </div>
                 <button onClick={handleCheckoutClick} className="w-full py-4 bg-[#D96C4A] text-white rounded-xl font-black text-lg shadow-lg hover:bg-[#b5462f] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2">
-                  {token ? 'Confirmar Pedido' : 'Iniciar Sesión para Pedir'} <ArrowRight size={20} />
+                  {userToken ? 'Confirmar Pedido' : 'Iniciar Sesión para Pedir'} <ArrowRight size={20} />
                 </button>
               </div>
             )}
@@ -465,9 +516,16 @@ export function PublicMenu() {
               <div className="flex flex-col h-full p-6 animate-in fade-in slide-in-from-right-4 duration-300">
                 <h3 className="text-xl font-black text-[#4B2E2D] mb-4">Selecciona tu ubicación</h3>
                 
+                <button
+                  onClick={handleGetLocation}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-blue-50 text-blue-600 rounded-xl font-bold mb-4 border border-blue-200 hover:bg-blue-100 transition-all shadow-sm active:scale-95"
+                >
+                  <Navigation size={18} /> Usar mi ubicación actual (GPS)
+                </button>
+
                 <div 
                   onClick={handleMapClick}
-                  className="w-full h-48 bg-gray-200 rounded-2xl relative cursor-pointer overflow-hidden border-2 border-transparent hover:border-[#D96C4A] transition-all shadow-inner group shrink-0"
+                  className="w-full h-56 bg-gray-200 rounded-2xl relative cursor-crosshair overflow-hidden border-2 border-[#D96C4A]/30 hover:border-[#D96C4A] transition-all shadow-inner group shrink-0"
                   style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1524661135-423995f22d0b?q=80&w=600)', backgroundSize: 'cover', backgroundPosition: 'center' }}
                 >
                   <div className="absolute inset-0 bg-white/40 group-hover:bg-white/20 transition-colors"></div>
@@ -476,14 +534,18 @@ export function PublicMenu() {
                       Leaflet | © Carto
                     </span>
                   </div>
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                     <div className="bg-[#4B2E2D] text-white px-4 py-2 rounded-full font-bold text-sm shadow-xl flex items-center gap-2">
-                        <MapPin size={16} /> Toca el mapa para fijar tu ubicación
-                     </div>
-                  </div>
-                  {deliveryInfo.distance > 0 && (
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full drop-shadow-xl animate-in zoom-in">
+                  {pinPos ? (
+                    <div
+                      className="absolute -translate-x-1/2 -translate-y-full drop-shadow-xl transition-all duration-200 ease-out z-10"
+                      style={{ left: pinPos.x, top: pinPos.y }}
+                    >
                       <MapPin size={40} className="text-[#D96C4A] drop-shadow-md" fill="currentColor" />
+                    </div>
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="bg-[#4B2E2D] text-white px-4 py-2 rounded-full font-bold text-sm shadow-xl flex items-center gap-2 animate-bounce">
+                        <MapPin size={16} /> Toca el mapa para fijar tu ubicación
+                      </div>
                     </div>
                   )}
                 </div>

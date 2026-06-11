@@ -1,0 +1,346 @@
+import React, { useState, useEffect } from 'react'
+import { User, MapPin, Package, Shield, ArrowLeft, LogOut, Plus, Trash2, Edit2, Loader2, Save } from 'lucide-react'
+import { useNavigate } from 'react-router'
+import { getStoredUser, api, setStoredUser } from '../services/api'
+import { toast } from 'sonner'
+
+export function ClientProfile() {
+  const navigate = useNavigate()
+  const user = getStoredUser()
+
+  const [activeTab, setActiveTab] = useState<'perfil' | 'direcciones' | 'historial' | 'seguridad'>('perfil')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  // Data
+  const [profileData, setProfileData] = useState({ nombre: '', email: '', telefono: '' })
+  const [addresses, setAddresses] = useState<any[]>([])
+  const [history, setHistory] = useState<any[]>([])
+  
+  // Password Form
+  const [passForm, setPassForm] = useState({ current: '', new: '', confirm: '' })
+
+  // New Address Form
+  const [showAddAddress, setShowAddAddress] = useState(false)
+  const [newAddress, setNewAddress] = useState({ alias: 'Casa', detalle: '', referencia: '' })
+
+  useEffect(() => {
+    const loadData = async () => {
+      if (!user?.id) return
+      try {
+        // Obtener perfil actualizado
+        try {
+          const usersRes: any = await api.get('/usuarios')
+          const me = usersRes.find((u: any) => u._id === user.id || u.id === user.id)
+          if (me) {
+            setProfileData({ nombre: me.nombre || '', email: me.email || '', telefono: me.telefono || '' })
+            setAddresses(me.direcciones || [])
+          }
+        } catch (apiError) {
+          // Fallback de seguridad: Si el backend bloquea la ruta a usuarios normales, usamos datos locales
+          setProfileData({ nombre: user.nombre || '', email: user.email || '', telefono: (user as any).telefono || '' })
+        }
+
+        // Obtener historial de pedidos (El parámetro mesero filtra por usuario en el backend)
+        const ordersRes: any = await api.get(`/pedidos?mesero=${user.id}`)
+        setHistory(ordersRes.data || ordersRes || [])
+      } catch (error) {
+        console.error('Error al cargar perfil:', error)
+        toast.error('No se pudo cargar la información del perfil.')
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadData()
+  }, [user?.id])
+
+  const handleUpdateProfile = async () => {
+    if (!profileData.nombre.trim()) return toast.error('El nombre es obligatorio')
+    setSaving(true)
+    try {
+      await api.put(`/usuarios/${user?.id}`, { nombre: profileData.nombre, telefono: profileData.telefono })
+      toast.success('Perfil actualizado correctamente')
+      setStoredUser({ ...user, nombre: profileData.nombre, telefono: profileData.telefono } as any)
+    } catch (e: any) {
+      toast.error(e.message || 'Error al actualizar el perfil')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (passForm.new !== passForm.confirm) return toast.error('Las nuevas contraseñas no coinciden')
+    if (passForm.new.length < 8) return toast.error('La contraseña debe tener al menos 8 caracteres')
+    
+    setSaving(true)
+    try {
+      await api.put(`/usuarios/${user?.id}`, { password: passForm.new })
+      toast.success('Contraseña actualizada correctamente')
+      setPassForm({ current: '', new: '', confirm: '' })
+    } catch (e: any) {
+      toast.error(e.message || 'Error al cambiar la contraseña')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSaveAddress = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newAddress.detalle) return toast.error('La dirección es obligatoria')
+    
+    setSaving(true)
+    const updatedAddresses = [...addresses, { id: Date.now().toString(), ...newAddress }]
+    try {
+      await api.put(`/usuarios/${user?.id}`, { direcciones: updatedAddresses })
+      setAddresses(updatedAddresses)
+      setShowAddAddress(false)
+      setNewAddress({ alias: 'Casa', detalle: '', referencia: '' })
+      toast.success('Dirección guardada con éxito')
+    } catch (e: any) {
+      toast.error('Error al guardar la dirección')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDeleteAddress = async (id: string) => {
+    const updatedAddresses = addresses.filter(a => a.id !== id)
+    try {
+      await api.put(`/usuarios/${user?.id}`, { direcciones: updatedAddresses })
+      setAddresses(updatedAddresses)
+      toast.success('Dirección eliminada')
+    } catch (e) {
+      toast.error('Error al eliminar la dirección')
+    }
+  }
+
+  const handleLogout = () => {
+    localStorage.clear()
+    navigate('/', { replace: true })
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center">
+        <Loader2 className="animate-spin text-[#D96C4A]" size={40} />
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-[#FAF7F2] font-sans text-gray-800">
+      {/* Header Simple */}
+      <header className="bg-white shadow-sm sticky top-0 z-40">
+        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+          <button onClick={() => navigate('/')} className="flex items-center gap-2 text-gray-500 hover:text-[#D96C4A] font-bold transition-colors">
+            <ArrowLeft size={20} /> Volver al Menú
+          </button>
+          <span className="font-black text-xl text-[#4B2E2D]">Mi Perfil</span>
+          <div className="w-20"></div> {/* Spacer */}
+        </div>
+      </header>
+
+      <main className="max-w-6xl mx-auto px-4 py-8 flex flex-col md:flex-row gap-8">
+        {/* Sidebar */}
+        <aside className="w-full md:w-80 shrink-0">
+          {/* Tarjeta de Usuario */}
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#E0D0C5] mb-6 text-center">
+            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#4B2E2D] to-[#D96C4A] text-white flex items-center justify-center font-black text-4xl shadow-xl mx-auto mb-4">
+              {profileData.nombre?.charAt(0).toUpperCase() || 'U'}
+            </div>
+            <h2 className="text-xl font-black text-[#4B2E2D]">{profileData.nombre}</h2>
+            <p className="text-sm font-medium text-gray-500 mb-3">{profileData.email}</p>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold border border-emerald-100">
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              Cliente Normal · {history.length} pedidos entregados
+            </div>
+          </div>
+
+          {/* Menú de Navegación */}
+          <div className="bg-white rounded-2xl shadow-sm border border-[#E0D0C5] overflow-hidden flex flex-col">
+            {[
+              { id: 'perfil', label: 'Perfil', icon: <User size={18} /> },
+              { id: 'direcciones', label: 'Direcciones', icon: <MapPin size={18} /> },
+              { id: 'historial', label: 'Historial', icon: <Package size={18} /> },
+              { id: 'seguridad', label: 'Seguridad', icon: <Shield size={18} /> },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex items-center gap-3 px-6 py-4 text-sm font-bold transition-all ${activeTab === tab.id ? 'bg-[#FFF5F0] text-[#D96C4A] border-l-4 border-[#D96C4A]' : 'text-gray-500 hover:bg-gray-50 hover:text-[#4B2E2D] border-l-4 border-transparent'}`}
+              >
+                {tab.icon} {tab.label}
+              </button>
+            ))}
+            <button onClick={handleLogout} className="flex items-center gap-3 px-6 py-4 text-sm font-bold text-red-500 hover:bg-red-50 transition-all border-t border-gray-100 mt-2">
+              <LogOut size={18} /> Cerrar sesión
+            </button>
+          </div>
+        </aside>
+
+        {/* Contenido Principal */}
+        <section className="flex-1">
+          {/* ════ TAB: PERFIL ════ */}
+          {activeTab === 'perfil' && (
+            <div className="bg-white rounded-2xl shadow-sm border border-[#E0D0C5] p-6 sm:p-8 animate-in fade-in">
+              <h3 className="text-2xl font-black text-[#4B2E2D] mb-6">Editar perfil</h3>
+              <div className="space-y-5 max-w-lg">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Nombre completo</label>
+                  <input type="text" value={profileData.nombre} onChange={e => setProfileData({...profileData, nombre: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D96C4A]/50 font-medium" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Correo electrónico</label>
+                  <input type="email" disabled value={profileData.email} className="w-full px-4 py-3 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 font-medium cursor-not-allowed" />
+                  <p className="text-xs text-gray-400 mt-1 font-medium">El correo no puede modificarse.</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Teléfono</label>
+                  <input type="tel" value={profileData.telefono} onChange={e => setProfileData({...profileData, telefono: e.target.value})} placeholder="Ej: 62729459" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D96C4A]/50 font-medium" />
+                </div>
+                <button onClick={handleUpdateProfile} disabled={saving} className="mt-4 px-6 py-3 bg-[#D96C4A] text-white font-bold rounded-xl shadow-lg hover:bg-[#C25838] transition-all flex items-center gap-2 disabled:opacity-50">
+                  {saving ? <Loader2 size={18} className="animate-spin"/> : <Save size={18} />}
+                  Guardar cambios
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ════ TAB: DIRECCIONES ════ */}
+          {activeTab === 'direcciones' && (
+            <div className="bg-white rounded-2xl shadow-sm border border-[#E0D0C5] p-6 sm:p-8 animate-in fade-in">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-black text-[#4B2E2D]">Mis Direcciones</h3>
+                <button onClick={() => setShowAddAddress(!showAddAddress)} className="flex items-center gap-1.5 px-4 py-2 bg-[#FCE4D6] text-[#D96C4A] font-bold rounded-lg hover:bg-[#E57C5D] hover:text-white transition-all text-sm">
+                  <Plus size={16} /> Agregar
+                </button>
+              </div>
+
+              {showAddAddress && (
+                <form onSubmit={handleSaveAddress} className="mb-8 bg-gray-50 p-5 rounded-xl border border-gray-200 space-y-4">
+                  <h4 className="font-bold text-[#4B2E2D]">Nueva Dirección</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 mb-1">Alias (Ej: Casa, Trabajo)</label>
+                      <input required type="text" value={newAddress.alias} onChange={e => setNewAddress({...newAddress, alias: e.target.value})} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#D96C4A]" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 mb-1">Referencia (Opcional)</label>
+                      <input type="text" value={newAddress.referencia} onChange={e => setNewAddress({...newAddress, referencia: e.target.value})} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#D96C4A]" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 mb-1">Dirección exacta</label>
+                    <input required type="text" value={newAddress.detalle} onChange={e => setNewAddress({...newAddress, detalle: e.target.value})} placeholder="Ej: Calle Ayacucho Nro 123..." className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#D96C4A]" />
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button type="button" onClick={() => setShowAddAddress(false)} className="px-4 py-2 text-sm font-bold text-gray-500 hover:bg-gray-200 rounded-lg transition-colors">Cancelar</button>
+                    <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-bold bg-[#D96C4A] text-white rounded-lg shadow-md hover:bg-[#C25838] transition-colors disabled:opacity-50">Guardar dirección</button>
+                  </div>
+                </form>
+              )}
+
+              <div className="space-y-3">
+                {addresses.length === 0 ? (
+                  <div className="text-center py-10 border-2 border-dashed border-gray-200 rounded-2xl">
+                    <MapPin size={40} className="mx-auto text-gray-300 mb-2" />
+                    <p className="font-bold text-gray-500">No tienes direcciones guardadas.</p>
+                  </div>
+                ) : (
+                  addresses.map((addr) => (
+                    <div key={addr.id} className="flex items-center justify-between p-4 border border-gray-100 rounded-xl hover:border-[#D96C4A]/30 hover:shadow-sm transition-all bg-white">
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-full bg-[#FFF5F0] text-[#D96C4A] flex items-center justify-center shrink-0 mt-0.5">
+                          <MapPin size={18} />
+                        </div>
+                        <div>
+                          <h4 className="font-black text-[#4B2E2D]">{addr.alias}</h4>
+                          <p className="text-sm font-medium text-gray-600 mt-0.5">{addr.detalle}</p>
+                          {addr.referencia && <p className="text-xs text-gray-400 mt-0.5">Ref: {addr.referencia}</p>}
+                        </div>
+                      </div>
+                      <button onClick={() => handleDeleteAddress(addr.id)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ════ TAB: HISTORIAL ════ */}
+          {activeTab === 'historial' && (
+            <div className="bg-white rounded-2xl shadow-sm border border-[#E0D0C5] p-6 sm:p-8 animate-in fade-in">
+              <h3 className="text-2xl font-black text-[#4B2E2D] mb-6">Historial de pedidos ({history.length})</h3>
+              
+              <div className="space-y-4">
+                {history.length === 0 ? (
+                  <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-2xl">
+                    <Package size={48} className="mx-auto text-gray-300 mb-3" />
+                    <p className="font-bold text-gray-500">Sin pedidos en el historial.</p>
+                    <p className="text-sm text-gray-400 mt-1">Tus compras aparecerán aquí.</p>
+                  </div>
+                ) : (
+                  history.map((order) => (
+                    <div key={order._id} className="border border-gray-100 rounded-2xl p-5 hover:shadow-md transition-shadow">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{new Date(order.fechaHoraBolivia || order.createdAt).toLocaleDateString()}</span>
+                          <h4 className="font-black text-lg text-[#4B2E2D]">{order.codigo}</h4>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-xs font-black uppercase ${order.estado === 'CERRADO' || order.estado === 'ENTREGADO' ? 'bg-emerald-100 text-emerald-700' : order.estado === 'CANCELADO' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700'}`}>
+                          {order.estado === 'CERRADO' ? 'Pagado' : order.estado}
+                        </span>
+                      </div>
+                      
+                      <div className="bg-gray-50 rounded-xl p-3 mb-3 space-y-1">
+                        {order.detalles?.map((item: any, idx: number) => (
+                          <div key={idx} className="flex justify-between text-sm">
+                            <span className="font-medium text-gray-600"><span className="text-gray-400 font-bold mr-1">{item.cantidad}x</span> {item.plato?.nombre || 'Plato'}</span>
+                            <span className="font-bold text-gray-700">Bs. {(item.subtotal || item.cantidad * (item.precioUnitario || item.plato?.precio)).toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <div className="flex justify-between items-center pt-2">
+                        <span className="text-xs font-bold text-gray-500 uppercase">Total Pagado</span>
+                        <span className="text-xl font-black text-[#D96C4A]">Bs. {(order.total || 0).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ════ TAB: SEGURIDAD ════ */}
+          {activeTab === 'seguridad' && (
+            <div className="bg-white rounded-2xl shadow-sm border border-[#E0D0C5] p-6 sm:p-8 animate-in fade-in">
+              <h3 className="text-2xl font-black text-[#4B2E2D] mb-6">Cambiar contraseña</h3>
+              <form onSubmit={handleUpdatePassword} className="space-y-5 max-w-lg">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Contraseña actual</label>
+                  <input type="password" required value={passForm.current} onChange={e => setPassForm({...passForm, current: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D96C4A]/50" />
+                </div>
+                <div className="pt-2">
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Nueva contraseña</label>
+                  <input type="password" required minLength={8} value={passForm.new} onChange={e => setPassForm({...passForm, new: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D96C4A]/50" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Confirmar nueva contraseña</label>
+                  <input type="password" required minLength={8} value={passForm.confirm} onChange={e => setPassForm({...passForm, confirm: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D96C4A]/50" />
+                </div>
+                <button type="submit" disabled={saving} className="mt-4 px-6 py-3 bg-[#4B2E2D] text-white font-bold rounded-xl shadow-md hover:bg-[#3A2222] transition-all flex items-center gap-2 disabled:opacity-50">
+                  {saving ? <Loader2 size={18} className="animate-spin"/> : <Shield size={18} />}
+                  Actualizar contraseña
+                </button>
+              </form>
+            </div>
+          )}
+        </section>
+      </main>
+    </div>
+  )
+}

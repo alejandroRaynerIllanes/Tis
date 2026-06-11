@@ -25,6 +25,12 @@ const UnderConstruction = lazy(() =>
 const PaymentSimulator = lazy(() =>
   import('./components/PaymentSimulator').then((m) => ({ default: m.PaymentSimulator }))
 )
+const ClientProfile = lazy(() =>
+  import('./components/ClientProfile').then((m) => ({ default: m.ClientProfile }))
+)
+const DeliveryView = lazy(() =>
+  import('./components/DeliveryView').then((m) => ({ default: m.DeliveryView }))
+)
 
 function RootLayout() {
   return (
@@ -88,6 +94,14 @@ export const router = createBrowserRouter([
         )
       },
       {
+        path: 'perfil',
+        element: (
+          <ProtectedRoute>
+            <ClientProfile />
+          </ProtectedRoute>
+        )
+      },
+      {
         path: 'waiter-view',
         element: (
           <ProtectedRoute>
@@ -116,6 +130,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute requireAdmin>
             <UserManagement />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'delivery',
+        element: (
+          <ProtectedRoute>
+            <DeliveryView />
           </ProtectedRoute>
         )
       },

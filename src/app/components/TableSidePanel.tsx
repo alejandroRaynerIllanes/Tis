@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import {
   X,
-  Crown,
-  Zap,
   Receipt,
   Search,
   Plus,
@@ -101,15 +99,12 @@ export function TableSidePanel({ isOpen, tableId, onClose, onOpenPayment }: Tabl
   if (!activeTable) return null
 
   const activeOrder = orders[tableId] || []
-  const orderTotal = activeOrder.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
+  
+  const isVip = activeTable?.type === 'vip' || (activeTable as any)?.tipo === 'vip'
+  const cargoVip = isVip ? 100 : 0
+  const itemsTotal = activeOrder.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
+  const orderTotal = itemsTotal + cargoVip
 
-  // Lógica VIP
-  const activeTableResArr = reservations[tableId] || []
-  const hasVipReservation = activeTableResArr.some((r) => r.vip)
-  const isVipOrder = activeTable.type === 'vip' // PUNTO 10: Separación estricta. Solo mesas de tipo VIP abren panel VIP.
-  const vipClientNameGlobal = hasVipReservation
-    ? activeTableResArr.find((r) => r.vip)?.clientName
-    : undefined
 
   // Filtrar platillos
   const filteredDishes = localProducts.filter(
@@ -149,12 +144,8 @@ export function TableSidePanel({ isOpen, tableId, onClose, onOpenPayment }: Tabl
 
       setViewingMenu(false)
       setShowSummary(false)
-      toast.success(
-        isVipOrder ? '⚡ Pedido VIP enviado con prioridad' : '¡Pedido enviado a cocina!',
-        {
-          description: isVipOrder
-            ? `${activeTable?.name} — ${activeOrder.length} plato(s) · Prioridad máxima en cocina.`
-            : `${activeTable?.name} — ${activeOrder.length} plato(s) en preparación.`,
+      toast.success('¡Pedido enviado a cocina!', {
+          description: `${activeTable?.name} — ${activeOrder.length} plato(s) en preparación.`,
           duration: 3500
         }
       )
@@ -196,9 +187,7 @@ export function TableSidePanel({ isOpen, tableId, onClose, onOpenPayment }: Tabl
         {/* Header del panel */}
         <div
           className={`pt-6 pb-4 px-5 border-b shrink-0 ${
-            isVipOrder
-              ? 'bg-gradient-to-b from-[#2C1A0E] to-[#3D2318] border-amber-800/40'
-              : activeTable.status === 'Esperando pago'
+            activeTable.status === 'Esperando pago'
                 ? 'bg-[#FFF9F0] border-[#E6A23C]/30'
                 : 'bg-[#FFF5F0] border-[#FCE4D6]/60'
           }`}
@@ -207,58 +196,38 @@ export function TableSidePanel({ isOpen, tableId, onClose, onOpenPayment }: Tabl
             <div>
               <div className="flex items-center gap-2">
                 <h3
-                  className={`font-black text-2xl ${isVipOrder ? 'text-white' : 'text-[#4B2E2D]'}`}
+                  className={`font-black text-2xl text-[#4B2E2D]`}
                 >
                   {activeTable.name}
                 </h3>
-                {isVipOrder && (
-                  <Crown size={18} className="text-yellow-300 drop-shadow" strokeWidth={2.5} />
-                )}
               </div>
               <p
-                className={`text-sm font-bold mt-1 ${isVipOrder ? 'text-white/65' : activeTable.status === 'Disponible' ? 'text-[#2C2C2C]/80' : activeTable.status === 'Ocupada' ? 'text-[#D96C4A]' : activeTable.status === 'Esperando pago' ? 'text-[#E6A23C]' : 'text-[#6B3E2E]'}`}
+                className={`text-sm font-bold mt-1 ${activeTable.status === 'Disponible' ? 'text-[#2C2C2C]/80' : activeTable.status === 'Ocupada' ? 'text-[#D96C4A]' : activeTable.status === 'Esperando pago' ? 'text-[#E6A23C]' : 'text-[#6B3E2E]'}`}
               >
                 {activeTable.status}
               </p>
             </div>
             <button
               onClick={onClose}
-              className={`p-2 rounded-xl transition-colors ${isVipOrder ? 'text-white/50 hover:bg-white/10' : 'text-[#4B2E2D]/50 hover:bg-black/5'}`}
+              className={`p-2 rounded-xl transition-colors text-[#4B2E2D]/50 hover:bg-black/5`}
             >
               <X size={24} />
             </button>
           </div>
 
-          {isVipOrder && (
-            <div className="flex items-center gap-2.5 bg-amber-400/15 border border-amber-400/30 rounded-xl px-3.5 py-2.5 mb-3">
-              <div className="w-7 h-7 rounded-lg bg-yellow-400/25 flex items-center justify-center shrink-0">
-                <Zap size={14} className="text-yellow-300" strokeWidth={2.5} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-yellow-200 font-black text-[11px] uppercase tracking-wider">
-                  Pedido con Prioridad VIP
-                </p>
-                <p className="text-white/55 text-[10px] font-medium leading-snug mt-0.5">
-                  {vipClientNameGlobal ? `Cliente: ${vipClientNameGlobal} · ` : ''}Este pedido
-                  encabeza la cola de cocina
-                </p>
-              </div>
-            </div>
-          )}
-
           {activeTable.status !== 'Esperando pago' && (
             <div
-              className={`flex p-1 rounded-xl shadow-inner border ${isVipOrder ? 'bg-white/10 border-white/15' : 'bg-white/60 border-[#FCE4D6]'}`}
+              className={`flex p-1 rounded-xl shadow-inner border bg-white/60 border-[#FCE4D6]`}
             >
               <button
                 onClick={() => setViewingMenu(false)}
-                className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${!viewingMenu ? (isVipOrder ? 'bg-white/20 text-white shadow-sm' : 'bg-white text-[#4B2E2D] shadow-sm') : isVipOrder ? 'text-white/50 hover:bg-white/10' : 'text-[#4B2E2D]/60 hover:bg-white/40'}`}
+                className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${!viewingMenu ? 'bg-white text-[#4B2E2D] shadow-sm' : 'text-[#4B2E2D]/60 hover:bg-white/40'}`}
               >
                 Pedido Actual
               </button>
               <button
                 onClick={() => setViewingMenu(true)}
-                className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${viewingMenu ? (isVipOrder ? 'bg-amber-500/80 text-white shadow-sm' : 'bg-[#4B2E2D] text-white shadow-sm') : isVipOrder ? 'text-white/50 hover:bg-white/10' : 'text-[#4B2E2D]/60 hover:bg-white/40'}`}
+                className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${viewingMenu ? 'bg-[#4B2E2D] text-white shadow-sm' : 'text-[#4B2E2D]/60 hover:bg-white/40'}`}
               >
                 Menú
               </button>
@@ -300,6 +269,17 @@ export function TableSidePanel({ isOpen, tableId, onClose, onOpenPayment }: Tabl
                     </div>
                   ))}
                 </div>
+                {isVip && (
+                  <div className="mt-4 pt-4 border-t border-dashed border-gray-300">
+                    <div className="flex justify-between items-start text-sm">
+                      <div className="flex items-start gap-2">
+                        <span className="font-bold text-amber-600 w-6">1x</span>
+                        <span className="font-bold text-amber-800">Cargo Mesa VIP</span>
+                      </div>
+                      <span className="font-bold text-amber-800 shrink-0">Bs. 100.00</span>
+                    </div>
+                  </div>
+                )}
                 <div className="pt-4 border-t border-dashed border-gray-300 flex justify-between items-center">
                   <span className="font-black text-lg text-[#4B2E2D]">Total</span>
                   <span className="font-black text-2xl text-[#D0543A]">
@@ -573,6 +553,19 @@ export function TableSidePanel({ isOpen, tableId, onClose, onOpenPayment }: Tabl
                       </div>
                     )
                   })}
+                  {isVip && (
+                    <div className="flex flex-col gap-2 bg-amber-50 p-4 rounded-[16px] border border-amber-200 shadow-sm mt-2">
+                      <div className="flex items-center gap-4">
+                        <div className="w-8 h-8 rounded-full bg-amber-200 text-amber-800 font-black flex items-center justify-center shrink-0">1</div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-bold text-amber-900 truncate text-[15px]">Cargo Mesa VIP</h4>
+                        </div>
+                        <div className="flex flex-col items-end gap-2 shrink-0">
+                          <span className="font-black text-amber-900">Bs. 100.00</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -582,15 +575,6 @@ export function TableSidePanel({ isOpen, tableId, onClose, onOpenPayment }: Tabl
         {/* FOOTER (Acciones) */}
         {activeTable.status !== 'Esperando pago' && activeOrder.length > 0 && (
           <div className="p-5 sm:p-6 bg-white border-t border-[#FCE4D6]/60 shadow-[0_-8px_20px_-10px_rgba(0,0,0,0.1)] shrink-0 flex flex-col gap-3">
-            {isVipOrder && (
-              <div className="flex items-center gap-2.5 bg-gradient-to-r from-[#2C1A0E] to-[#4B2E2D] rounded-xl px-3.5 py-2.5 -mt-1">
-                <Crown size={14} className="text-yellow-300 shrink-0" strokeWidth={2.5} />
-                <p className="text-yellow-200 font-black text-[11px] uppercase tracking-wider flex-1">
-                  Prioridad VIP — Cocina primero
-                </p>
-                <Zap size={13} className="text-amber-400 shrink-0" strokeWidth={2.5} />
-              </div>
-            )}
             <div className="flex justify-between items-center mb-1">
               <span className="font-black text-gray-500">Total a Pagar</span>
               <span className="font-black text-2xl sm:text-3xl text-[#4B2E2D]">

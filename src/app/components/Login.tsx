@@ -37,7 +37,21 @@ export function Login() {
       setStoredUser(user)
       localStorage.setItem('userRole', role)
 
-      redirectByRole(role)
+      const roleLower = role.toLowerCase()
+      if (roleLower === 'admin' || roleLower === 'administrador') {
+        navigate('/catalog', { replace: true })
+      } else if (roleLower === 'mesero') {
+        navigate('/waiter-view', { replace: true })
+      } else if (roleLower === 'cocinero') {
+        navigate('/chef-view', { replace: true })
+      } else if (roleLower === 'cajero') {
+        navigate('/cashier-view', { replace: true })
+      } else if (roleLower === 'delivery') {
+        navigate('/delivery', { replace: true })
+      } else {
+        // Cliente
+        navigate('/', { replace: true })
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Error al iniciar sesión'
       setError(message)

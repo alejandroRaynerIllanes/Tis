@@ -13,7 +13,6 @@ import {
   Edit2,
   CalendarDays,
   UserCheck,
-  Crown,
   Bell,
   History
 } from 'lucide-react'
@@ -256,14 +255,8 @@ export function WaiterView({
       .toLowerCase()
       .trim()
 
-  // Identificar si el mesero es de la zona VIP
-  const isUserVipZone =
-    normalizeZone(userLocation) === 'vip' || normalizeZone(userLocation) === 'zona vip'
-
   // Buscar la ubicación exacta en el sistema (con sus mayúsculas originales) que coincide con la zona del mesero
-  const matchedUserLocation = isUserVipZone
-    ? 'VIP'
-    : LOCATIONS.find((loc: string) => normalizeZone(loc) === normalizeZone(userLocation)) ||
+  const matchedUserLocation = LOCATIONS.find((loc: string) => normalizeZone(loc) === normalizeZone(userLocation)) ||
       userLocation
 
   // Respaldo dinámico: Si el backend no envió la zona al hacer login, la buscamos
@@ -297,13 +290,6 @@ export function WaiterView({
 
   // Identificamos las mesas que le pertenecen a este mesero basado en su zona
   const myAllowedTables = tables.filter((t) => {
-    if (isUserVipZone) {
-      return (
-        t.type === 'vip' ||
-        normalizeZone(getTableLocation(t)) === 'vip' ||
-        normalizeZone(getTableLocation(t)) === 'zona vip'
-      )
-    }
     return normalizeZone(getTableLocation(t)) === normalizeZone(userLocation)
   })
 
@@ -730,13 +716,6 @@ export function WaiterView({
                         >
                           {tableName}
                         </span>
-                        {t.type === 'vip' && (
-                          <Crown
-                            size={16}
-                            className="text-yellow-300 drop-shadow-sm shrink-0 mt-1"
-                            strokeWidth={2.5}
-                          />
-                        )}
                       </div>
                       {tableLocation && (
                         <div
@@ -808,13 +787,6 @@ export function WaiterView({
                           <span className="text-[11px] font-black truncate">
                             {tableReservation.clientName}
                           </span>
-                          {tableReservation.vip && (
-                            <Crown
-                              size={10}
-                              className="shrink-0 text-yellow-300"
-                              strokeWidth={2.5}
-                            />
-                          )}
                         </div>
                         {tableReservations.length > 1 && (
                           <span className="text-[9px] font-black bg-white/25 px-1.5 py-0.5 rounded-full shrink-0">

@@ -6,6 +6,7 @@ import { NotificationsProvider } from './context/NotificationsContext'
 import { Toaster } from 'sonner'
 
 const Login = lazy(() => import('./components/Login').then((m) => ({ default: m.Login })))
+const PublicMenu = lazy(() => import('./components/PublicMenu').then((m) => ({ default: m.PublicMenu })))
 const Catalog = lazy(() => import('./components/Catalog').then((m) => ({ default: m.Catalog })))
 const WaiterView = lazy(() =>
   import('./components/WaiterView').then((m) => ({ default: m.WaiterView }))
@@ -67,6 +68,10 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
+        element: <PublicMenu />
+      },
+      {
+        path: 'login',
         element: <Login />
       },
       {

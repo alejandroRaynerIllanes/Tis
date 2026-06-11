@@ -23,7 +23,6 @@ interface Order {
   waiter: string
   time: string
   status: OrderStatus
-  isVip?: boolean
   items: OrderItem[]
   rawId?: string
 }
@@ -60,7 +59,6 @@ export function ChefView() {
         : o.estado === 'EN_PREPARACION'
           ? 'En preparación'
           : 'Listo',
-    isVip: o.mesa?.tipo === 'vip' || o.vip,
     items: (o.detalles || []).map((d: any, idx: number) => ({
       id: d.plato?._id || String(idx),
       name: d.plato?.nombre || 'Plato',
@@ -235,11 +233,6 @@ export function ChefView() {
             <h3 className="font-black text-2xl sm:text-3xl text-[#D0543A] leading-none tracking-tight">
               {order.id}
             </h3>
-            {order.isVip && (
-              <span className="bg-amber-100 text-amber-700 text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 border border-amber-200">
-                ★ VIP
-              </span>
-            )}
           </div>
           <p className="text-sm font-bold text-[#4B2E2D]/60">{order.table}</p>
           <p className="text-xs font-semibold text-[#4B2E2D]/50 flex items-center gap-1 mt-0.5">

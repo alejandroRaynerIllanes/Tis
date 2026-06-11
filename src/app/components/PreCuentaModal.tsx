@@ -34,7 +34,7 @@ export function PreCuentaModal({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoadingCajeros, setIsLoadingCajeros] = useState(true)
 
-  const { socket, updateTableStatus } = useAppContext()
+  const { socket, updateTableStatus, tables } = useAppContext()
 
   // Limpiar y cargar cajeros al abrir
   useEffect(() => {
@@ -66,6 +66,10 @@ export function PreCuentaModal({
   }, [isOpen])
 
   if (!isOpen) return null
+
+  const table = tables.find(t => t.id === tableId)
+  const isVip = table?.type === 'vip' || (table as any)?.tipo === 'vip'
+  const cargoVip = isVip ? 100 : 0
 
   const subtotal = orderTotal
   const montoDescuento = subtotal * (discountPercent / 100)
@@ -274,7 +278,15 @@ export function PreCuentaModal({
           {/* Resumen */}
           <div className="bg-[#FFF5F0] rounded-xl p-4 mb-6 border border-[#FCE4D6]">
             <div className="flex justify-between text-sm mb-1 text-gray-600">
-              <span>Subtotal</span> <span className="font-bold">Bs. {subtotal.toFixed(2)}</span>
+              <span>Consumo de Platos</span> <span className="font-bold">Bs. {(subtotal - cargoVip).toFixed(2)}</span>
+            </div>
+            {isVip && (
+              <div className="flex justify-between text-sm mb-1 text-amber-600">
+                <span className="font-bold">Cargo Mesa VIP</span> <span className="font-bold">+Bs. 100.00</span>
+              </div>
+            )}
+            <div className="flex justify-between text-sm mb-1 text-[#4B2E2D] pt-1 border-t border-[#D96C4A]/10 mt-1">
+              <span className="font-bold">Subtotal Neto</span> <span className="font-bold">Bs. {subtotal.toFixed(2)}</span>
             </div>
             {discountPercent > 0 && (
               <div className="flex justify-between text-sm mb-1 text-green-600">

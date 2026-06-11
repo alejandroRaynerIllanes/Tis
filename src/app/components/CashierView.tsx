@@ -763,6 +763,16 @@ export function CashierView() {
                       </div>
                     )
                   )}
+                  
+                  {(selectedBill.mesa?.tipo === 'vip' || selectedBill.mesa?.type === 'vip') && (
+                    <div className="mt-3 flex justify-between items-start text-sm border-b border-amber-200 pb-2 bg-amber-50 p-3 rounded-xl">
+                      <div className="flex items-start gap-2">
+                        <span className="font-bold text-amber-600 w-5">1x</span>
+                        <span className="font-bold text-amber-800">Cargo Mesa VIP</span>
+                      </div>
+                      <span className="font-bold text-amber-800 shrink-0">Bs. 100.00</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1091,6 +1101,18 @@ export function CashierView() {
                       </div>
                     </div>
                   )
+                )}
+                
+                {(processedBill.mesa?.tipo === 'vip' || processedBill.mesa?.type === 'vip') && (
+                  <div className="flex justify-between items-start text-xs bg-amber-50 p-2.5 rounded-lg border border-amber-100 mt-2">
+                    <div className="flex gap-2">
+                      <span className="font-bold text-amber-600">1x</span>
+                      <span className="font-bold text-amber-800">Cargo Mesa VIP</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-bold text-amber-800">Bs. 100.00</span>
+                    </div>
+                  </div>
                 )}
               </div>
 

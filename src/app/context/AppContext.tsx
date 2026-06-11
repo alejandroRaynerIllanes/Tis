@@ -51,7 +51,7 @@ interface AppContextType {
   confirmOrder: (tableId: string) => Promise<void>
   requestBill: (tableId: string) => void
   closeTable: (tableId: string) => void
-  reserveTable: (tableId: string, info: Omit<ReservationInfo, 'id' | 'endTime'>) => void
+  reserveTable: (tableId: string, info: Omit<ReservationInfo, 'id' | 'endTime' | 'vip'>) => void
   cancelReservation: (tableId: string, reservationId: string) => void
   getActiveReservation: (tableId: string) => ReservationInfo | null
   setProducts: React.Dispatch<React.SetStateAction<Product[]>>
@@ -466,8 +466,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       guestCount: r.guestCount || r.cantidadPersonas || 1,
       date: dateStr,
       startTime,
-      endTime: calculateEndTime(startTime, duration),
-      vip: Boolean(r.vip)
+      endTime: calculateEndTime(startTime, duration)
     }
     return { tableId: tId.toString(), resInfo }
   }
@@ -717,7 +716,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
 
         // 2. Formatear payload según modelo IPedido / IDetallePedido
-        const total = tableOrder.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
+        const table = tables.find(t => t.id === tableId)
+        const isVip = table?.type === 'vip' || (table as any)?.tipo === 'vip'
+        const cargoVip = isVip ? 100 : 0
+        const total = tableOrder.reduce((sum, item) => sum + item.product.price * item.quantity, 0) + cargoVip
+
         const payload = {
           mesa: tableId,
           usuario: userId,
@@ -776,8 +779,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     info: Omit<ReservationInfo, 'id' | 'endTime' | 'vip'>
   ) => {
     const table = tables.find((t) => t.id === tableId)
-    const tableType = table?.type || 'normal'
-    const isVipClient = tableType === 'vip'
 
     if (!info.startTime) throw new Error('Falta la hora de la reserva (startTime).')
     if (!info.date) throw new Error('Falta la fecha de la reserva.')
@@ -801,7 +802,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       guestCount: info.guestCount,
       date: info.date,
       time: info.startTime,
-      vip: isVipClient
+      vip: false // Añadido para cumplir con la interfaz del servicio, el backend lo ignorará
     }
 
     const created = await reservationsService.create(payload)

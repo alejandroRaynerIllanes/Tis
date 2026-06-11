@@ -104,7 +104,7 @@ export function StockEntryModal({
               </option>
               {ingredients.map((i) => (
                 <option key={i._id} value={i._id}>
-                  {i.nombre} ({i.unidad})
+                  {i.nombre} ({i.unidadMedida || i.unidad})
                 </option>
               ))}
             </select>

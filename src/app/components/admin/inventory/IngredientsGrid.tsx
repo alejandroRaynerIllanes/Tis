@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowUpRight, Package, Search, Trash2 } from 'lucide-react'
+import { AlertTriangle, ArrowUpRight, Package, Search, Trash2, Edit2 } from 'lucide-react'
 import type { Ingrediente } from '../../../services/inventario.service'
 
 interface IngredientsGridProps {
@@ -8,6 +8,7 @@ interface IngredientsGridProps {
   onSearchChange: (term: string) => void
   onRegisterEntry: (ingrediente?: Ingrediente) => void
   onDeleteRequest: (id: string) => void
+  onEditRequest: (ingrediente: Ingrediente) => void
 }
 
 export function IngredientsGrid({
@@ -16,7 +17,8 @@ export function IngredientsGrid({
   searchTerm,
   onSearchChange,
   onRegisterEntry,
-  onDeleteRequest
+  onDeleteRequest,
+  onEditRequest
 }: IngredientsGridProps) {
   const filtered = ingredients.filter((i) =>
     i.nombre.toLowerCase().includes(searchTerm.toLowerCase())
@@ -76,7 +78,7 @@ export function IngredientsGrid({
                 <div className="space-y-3 mb-6 flex-1">
                   <div className="flex justify-between items-center border-b border-gray-100 pb-2">
                     <span className="text-sm font-semibold text-gray-500">Unidad</span>
-                    <span className="text-sm font-bold text-[#4B2E2D]">{item.unidad}</span>
+                    <span className="text-sm font-bold text-[#4B2E2D]">{item.unidadMedida || item.unidad}</span>
                   </div>
                   <div className="flex justify-between items-center border-b border-gray-100 pb-2">
                     <span className="text-sm font-semibold text-gray-500">Stock actual</span>
@@ -105,19 +107,27 @@ export function IngredientsGrid({
                 </div>
 
                 {/* Footer */}
-                <div className="flex gap-3 mt-auto">
+                <div className="flex flex-col gap-2 mt-auto">
                   <button
                     onClick={() => onRegisterEntry(item)}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-[#FCE4D6] hover:bg-[#F5C9B0] text-[#D0543A] font-bold text-sm transition-colors"
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#FCE4D6] hover:bg-[#F5C9B0] text-[#D0543A] font-bold text-sm transition-colors"
                   >
                     <ArrowUpRight size={16} /> Registrar Entrada
                   </button>
-                  <button
-                    onClick={() => onDeleteRequest(item._id)}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-bold text-sm transition-colors border border-red-100"
-                  >
-                    <Trash2 size={16} /> Eliminar
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => onEditRequest(item)}
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold text-sm transition-colors border border-gray-200"
+                    >
+                      <Edit2 size={16} /> Editar
+                    </button>
+                    <button
+                      onClick={() => onDeleteRequest(item._id)}
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-bold text-sm transition-colors border border-red-100"
+                    >
+                      <Trash2 size={16} /> Eliminar
+                    </button>
+                  </div>
                 </div>
               </div>
             )

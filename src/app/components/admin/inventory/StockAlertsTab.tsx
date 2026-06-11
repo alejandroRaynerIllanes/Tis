@@ -39,13 +39,13 @@ export function StockAlertsTab({ lowStockIngredients, onRegisterEntry }: StockAl
                 <div>
                   <p className="text-[10px] font-bold text-[#4B2E2D]/40 uppercase">Stock Actual</p>
                   <p className="text-xl font-black text-red-500">
-                    {item.stockActual} <span className="text-sm font-bold">{item.unidad}</span>
+                    {item.stockActual} <span className="text-sm font-bold">{item.unidadMedida || item.unidad}</span>
                   </p>
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-[#4B2E2D]/40 uppercase">Mínimo ideal</p>
                   <p className="text-xl font-black text-[#4B2E2D]">
-                    {item.stockMinimo} <span className="text-sm font-bold">{item.unidad}</span>
+                    {item.stockMinimo} <span className="text-sm font-bold">{item.unidadMedida || item.unidad}</span>
                   </p>
                 </div>
               </div>

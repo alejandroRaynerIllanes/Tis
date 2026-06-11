@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { Users, UserCheck, Star, Search } from 'lucide-react'
+import { Users, UserCheck, Star, Search, Trash2 } from 'lucide-react'
 import { api } from '../../services/api'
 import { toast } from 'sonner'
 
@@ -47,6 +47,18 @@ export function ClientManagement() {
       return matchesSearch && matchesFilter
     })
   }, [clients, searchTerm, filter])
+
+  const handleDeleteClient = async (id: string) => {
+    if (window.confirm('¿Estás seguro de eliminar este cliente? Se revocará su acceso.')) {
+      try {
+        await api.delete(`/usuarios/${id}`)
+        setClients(prev => prev.filter(c => (c._id || c.id) !== id))
+        toast.success('Cliente eliminado exitosamente')
+      } catch (error) {
+        toast.error('Error al eliminar cliente')
+      }
+    }
+  }
 
   return (
     <div className="flex flex-col h-full bg-[#FCE4D6]">
@@ -116,6 +128,7 @@ export function ClientManagement() {
                     <th className="text-left py-4 px-6 font-bold text-gray-500 text-sm">Contacto</th>
                     <th className="text-left py-4 px-6 font-bold text-gray-500 text-sm">Estado</th>
                     <th className="text-left py-4 px-6 font-bold text-gray-500 text-sm">Fecha Registro</th>
+                    <th className="text-right py-4 px-6 font-bold text-gray-500 text-sm">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -140,6 +153,11 @@ export function ClientManagement() {
                       </td>
                       <td className="py-4 px-6 text-sm text-gray-500 font-medium">
                         {new Date(client.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="py-4 px-6 text-right">
+                        <button onClick={() => handleDeleteClient(client._id || client.id)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar Cliente">
+                          <Trash2 size={18} />
+                        </button>
                       </td>
                     </tr>
                   ))}

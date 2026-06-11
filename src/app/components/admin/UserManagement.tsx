@@ -396,6 +396,7 @@ export function UserManagement() {
                   <option value="Cajero">Cajero</option>
                   <option value="Mesero">Mesero</option>
                   <option value="Cocinero">Cocinero</option>
+                  <option value="Delivery">Repartidor (Delivery)</option>
                 </select>
               </div>
 

@@ -6,6 +6,7 @@ import { getStoredUser, api } from '../services/api'
 import { ordersService } from '../services/orders.service'
 import { useAppContext } from '../context/AppContext'
 import { inventarioService, type Ingrediente } from '../services/inventario.service'
+import { Order as GlobalOrder, User as GlobalUser, OrderDetail } from '../types'
 
 type OrderStatus = 'Pendiente' | 'En preparación' | 'Listo'
 
@@ -38,7 +39,7 @@ export function ChefView() {
     ? `${currentUser.nombre} ${currentUser.apellido || ''}`.trim()
     : 'Cocinero'
 
-  const formatOrder = (o: any): Order => ({
+  const formatOrder = (o: GlobalOrder): Order => ({
     // Si es un pedido antiguo sin código, generamos uno a partir del _id para que jamás se vea el hash largo
     id:
       o.codigo ||
@@ -46,9 +47,9 @@ export function ChefView() {
         .slice(-4)
         .toUpperCase()}`,
     rawId: o._id,
-    table: o.mesa?.numero || o.mesa?.name || 'Mesa ?',
-    tableId: o.mesa?._id || o.mesa?.id || o.mesa,
-    waiter: o.usuario?.nombre ? `${o.usuario.nombre} ${o.usuario.apellido || ''}`.trim() : 'Mesero',
+    table: typeof o.mesa === 'object' && o.mesa !== null ? (o.mesa.numero || o.mesa.name || 'Mesa ?') : 'Mesa ?',
+    tableId: typeof o.mesa === 'object' && o.mesa !== null ? o.mesa._id || o.mesa.id : String(o.mesa || ''),
+    waiter: typeof o.usuario === 'object' && o.usuario !== null ? `${o.usuario.nombre} ${o.usuario.apellido || ''}`.trim() : 'Mesero',
     time: new Date(o.fechaHora || o.createdAt || Date.now()).toLocaleTimeString('es-ES', {
       hour: '2-digit',
       minute: '2-digit'
@@ -59,9 +60,9 @@ export function ChefView() {
         : o.estado === 'EN_PREPARACION'
           ? 'En preparación'
           : 'Listo',
-    items: (o.detalles || []).map((d: any, idx: number) => ({
-      id: d.plato?._id || String(idx),
-      name: d.plato?.nombre || 'Plato',
+    items: (o.detalles || []).map((d: OrderDetail, idx: number) => ({
+      id: typeof d.plato === 'object' && d.plato !== null ? d.plato._id || d.plato.id || String(idx) : String(d.plato || idx),
+      name: d.nombre || (typeof d.plato === 'object' && d.plato !== null ? d.plato.nombre : 'Plato') || 'Plato',
       quantity: d.cantidad,
       notes: d.observacion
     }))
@@ -70,8 +71,8 @@ export function ChefView() {
   useEffect(() => {
     const fetchOrders = async () => {
       try {
-        const res: any = await api.get('/pedidos?activo=true')
-        const activeOrders = res.data || res || []
+        const res = await api.get<GlobalOrder[]>('/pedidos?activo=true')
+        const activeOrders = (res as any).data || res || []
 
         setOrders(activeOrders.map(formatOrder))
       } catch (err) {
@@ -84,12 +85,12 @@ export function ChefView() {
   useEffect(() => {
     if (!socket) return
 
-    const handleNuevoPedido = (o: any) => {
+    const handleNuevoPedido = (o: GlobalOrder) => {
       setOrders((prev) => [formatOrder(o), ...prev])
       toast.info(`🔔 ¡Nuevo pedido recibido! (${o.codigo || 'Mesa'})`)
     }
 
-    const handleActualizarTablero = (o: any) => {
+    const handleActualizarTablero = (o: GlobalOrder) => {
       // Si el pedido fue cancelado o cobrado, desaparece de la vista.
       // Si está en 'ENTREGADO' (Listo), se queda en la última columna hasta que se pague.
       if (['CANCELADO', 'CERRADO'].includes(o.estado)) {

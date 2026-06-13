@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { ShoppingCart, Search, Plus, Minus, X, User, LogOut, Loader2, ArrowRight, ChefHat, Trash2, ChevronLeft, MapPin, Bike, QrCode, Banknote, Info, Clock, Navigation } from 'lucide-react'
+import { ShoppingCart, Search, Plus, Minus, X, User, LogOut, ArrowRight, ChefHat, Trash2 } from 'lucide-react'
 import { platosService } from '../services/platos.service'
 import { categoriesService } from '../services/categories.service'
 import { api, getStoredUser, getToken, setToken, setStoredUser } from '../services/api'
 import { authService } from '../services/auth.service'
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router'
+import { CheckoutStepper } from './CheckoutStepper'
 
 export function PublicMenu() {
   const [dishes, setDishes] = useState<any[]>([])
@@ -15,21 +16,9 @@ export function PublicMenu() {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState<string>('all')
 
-  // Estados del Flujo de Checkout (Delivery)
-  const [checkoutStep, setCheckoutStep] = useState(0)
-  const [deliveryInfo, setDeliveryInfo] = useState({
-    address: '',
-    reference: '',
-    lat: -17.3895,
-    lng: -66.1568,
-    distance: 0,
-    time: 0,
-    cost: 0
-  })
-  const [billingInfo, setBillingInfo] = useState({ name: '', phone: '', email: '' })
-  const [paymentMethod, setPaymentMethod] = useState<'QR' | 'Efectivo'>('QR')
+  // Flag para saber si mostramos el carrito o el proceso de pago
+  const [isCheckoutStarted, setIsCheckoutStarted] = useState(false)
 
-  const [pinPos, setPinPos] = useState<{ x: number; y: number } | null>(null)
   const [showAuthModal, setShowAuthModal] = useState<'login' | 'register' | null>(null)
   const [authLoading, setAuthLoading] = useState(false)
 
@@ -90,14 +79,7 @@ export function PublicMenu() {
   // Reiniciar paso y pre-llenar datos del usuario cuando se abre el carrito
   useEffect(() => {
     if (isCartOpen) {
-      setCheckoutStep(0)
-      if (currentUser) {
-        setBillingInfo({
-          name: currentUser.nombre || '',
-          phone: (currentUser as any).telefono || '',
-          email: currentUser.email || ''
-        })
-      }
+      setIsCheckoutStarted(false)
     }
   }, [isCartOpen, currentUser])
 
@@ -141,99 +123,7 @@ export function PublicMenu() {
       setShowAuthModal('login')
       return
     }
-    setCheckoutStep(1)
-  }
-
-  const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Mapa Interactivo: Calculamos dónde dio clic y fijamos el Pin visualmente
-    const rect = e.currentTarget.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
-    setPinPos({ x, y })
-    
-    // Centro del mapa es el restaurante
-    const center_x = rect.width / 2
-    const center_y = rect.height / 2
-    
-    // Distancia visual escalada a Km reales (30 pixels = ~1 Km)
-    const distPixels = Math.sqrt(Math.pow(x - center_x, 2) + Math.pow(y - center_y, 2))
-    const distKm = Math.max(0.5, (distPixels / 30)).toFixed(1)
-    const dist = parseFloat(distKm)
-
-    const time = Math.round(10 + dist * 5)
-    const cost = Math.max(5, Math.round(dist * 3))
-
-    setDeliveryInfo(prev => ({
-      ...prev,
-      distance: dist,
-      time: time,
-      cost: cost,
-      lat: -17.3895 + ((y - center_y) * -0.0005),
-      lng: -66.1568 + ((x - center_x) * 0.0005)
-    }))
-  }
-
-  const handleGetLocation = () => {
-    if ('geolocation' in navigator) {
-      toast.info('Obteniendo ubicación GPS...')
-      navigator.geolocation.getCurrentPosition((position) => {
-        const lat = position.coords.latitude
-        const lng = position.coords.longitude
-        
-        // Distancia real contra Cochabamba (Restaurante) usando Haversine
-        const R = 6371; 
-        const dLat = (lat - -17.3895) * Math.PI / 180;
-        const dLon = (lng - -66.1568) * Math.PI / 180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(-17.3895 * Math.PI / 180) * Math.cos(lat * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        let dist = parseFloat(Math.max(0.5, R * c).toFixed(1));
-
-        const time = Math.round(10 + dist * 5)
-        const cost = Math.max(5, Math.round(dist * 3))
-
-        setDeliveryInfo(prev => ({ ...prev, lat, lng, distance: dist, time, cost }))
-        setPinPos({ x: 150, y: 100 }) // Pin al centro
-        toast.success('¡Ubicación real obtenida!')
-      }, () => {
-        toast.error('Activa los permisos de ubicación en tu navegador.')
-      })
-    } else {
-      toast.error('Geolocalización no soportada.')
-    }
-  }
-
-  const processCheckout = async () => {
-    try {
-      const items = cart.map(c => ({
-        platoId: c.product.id,
-        cantidad: c.quantity,
-        precioUnitario: c.product.precio || c.product.price
-      }))
-
-      const finalTotal = cartTotal + deliveryInfo.cost
-
-      // Estructura lista para el módulo Delivery
-      await api.post('/pedidos/checkout', {
-        items,
-        metodoPago: paymentMethod,
-        metodoEntrega: 'delivery',
-        coordenadasEntrega: { lat: deliveryInfo.lat, lng: deliveryInfo.lng },
-        direccionEntrega: deliveryInfo.address,
-        referenciaEntrega: deliveryInfo.reference,
-        costoDelivery: deliveryInfo.cost,
-        clienteNombre: billingInfo.name,
-        clienteTelefono: billingInfo.phone,
-        total: finalTotal
-      })
-
-      toast.success('¡Pedido realizado con éxito!')
-      setCart([])
-      setCheckoutStep(0)
-      setIsCartOpen(false)
-      navigate('/perfil')
-    } catch (error: any) {
-      toast.error(error.response?.data?.mensaje || 'Error al procesar el pedido')
-    }
+    setIsCheckoutStarted(true)
   }
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
@@ -430,323 +320,78 @@ export function PublicMenu() {
       {isCartOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-end">
           <div className="bg-white w-full max-w-md h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
-            <div className="p-6 border-b flex items-center justify-between bg-[#FCE4D6]/30">
-              <div className="flex items-center gap-3">
-                {checkoutStep > 0 && (
-                  <button onClick={() => setCheckoutStep(prev => prev - 1)} className="p-1 text-[#4B2E2D]/50 hover:text-[#D96C4A] transition-colors rounded-full hover:bg-white">
-                    <ChevronLeft size={20} />
+            {!isCheckoutStarted ? (
+              <>
+                <div className="p-6 border-b flex items-center justify-between bg-[#FCE4D6]/30">
+                  <div className="flex items-center gap-3">
+                    <ShoppingCart className="text-[#D96C4A]" size={24} />
+                    <h2 className="text-xl font-black text-[#4B2E2D]">Tu Pedido</h2>
+                  </div>
+                  <button onClick={() => setIsCartOpen(false)} className="p-2 text-[#4B2E2D]/50 hover:text-[#D96C4A] transition-colors bg-white rounded-full shadow-sm">
+                    <X size={20} />
                   </button>
-                )}
-                <ShoppingCart className="text-[#D96C4A]" size={24} />
-                <h2 className="text-xl font-black text-[#4B2E2D]">
-                  {checkoutStep === 0 ? 'Tu Pedido' : checkoutStep === 1 ? 'Paso 1' : checkoutStep === 2 ? 'Paso 2' : checkoutStep === 3 ? 'Paso 3' : checkoutStep === 4 ? 'Paso 4' : 'Final'}
-                </h2>
-              </div>
-              <button onClick={() => setIsCartOpen(false)} className="p-2 text-[#4B2E2D]/50 hover:text-[#D96C4A] transition-colors bg-white rounded-full shadow-sm">
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* ════ PASO 0: CARRITO ════ */}
-            {checkoutStep === 0 && (
-              <div className="flex-1 overflow-y-auto p-6 space-y-4 animate-in fade-in slide-in-from-left-4 duration-300">
-                {cart.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full text-gray-400 space-y-4">
-                    <ShoppingCart size={48} className="opacity-20" />
-                    <p className="font-medium">Tu carrito está vacío</p>
-                    <button onClick={() => setIsCartOpen(false)} className="px-6 py-2 bg-[#FCE4D6] text-[#D96C4A] font-bold rounded-full">Explorar Menú</button>
-                  </div>
-                ) : (
-                  cart.map((item) => (
-                    <div key={item.product.id} className="flex gap-4 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm relative">
-                      <img src={item.product.imagenUrl || item.product.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200'} alt={item.product.nombre} className="w-20 h-20 object-cover rounded-xl" />
-                      <button 
-                        onClick={() => removeFromCart(item.product.id)}
-                        className="absolute top-2 right-2 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Eliminar del pedido"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                      <div className="flex-1 flex flex-col justify-between pr-6">
-                        <div>
-                          <h4 className="font-bold text-[#4B2E2D] line-clamp-1">{item.product.nombre || item.product.name}</h4>
-                          <span className="text-[#D96C4A] font-black text-sm">Bs. {(item.product.precio || item.product.price).toFixed(2)}</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <button onClick={() => updateQuantity(item.product.id, -1)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors"><Minus size={14}/></button>
-                          <span className="font-bold text-[#4B2E2D] w-4 text-center">{item.quantity}</span>
-                          <button onClick={() => updateQuantity(item.product.id, 1)} className="w-8 h-8 rounded-full bg-[#FCE4D6] flex items-center justify-center text-[#D96C4A] hover:bg-[#D96C4A] hover:text-white transition-colors"><Plus size={14}/></button>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-            {checkoutStep === 0 && cart.length > 0 && (
-              <div className="p-6 bg-white border-t shadow-[0_-10px_20px_rgba(0,0,0,0.05)] animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <div className="flex justify-between items-center mb-6">
-                  <span className="text-gray-500 font-bold">Total a pagar:</span>
-                  <span className="text-2xl font-black text-[#4B2E2D]">Bs. {cartTotal.toFixed(2)}</span>
                 </div>
-                <button onClick={handleCheckoutClick} className="w-full py-4 bg-[#D96C4A] text-white rounded-xl font-black text-lg shadow-lg hover:bg-[#b5462f] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2">
-                  {userToken ? 'Confirmar Pedido' : 'Iniciar Sesión para Pedir'} <ArrowRight size={20} />
-                </button>
-              </div>
-            )}
 
-            {/* ════ PASO 1: METODO DE ENTREGA ════ */}
-            {checkoutStep === 1 && (
-              <div className="flex flex-col h-full p-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                <h3 className="text-xl font-black text-[#4B2E2D] mb-4">¿Cómo deseas tu pedido?</h3>
-                <button onClick={() => setCheckoutStep(2)} className="flex items-center gap-4 p-5 rounded-2xl border-2 border-[#D96C4A] bg-[#FCE4D6]/30 hover:bg-[#FCE4D6]/60 transition-all text-left group">
-                  <div className="w-12 h-12 rounded-full bg-[#D96C4A] text-white flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                    <Bike size={24} />
-                  </div>
-                  <div>
-                    <h4 className="font-black text-[#4B2E2D] text-lg">Delivery</h4>
-                    <p className="text-sm font-medium text-gray-600">Envío directo a tu domicilio</p>
-                  </div>
-                </button>
-              </div>
-            )}
-
-            {/* ════ PASO 2: UBICACIÓN Y MAPA ════ */}
-            {checkoutStep === 2 && (
-              <div className="flex flex-col h-full p-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                <h3 className="text-xl font-black text-[#4B2E2D] mb-4">Selecciona tu ubicación</h3>
-                
-                <button
-                  onClick={handleGetLocation}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-blue-50 text-blue-600 rounded-xl font-bold mb-4 border border-blue-200 hover:bg-blue-100 transition-all shadow-sm active:scale-95"
-                >
-                  <Navigation size={18} /> Usar mi ubicación actual (GPS)
-                </button>
-
-                <div 
-                  onClick={handleMapClick}
-                  className="w-full h-56 bg-gray-200 rounded-2xl relative cursor-crosshair overflow-hidden border-2 border-[#D96C4A]/30 hover:border-[#D96C4A] transition-all shadow-inner group shrink-0"
-                  style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1524661135-423995f22d0b?q=80&w=600)', backgroundSize: 'cover', backgroundPosition: 'center' }}
-                >
-                  <div className="absolute inset-0 bg-white/40 group-hover:bg-white/20 transition-colors"></div>
-                  <div className="absolute top-2 left-2 right-2 flex justify-between items-start">
-                    <span className="bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] font-black text-[#4B2E2D] shadow-sm">
-                      Leaflet | © Carto
-                    </span>
-                  </div>
-                  {pinPos ? (
-                    <div
-                      className="absolute -translate-x-1/2 -translate-y-full drop-shadow-xl transition-all duration-200 ease-out z-10"
-                      style={{ left: pinPos.x, top: pinPos.y }}
-                    >
-                      <MapPin size={40} className="text-[#D96C4A] drop-shadow-md" fill="currentColor" />
+                <div className="flex-1 overflow-y-auto p-6 space-y-4 animate-in fade-in slide-in-from-left-4 duration-300">
+                  {cart.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-400 space-y-4">
+                      <ShoppingCart size={48} className="opacity-20" />
+                      <p className="font-medium">Tu carrito está vacío</p>
+                      <button onClick={() => setIsCartOpen(false)} className="px-6 py-2 bg-[#FCE4D6] text-[#D96C4A] font-bold rounded-full">Explorar Menú</button>
                     </div>
                   ) : (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <div className="bg-[#4B2E2D] text-white px-4 py-2 rounded-full font-bold text-sm shadow-xl flex items-center gap-2 animate-bounce">
-                        <MapPin size={16} /> Toca el mapa para fijar tu ubicación
+                    cart.map((item) => (
+                      <div key={item.product.id} className="flex gap-4 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm relative">
+                        <img src={item.product.imagenUrl || item.product.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200'} alt={item.product.nombre} className="w-20 h-20 object-cover rounded-xl" />
+                        <button 
+                          onClick={() => removeFromCart(item.product.id)}
+                          className="absolute top-2 right-2 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Eliminar del pedido"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                        <div className="flex-1 flex flex-col justify-between pr-6">
+                          <div>
+                            <h4 className="font-bold text-[#4B2E2D] line-clamp-1">{item.product.nombre || item.product.name}</h4>
+                            <span className="text-[#D96C4A] font-black text-sm">Bs. {(item.product.precio || item.product.price).toFixed(2)}</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <button onClick={() => updateQuantity(item.product.id, -1)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors"><Minus size={14}/></button>
+                            <span className="font-bold text-[#4B2E2D] w-4 text-center">{item.quantity}</span>
+                            <button onClick={() => updateQuantity(item.product.id, 1)} className="w-8 h-8 rounded-full bg-[#FCE4D6] flex items-center justify-center text-[#D96C4A] hover:bg-[#D96C4A] hover:text-white transition-colors"><Plus size={14}/></button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    ))
                   )}
                 </div>
 
-                <div className="space-y-4 mt-4">
-                  <div>
-                    <label className="block text-sm font-bold text-[#4B2E2D] mb-1.5">Dirección <span className="text-red-500">*</span></label>
-                    <input required type="text" placeholder="Ej. Av. América Oeste #456" value={deliveryInfo.address} onChange={e => setDeliveryInfo({...deliveryInfo, address: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-[#D96C4A] focus:ring-2 focus:ring-[#D96C4A]/20" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-[#4B2E2D] mb-1.5">Referencia <span className="text-red-500">*</span></label>
-                    <input required type="text" placeholder="Ej. Casa azul frente al surtidor" value={deliveryInfo.reference} onChange={e => setDeliveryInfo({...deliveryInfo, reference: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-[#D96C4A] focus:ring-2 focus:ring-[#D96C4A]/20" />
-                    <p className="text-xs text-gray-500 mt-1.5 font-medium">Ayuda al repartidor a encontrarte más rápido.</p>
-                  </div>
-                </div>
-
-                {deliveryInfo.distance > 0 && (
-                  <div className="grid grid-cols-3 gap-2 bg-[#FCE4D6]/30 p-4 rounded-xl border border-[#FCE4D6] mt-4">
-                    <div className="text-center">
-                      <p className="text-[10px] font-bold text-gray-500 uppercase">Distancia</p>
-                      <p className="font-black text-[#4B2E2D] text-lg leading-tight">{deliveryInfo.distance} km</p>
+                {cart.length > 0 && (
+                  <div className="p-6 bg-white border-t shadow-[0_-10px_20px_rgba(0,0,0,0.05)] animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div className="flex justify-between items-center mb-6">
+                      <span className="text-gray-500 font-bold">Total a pagar:</span>
+                      <span className="text-2xl font-black text-[#4B2E2D]">Bs. {cartTotal.toFixed(2)}</span>
                     </div>
-                    <div className="text-center border-x border-[#E0D0C5]">
-                      <p className="text-[10px] font-bold text-gray-500 uppercase">Tiempo est.</p>
-                      <p className="font-black text-[#4B2E2D] text-lg leading-tight">{deliveryInfo.time} min</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-[10px] font-bold text-gray-500 uppercase">Costo Delivery</p>
-                      <p className="font-black text-[#D96C4A] text-lg leading-tight">Bs. {deliveryInfo.cost.toFixed(2)}</p>
-                    </div>
+                    <button onClick={handleCheckoutClick} className="w-full py-4 bg-[#D96C4A] text-white rounded-xl font-black text-lg shadow-lg hover:bg-[#b5462f] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2">
+                      {userToken ? 'Confirmar Pedido' : 'Iniciar Sesión para Pedir'} <ArrowRight size={20} />
+                    </button>
                   </div>
                 )}
-
-                <div className="mt-auto pt-6">
-                  <button 
-                    disabled={!deliveryInfo.address || !deliveryInfo.reference || deliveryInfo.distance === 0}
-                    onClick={() => setCheckoutStep(3)} 
-                    className="w-full py-4 bg-[#D96C4A] text-white rounded-xl font-black text-lg shadow-lg hover:bg-[#b5462f] transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
-                  >
-                    Confirmar Dirección
-                  </button>
-                </div>
-              </div>
+              </>
+            ) : (
+              <CheckoutStepper
+                cart={cart}
+                cartTotal={cartTotal}
+                currentUser={currentUser as any}
+                onClose={() => setIsCheckoutStarted(false)}
+                onOrderSuccess={() => {
+                  setCart([])
+                  setIsCheckoutStarted(false)
+                  setIsCartOpen(false)
+                  navigate('/perfil')
+                }}
+              />
             )}
-
-            {/* ════ PASO 3: FACTURACIÓN ════ */}
-            {checkoutStep === 3 && (
-              <div className="flex flex-col h-full p-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                <h3 className="text-xl font-black text-[#4B2E2D] mb-6">Tus datos</h3>
-                
-                <div className="space-y-5">
-                  <div>
-                    <label className="block text-sm font-bold text-[#4B2E2D] mb-1.5">Nombre completo <span className="text-red-500">*</span></label>
-                    <input required type="text" value={billingInfo.name} onChange={e => setBillingInfo({...billingInfo, name: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-[#D96C4A] focus:ring-2 focus:ring-[#D96C4A]/20" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-[#4B2E2D] mb-1.5">Teléfono <span className="text-red-500">*</span></label>
-                    <input required type="tel" value={billingInfo.phone} onChange={e => setBillingInfo({...billingInfo, phone: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-[#D96C4A] focus:ring-2 focus:ring-[#D96C4A]/20" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-[#4B2E2D] mb-1.5">Correo electrónico <span className="text-gray-400 font-normal">(Opcional)</span></label>
-                    <input type="email" value={billingInfo.email} onChange={e => setBillingInfo({...billingInfo, email: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-[#D96C4A] focus:ring-2 focus:ring-[#D96C4A]/20" />
-                  </div>
-                </div>
-
-                <div className="mt-auto pt-6">
-                  <button 
-                    disabled={!billingInfo.name || !billingInfo.phone}
-                    onClick={() => setCheckoutStep(4)} 
-                    className="w-full py-4 bg-[#D96C4A] text-white rounded-xl font-black text-lg shadow-lg hover:bg-[#b5462f] transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
-                  >
-                    Continuar a Pago
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* ════ PASO 4: METODO DE PAGO ════ */}
-            {checkoutStep === 4 && (
-              <div className="flex flex-col h-full p-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                <h3 className="text-xl font-black text-[#4B2E2D] mb-6">Método de Pago</h3>
-                
-                <div className="space-y-4">
-                  <button 
-                    onClick={() => setPaymentMethod('QR')}
-                    className={`w-full flex items-start gap-4 p-5 rounded-2xl border-2 transition-all text-left ${paymentMethod === 'QR' ? 'border-[#D96C4A] bg-[#FCE4D6]/30' : 'border-gray-200 bg-white hover:border-[#D96C4A]/50'}`}
-                  >
-                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${paymentMethod === 'QR' ? 'border-[#D96C4A]' : 'border-gray-300'}`}>
-                      {paymentMethod === 'QR' && <div className="w-3 h-3 bg-[#D96C4A] rounded-full"></div>}
-                    </div>
-                    <div>
-                      <h4 className="font-black text-[#4B2E2D] flex items-center gap-2 text-lg leading-none mb-1.5"><QrCode size={20} /> Pago QR</h4>
-                      <p className="text-xs font-medium text-gray-500 leading-relaxed">El pedido quedará registrado como PAGADO automáticamente tras confirmar.</p>
-                    </div>
-                  </button>
-
-                  <button 
-                    onClick={() => setPaymentMethod('Efectivo')}
-                    className={`w-full flex items-start gap-4 p-5 rounded-2xl border-2 transition-all text-left ${paymentMethod === 'Efectivo' ? 'border-[#D96C4A] bg-[#FCE4D6]/30' : 'border-gray-200 bg-white hover:border-[#D96C4A]/50'}`}
-                  >
-                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${paymentMethod === 'Efectivo' ? 'border-[#D96C4A]' : 'border-gray-300'}`}>
-                      {paymentMethod === 'Efectivo' && <div className="w-3 h-3 bg-[#D96C4A] rounded-full"></div>}
-                    </div>
-                    <div>
-                      <h4 className="font-black text-[#4B2E2D] flex items-center gap-2 text-lg leading-none mb-1.5"><Banknote size={20} /> Efectivo</h4>
-                      <p className="text-xs font-medium text-gray-500 leading-relaxed">El pedido quedará como POR COBRAR hasta la entrega.</p>
-                    </div>
-                  </button>
-                </div>
-
-                <div className="mt-auto pt-6">
-                  <button 
-                    onClick={() => setCheckoutStep(5)} 
-                    className="w-full py-4 bg-[#D96C4A] text-white rounded-xl font-black text-lg shadow-lg hover:bg-[#b5462f] transition-all active:scale-[0.98]"
-                  >
-                    Revisar Pedido
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* ════ PASO 5: RESUMEN FINAL ════ */}
-            {checkoutStep === 5 && (
-              <div className="flex flex-col h-full p-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                <h3 className="text-xl font-black text-[#4B2E2D] mb-4">Resumen Final</h3>
-                
-                <div className="bg-gray-50 p-5 rounded-2xl border border-gray-200 space-y-4 shadow-sm mb-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="text-[10px] font-bold text-[#D96C4A] uppercase tracking-widest mb-1 flex items-center gap-1"><Bike size={12} /> Delivery</p>
-                      <p className="font-black text-[#4B2E2D] text-lg leading-tight">{billingInfo.name}</p>
-                      <p className="text-sm font-medium text-gray-500 mt-0.5">{billingInfo.phone}</p>
-                    </div>
-                    <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-emerald-200 shadow-sm">
-                      Pago {paymentMethod}
-                    </span>
-                  </div>
-
-                  <div className="pt-4 border-t border-gray-200">
-                     <div className="flex gap-3 text-sm">
-                        <MapPin size={18} className="text-[#D96C4A] shrink-0 mt-0.5" />
-                        <div>
-                           <p className="font-bold text-[#4B2E2D] leading-tight">Dirección de entrega</p>
-                           <p className="text-gray-600 font-medium text-xs mt-0.5 leading-relaxed">{deliveryInfo.address}</p>
-                        </div>
-                     </div>
-                     <div className="flex gap-3 text-sm mt-4">
-                        <Info size={18} className="text-blue-500 shrink-0 mt-0.5" />
-                        <div>
-                           <p className="font-bold text-[#4B2E2D] leading-tight">Referencia</p>
-                           <p className="text-gray-600 font-medium text-xs mt-0.5 leading-relaxed uppercase">{deliveryInfo.reference}</p>
-                        </div>
-                     </div>
-                  </div>
-                  
-                  <div className="bg-blue-50 text-blue-700 p-3 rounded-xl flex items-center gap-2 text-xs font-bold border border-blue-100 shadow-sm">
-                     <Clock size={16} /> Tiempo estimado: ~{deliveryInfo.time - 5} - {deliveryInfo.time + 5} min
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-200 pb-2">Productos</p>
-                  <div className="max-h-[150px] overflow-y-auto pr-2 space-y-3 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-black/10">
-                    {cart.map((item) => (
-                       <div key={item.product.id} className="flex justify-between text-sm">
-                          <span className="font-medium text-gray-700 leading-tight">
-                            <span className="font-bold text-[#D96C4A] w-6 inline-block">{item.quantity}x</span> 
-                            {item.product.nombre || item.product.name}
-                          </span>
-                          <span className="font-bold text-[#4B2E2D] shrink-0">Bs. {((item.product.precio || item.product.price) * item.quantity).toFixed(2)}</span>
-                       </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-auto pt-4 border-t border-dashed border-gray-300 space-y-2.5">
-                   <div className="flex justify-between text-sm">
-                      <span className="font-bold text-gray-500">Subtotal</span>
-                      <span className="font-bold text-[#4B2E2D]">Bs. {cartTotal.toFixed(2)}</span>
-                   </div>
-                   <div className="flex justify-between text-sm text-[#D96C4A]">
-                      <span className="font-bold flex items-center gap-1.5"><Bike size={14} /> Costo Delivery</span>
-                      <span className="font-bold">Bs. {deliveryInfo.cost.toFixed(2)}</span>
-                   </div>
-                   <div className="flex justify-between items-center pt-3 border-t border-gray-200 mt-3">
-                      <span className="font-black text-lg text-[#4B2E2D]">Total a Pagar</span>
-                      <span className="font-black text-3xl text-[#D0543A] leading-none">Bs. {(cartTotal + deliveryInfo.cost).toFixed(2)}</span>
-                   </div>
-                </div>
-
-                <div className="mt-6">
-                  <button 
-                    onClick={processCheckout} 
-                    className="w-full py-4 bg-[#D96C4A] text-white rounded-xl font-black text-lg shadow-lg shadow-[#D96C4A]/30 hover:bg-[#b5462f] transition-all active:scale-[0.98]"
-                  >
-                    Confirmar Pedido
-                  </button>
-                </div>
-              </div>
-            )}
-
           </div>
         </div>
       )}

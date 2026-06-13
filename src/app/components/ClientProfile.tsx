@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { User, MapPin, Package, Shield, ArrowLeft, LogOut, Plus, Trash2, Edit2, Loader2, Save } from 'lucide-react'
 import { useNavigate } from 'react-router'
-import { getStoredUser, api, setStoredUser } from '../services/api'
+import { getStoredUser, api, setStoredUser, getToken } from '../services/api'
 import { toast } from 'sonner'
+import { User as UserType, Address, Order, OrderDetail } from '../types'
+import { usersService } from '../services/users.service'
 
 export function ClientProfile() {
   const navigate = useNavigate()
@@ -14,8 +16,8 @@ export function ClientProfile() {
 
   // Data
   const [profileData, setProfileData] = useState({ nombre: '', email: '', telefono: '' })
-  const [addresses, setAddresses] = useState<any[]>([])
-  const [history, setHistory] = useState<any[]>([])
+  const [addresses, setAddresses] = useState<Address[]>([])
+  const [history, setHistory] = useState<Order[]>([])
   
   // Password Form
   const [passForm, setPassForm] = useState({ current: '', new: '', confirm: '' })
@@ -26,24 +28,20 @@ export function ClientProfile() {
 
   useEffect(() => {
     const loadData = async () => {
-      if (!user?.id) return
+      if (!user?.id || !getToken()) return
       try {
-        // Obtener perfil actualizado
-        try {
-          const usersRes: any = await api.get('/usuarios')
-          const me = usersRes.find((u: any) => u._id === user.id || u.id === user.id)
-          if (me) {
-            setProfileData({ nombre: me.nombre || '', email: me.email || '', telefono: me.telefono || '' })
-            setAddresses(me.direcciones || [])
-          }
-        } catch (apiError) {
-          // Fallback de seguridad: Si el backend bloquea la ruta a usuarios normales, usamos datos locales
-          setProfileData({ nombre: user.nombre || '', email: user.email || '', telefono: (user as any).telefono || '' })
-        }
+        // Obtener perfil actualizado desde el endpoint de sesión actual
+        const me = await usersService.getProfile();
+        setProfileData({ 
+          nombre: me.nombre || '', 
+          email: me.email || '', 
+          telefono: me.telefono || '' 
+        })
+        setAddresses(me.direcciones || [])
 
         // Obtener historial de pedidos (El parámetro mesero filtra por usuario en el backend)
-        const ordersRes: any = await api.get(`/pedidos?mesero=${user.id}`)
-        setHistory(ordersRes.data || ordersRes || [])
+        const ordersRes = await api.get<Order[]>(`/pedidos?mesero=${user.id}`)
+        setHistory((ordersRes as any).data || ordersRes || [])
       } catch (error) {
         console.error('Error al cargar perfil:', error)
         toast.error('No se pudo cargar la información del perfil.')
@@ -59,7 +57,7 @@ export function ClientProfile() {
     setSaving(true)
     try {
       await api.put(`/usuarios/${user?.id}`, { nombre: profileData.nombre, telefono: profileData.telefono })
-      toast.success('Perfil actualizado correctamente')
+      toast.success('Perfil actualizado correctamente') // Use UserType for setStoredUser
       setStoredUser({ ...user, nombre: profileData.nombre, telefono: profileData.telefono } as any)
     } catch (e: any) {
       toast.error(e.message || 'Error al actualizar el perfil')
@@ -295,7 +293,7 @@ export function ClientProfile() {
                         </span>
                       </div>
                       
-                      <div className="bg-gray-50 rounded-xl p-3 mb-3 space-y-1">
+                      <div className="bg-gray-50 rounded-xl p-3 mb-3 space-y-1"> {/* Use OrderDetail type */}
                         {order.detalles?.map((item: any, idx: number) => (
                           <div key={idx} className="flex justify-between text-sm">
                             <span className="font-medium text-gray-600"><span className="text-gray-400 font-bold mr-1">{item.cantidad}x</span> {item.plato?.nombre || 'Plato'}</span>

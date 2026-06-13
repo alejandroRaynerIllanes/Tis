@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router'
 import { api, getStoredUser } from '../services/api'
 import { toast } from 'sonner'
 import { useAppContext } from '../context/AppContext'
+import { Order as GlobalOrder, User as GlobalUser } from '../types'
 
 export function DeliveryView() {
   const navigate = useNavigate()
@@ -11,15 +12,15 @@ export function DeliveryView() {
   const { socket } = useAppContext()
 
   const [activeTab, setActiveTab] = useState<'disponibles' | 'activos' | 'historial'>('disponibles')
-  const [orders, setOrders] = useState<any[]>([])
+  const [orders, setOrders] = useState<GlobalOrder[]>([])
   const [isOnline, setIsOnline] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
 
   const loadOrders = async () => {
     try {
-      const res: any = await api.get('/pedidos')
-      const allOrders = res.data || res || []
-      const deliveryOrders = allOrders.filter((o: any) => o.metodoEntrega === 'delivery')
+      const res = await api.get<GlobalOrder[]>('/pedidos')
+      const allOrders = (res as any).data || res || []
+      const deliveryOrders = allOrders.filter((o: GlobalOrder) => (o as any).metodoEntrega === 'delivery')
       setOrders(deliveryOrders)
     } catch (e) {
       console.error('Error cargando pedidos de delivery:', e)
@@ -33,7 +34,7 @@ export function DeliveryView() {
   useEffect(() => {
     if (!socket) return
     
-    const handleNuevo = (pedido: any) => {
+    const handleNuevo = (pedido: GlobalOrder) => {
       setOrders(prev => [pedido, ...prev.filter(p => p._id !== pedido._id)])
       if(isOnline) toast.info('¡Nuevo pedido de Delivery disponible!')
     }
@@ -182,18 +183,18 @@ export function DeliveryView() {
                   <div className="relative">
                     <div className="absolute -left-6 top-0.5 w-4 h-4 rounded-full bg-[#D96C4A] border-2 border-white shadow-sm flex items-center justify-center"><div className="w-1.5 h-1.5 bg-white rounded-full"></div></div>
                     <p className="text-xs font-bold text-gray-500 uppercase">Entregar a</p>
-                    <p className="text-sm font-black text-[#4B2E2D] line-clamp-1">{order.usuario?.nombre || 'Cliente'} - {order.coordenadasEntrega ? 'Ubicación GPS' : 'Dirección'}</p>
+                    <p className="text-sm font-black text-[#4B2E2D] line-clamp-1">{typeof order.usuario === 'object' ? order.usuario?.nombre : 'Cliente'} - {(order as any).coordenadasEntrega ? 'Ubicación GPS' : 'Dirección'}</p>
                   </div>
                 </div>
 
                 <div className="bg-gray-50 rounded-xl p-3 mb-5">
                   <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Detalle del pedido</p>
                   <p className="text-sm font-bold text-gray-700 truncate">
-                    {order.detalles?.map((d: any) => `${d.cantidad}x ${d.plato?.nombre || 'Plato'}`).join(', ')}
+                    {order.detalles?.map((d: any) => `${d.cantidad}x ${d.nombre || (typeof d.plato === 'object' ? d.plato?.nombre : 'Plato')}`).join(', ')}
                   </p>
                 </div>
 
-                <button onClick={() => handleUpdateStatus(order._id, 'ABIERTO', true)} disabled={isLoading} className="w-full py-4 bg-[#D96C4A] hover:bg-[#C25838] text-white rounded-xl font-black text-lg shadow-xl shadow-[#D96C4A]/30 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50">
+                <button onClick={() => handleUpdateStatus(String(order._id), 'ABIERTO', true)} disabled={isLoading} className="w-full py-4 bg-[#D96C4A] hover:bg-[#C25838] text-white rounded-xl font-black text-lg shadow-xl shadow-[#D96C4A]/30 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50">
                   Aceptar Pedido <Navigation size={18} className="ml-1" />
                 </button>
               </div>
@@ -213,7 +214,7 @@ export function DeliveryView() {
                 <div className="flex justify-between items-start">
                   <div>
                     <h3 className="font-black text-lg text-[#4B2E2D]">{order.codigo}</h3>
-                    <p className="text-xs font-bold text-gray-400 flex items-center gap-1 mt-0.5"><User size={12}/> {order.usuario?.nombre || 'Cliente'}</p>
+                    <p className="text-xs font-bold text-gray-400 flex items-center gap-1 mt-0.5"><User size={12}/> {typeof order.usuario === 'object' ? order.usuario?.nombre : 'Cliente'}</p>
                   </div>
                   {getStatusBadge(order.estado)}
                 </div>
@@ -234,13 +235,13 @@ export function DeliveryView() {
                   )}
                   
                   {order.estado === 'ENTREGADO' && (
-                    <button onClick={() => handleUpdateStatus(order._id, 'EN_CAMINO')} disabled={isLoading} className="w-full py-4 bg-[#4B2E2D] text-white rounded-xl font-black shadow-lg hover:bg-[#3A2222] transition-all flex items-center justify-center gap-2">
+                    <button onClick={() => handleUpdateStatus(String(order._id), 'EN_CAMINO')} disabled={isLoading} className="w-full py-4 bg-[#4B2E2D] text-white rounded-xl font-black shadow-lg hover:bg-[#3A2222] transition-all flex items-center justify-center gap-2">
                       <Package size={20}/> Marcar como Recogido
                     </button>
                   )}
 
                   {order.estado === 'EN_CAMINO' && (
-                    <button onClick={() => handleUpdateStatus(order._id, 'CERRADO')} disabled={isLoading} className="w-full py-4 bg-emerald-500 text-white rounded-xl font-black shadow-lg shadow-emerald-500/30 hover:bg-emerald-600 transition-all flex items-center justify-center gap-2">
+                    <button onClick={() => handleUpdateStatus(String(order._id), 'CERRADO')} disabled={isLoading} className="w-full py-4 bg-emerald-500 text-white rounded-xl font-black shadow-lg shadow-emerald-500/30 hover:bg-emerald-600 transition-all flex items-center justify-center gap-2">
                       <CheckCircle2 size={20}/> Entregado y Pagado
                     </button>
                   )}

@@ -1,13 +1,25 @@
 import React, { useEffect, useState } from 'react'
 import { UserCheck, MapPin, Receipt, Coins, Flame, ChefHat, Edit2, Check, X } from 'lucide-react'
-import { usersService } from '../../services/users.service'
+import { usersService, BackendUser } from '../../services/users.service'
 import { api } from '../../services/api'
 import { toast } from 'sonner'
+import { Order as GlobalOrder } from '../../types'
+
+interface WaiterStats {
+  id: string
+  name: string
+  status: 'Ocupado' | 'Libre'
+  zone: string
+  activeTables: number
+  totalOrders: number
+  totalSold: number
+  totalTips: number
+}
 
 export function ActiveWaitersSection() {
-  const [waitersData, setWaitersData] = useState<any[]>([])
+  const [waitersData, setWaitersData] = useState<WaiterStats[]>([])
   const [loading, setLoading] = useState(true)
-  const [locations, setLocations] = useState<any[]>([])
+  const [locations, setLocations] = useState<{ id: string; name: string; _id?: string; nombre?: string }[]>([])
   const [editingZone, setEditingZone] = useState<string | null>(null)
   const [selectedZone, setSelectedZone] = useState<string>('')
   const [isSavingZone, setIsSavingZone] = useState(false)
@@ -22,26 +34,27 @@ export function ActiveWaitersSection() {
         // 1. Obtener todos los usuarios y filtrar meseros
         const users = await usersService.getAll()
         const waiters = users.filter(
-          (u: any) => u.rol.toLowerCase() === 'mesero' && u.estado === true
+          (u: BackendUser) => u.rol.toLowerCase() === 'mesero' && u.estado === true
         )
 
         // 2. Obtener órdenes de hoy optimizadas desde el servidor
-        const todaysOrders = await api.get<any[]>('/pedidos?hoy=true')
+        const resOrders = await api.get<GlobalOrder[]>('/pedidos?hoy=true')
+        const todaysOrders = (resOrders as any).data || resOrders || []
 
         // 3. Cruzar datos (Mapear a cada mesero sus órdenes)
-        const enrichedWaiters = waiters.map((waiter: any) => {
+        const enrichedWaiters: WaiterStats[] = waiters.map((waiter: BackendUser) => {
           const myOrders = todaysOrders.filter(
-            (o: any) => o.usuario?._id === waiter._id || o.usuario === waiter._id
+            (o: GlobalOrder) => typeof o.usuario === 'object' ? o.usuario?._id === waiter._id : o.usuario === waiter._id
           )
 
-          const activeOrders = myOrders.filter((o: any) =>
+          const activeOrders = myOrders.filter((o: GlobalOrder) =>
             ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO', 'SERVIDO'].includes(o.estado)
           )
-          const closedOrders = myOrders.filter((o: any) => o.estado === 'CERRADO')
+          const closedOrders = myOrders.filter((o: GlobalOrder) => o.estado === 'CERRADO')
 
-          const totalSold = closedOrders.reduce((sum: number, o: any) => sum + (o.total || 0), 0)
+          const totalSold = closedOrders.reduce((sum: number, o: GlobalOrder) => sum + (o.total || 0), 0)
           const totalTips = closedOrders.reduce(
-            (sum: number, o: any) => sum + (o.montoPropina || 0),
+            (sum: number, o: GlobalOrder) => sum + (o.montoPropina || 0),
             0
           )
 
@@ -52,7 +65,7 @@ export function ActiveWaitersSection() {
           if (!primaryZone || typeof primaryZone !== 'string' || primaryZone.trim() === '') {
             const locationsCounts: any = {}
             myOrders.forEach((o: any) => {
-              const loc = o.mesa?.ubicacion?.nombre || o.mesa?.ubicacionId?.nombre || 'Interior'
+              const loc = typeof o.mesa === 'object' ? (o.mesa?.ubicacion?.nombre || o.mesa?.ubicacionId?.nombre || 'Interior') : 'Interior'
               locationsCounts[loc] = (locationsCounts[loc] || 0) + 1
             })
             primaryZone =
@@ -62,7 +75,7 @@ export function ActiveWaitersSection() {
           }
 
           return {
-            id: waiter._id,
+            id: String(waiter._id || waiter.id),
             name: `${waiter.nombre} ${waiter.apellido}`,
             status: activeOrders.length > 0 ? 'Ocupado' : 'Libre',
             zone: primaryZone,

@@ -2,9 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { Users, UserCheck, Star, Search, Trash2 } from 'lucide-react'
 import { api } from '../../services/api'
 import { toast } from 'sonner'
+import { User as GlobalUser } from '../../types'
 
 export function ClientManagement() {
-  const [clients, setClients] = useState<any[]>([])
+  const [clients, setClients] = useState<GlobalUser[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [filter, setFilter] = useState<'todos' | 'activos' | 'frecuentes'>('todos')
@@ -12,9 +13,9 @@ export function ClientManagement() {
   useEffect(() => {
     const fetchClients = async () => {
       try {
-        const res: any = await api.get('/usuarios')
-        const usersData = res.data || res || []
-        const clientUsers = usersData.filter((u: any) => u.rol === 'Cliente')
+        const res = await api.get<GlobalUser[]>('/usuarios')
+        const usersData = (res as any).data || res || []
+        const clientUsers = usersData.filter((u: GlobalUser) => u.rol === 'Cliente')
         setClients(clientUsers)
       } catch (error) {
         console.error('Error fetching clients', error)
@@ -133,18 +134,18 @@ export function ClientManagement() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredClients.map(client => (
-                    <tr key={client._id || client.id} className="hover:bg-gray-50 transition-colors">
+                    <tr key={client._id || client.id || ''} className="hover:bg-gray-50 transition-colors">
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-[#FCE4D6] text-[#D96C4A] flex items-center justify-center font-bold">
-                            {client.nombre.charAt(0).toUpperCase()}
+                            {client.nombre?.charAt(0).toUpperCase() || 'U'}
                           </div>
                           <span className="font-bold text-[#4B2E2D]">{client.nombre} {client.apellido}</span>
                         </div>
                       </td>
                       <td className="py-4 px-6">
                         <p className="text-sm font-medium text-[#4B2E2D]">{client.email}</p>
-                        <p className="text-xs text-gray-500">{client.telefono || 'Sin teléfono'}</p>
+                        <p className="text-xs text-gray-500">{(client as any).telefono || 'Sin teléfono'}</p>
                       </td>
                       <td className="py-4 px-6">
                         <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${client.estado ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
@@ -152,10 +153,10 @@ export function ClientManagement() {
                         </span>
                       </td>
                       <td className="py-4 px-6 text-sm text-gray-500 font-medium">
-                        {new Date(client.createdAt).toLocaleDateString()}
+                        {client.createdAt ? new Date(client.createdAt).toLocaleDateString() : 'N/A'}
                       </td>
                       <td className="py-4 px-6 text-right">
-                        <button onClick={() => handleDeleteClient(client._id || client.id)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar Cliente">
+                        <button onClick={() => handleDeleteClient(String(client._id || client.id))} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar Cliente">
                           <Trash2 size={18} />
                         </button>
                       </td>

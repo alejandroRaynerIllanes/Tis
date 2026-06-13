@@ -27,6 +27,22 @@ import { getStoredUser, api } from '../services/api'
 import { authService } from '../services/auth.service'
 import { useAppContext } from '../context/AppContext'
 import { tablesService } from '../services/tables.service'
+import { Order, OrderDetail, User as UserType } from '../types'
+
+// --- Helpers para manejo seguro de tipos ---
+const safeMesaName = (pedido: any): string => {
+  if (!pedido) return 'Mesa';
+  if (pedido.mesaNombre) return String(pedido.mesaNombre);
+  if (pedido.mesa && typeof pedido.mesa === 'object') return String(pedido.mesa.numero || 'Mesa');
+  return 'Mesa';
+};
+
+const safeMesaId = (pedido: any): string => {
+  if (!pedido) return '';
+  if (pedido.mesaId) return String(pedido.mesaId);
+  if (pedido.mesa && typeof pedido.mesa === 'object') return String(pedido.mesa._id || '');
+  return String(pedido.mesa || '');
+};
 
 // ─── COMPONENTE PRINCIPAL ───────────────────────────────────────────────────
 
@@ -34,7 +50,7 @@ export function CashierView() {
   const navigate = useNavigate()
 
   // Estados reales
-  const [pendingBills, setPendingBills] = useState<any[]>([])
+  const [pendingBills, setPendingBills] = useState<Order[]>([])
   const [stats, setStats] = useState({
     totalDia: 0,
     efectivo: 0,
@@ -44,7 +60,7 @@ export function CashierView() {
     propinas: 0,
     pagosProcesados: 0
   })
-  const [selectedBill, setSelectedBill] = useState<any | null>(null)
+  const [selectedBill, setSelectedBill] = useState<Order | null>(null)
   const [selectedMethod, setSelectedMethod] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [isRegisterClosed, setIsRegisterClosed] = useState(false)
@@ -55,25 +71,25 @@ export function CashierView() {
   // Nuevos estados para el flujo de QR y Facturación
   const [isQRModalOpen, setIsQRModalOpen] = useState(false)
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false)
-  const [processedBill, setProcessedBill] = useState<any | null>(null)
+  const [processedBill, setProcessedBill] = useState<Order | null>(null)
 
   const { socket } = useAppContext()
-  const currentUser = getStoredUser()
+  const currentUser = getStoredUser() as UserType | null
   const cashierName = currentUser
     ? `${currentUser.nombre} ${currentUser.apellido || ''}`.trim()
     : 'Cajero de Turno'
 
   const fetchDashboardData = async () => {
     try {
-      const cajeroId = currentUser?.id || (currentUser as any)?._id
-
-      const [pendientesRes, cerradasRes]: any = await Promise.all([
-        api.get(`/pedidos/pendientes-cobro?cajero=${cajeroId}`),
+      const cajeroId = currentUser?.id || currentUser?._id
+      // Explicitly type the responses
+      const [pendientesRes, cerradasRes] = await Promise.all([
+        api.get<Order[]>(`/pedidos/pendientes-cobro?cajero=${cajeroId}`),
         api.get(`/pedidos?hoy=true&cajero=${cajeroId}`) // SOLUCIÓN BUG 2: Solo obtenemos las ventas de ESTE cajero específico
       ])
 
-      let pending = pendientesRes.data || pendientesRes || []
-      const myOrders = cerradasRes.data || cerradasRes || []
+      let pending = (pendientesRes as any).data || pendientesRes || []
+      const myOrders = (cerradasRes as any).data || cerradasRes || []
       const closed = myOrders.filter((o: any) => o.estado === 'CERRADO')
 
       let totalDia = 0,
@@ -83,7 +99,7 @@ export function CashierView() {
         descuentos = 0,
         propinas = 0,
         pagosProcesados = 0
-      closed.forEach((o: any) => {
+      closed.forEach((o: Order) => {
         totalDia += o.total || 0
         descuentos += o.montoDescuento || 0
         propinas += o.montoPropina || 0
@@ -94,7 +110,7 @@ export function CashierView() {
       })
 
       setPendingBills((prev) => {
-        const mergedList = [...pending]
+        const mergedList: Order[] = [...pending]
         prev.forEach((localItem) => {
           const localId = localItem.pedidoId || localItem._id
           const existeEnFetch = mergedList.find(
@@ -151,10 +167,10 @@ export function CashierView() {
   useEffect(() => {
     if (!socket) return
 
-    const handleNuevaCuenta = (pedido: any) => {
+    const handleNuevaCuenta = (pedido: Order) => {
       if (!pedido) return
       if (
-        pedido.cajeroAsignado === currentUser?.id ||
+        pedido.cajeroAsignado === currentUser?.id || // Use currentUser?.id directly
         pedido.cajeroAsignado === (currentUser as any)?._id ||
         !pedido.cajeroAsignado
       ) {
@@ -163,14 +179,14 @@ export function CashierView() {
           if (existe) return prev
 
           toast.info(
-            `¡Nueva cuenta recibida de la ${pedido.mesa?.numero || pedido.mesaNombre || 'Mesa'}!`
+            `¡Nueva cuenta recibida de la ${safeMesaName(pedido)}!`
           )
           return [pedido, ...prev]
         })
       }
     }
 
-    const handleCuentaSolicitada = (pedidoActualizado: any) => {
+    const handleCuentaSolicitada = (pedidoActualizado: Order) => {
       if (!pedidoActualizado?._id) return
       setPendingBills((prev: any[]) => {
         const existe = prev.some(
@@ -186,7 +202,7 @@ export function CashierView() {
       })
     }
 
-    const handlePagoCompletado = (payload: any) => {
+    const handlePagoCompletado = (payload: { pedidoId?: string; _id?: string; id?: string }) => {
       const paidId = payload.pedidoId || payload._id || payload.id
       if (!paidId) return
 
@@ -204,22 +220,22 @@ export function CashierView() {
       fetchDashboardData()
     }
 
-    const handleMesasUpdated = (payload: any) => {
-      const items = Array.isArray(payload) ? payload : [payload]
-      items.forEach((item: any) => {
-        if (item.status === 'Disponible' || item.estado === 'Libre') {
+    const handleMesasUpdated = (payload: { id?: string; _id?: string; tableId?: string; status?: string; estado?: string } | Array<{ id?: string; _id?: string; tableId?: string; status?: string; estado?: string }>) => {
+      const items = Array.isArray(payload) ? payload : [payload];
+      items.forEach((item) => {
+        if (item.status === 'Disponible' || item.estado === 'Libre') { // 'estado' for backend consistency
           const tId = item.id || item._id || item.tableId
           
           setPendingBills((prev) =>
             prev.filter((bill) => {
-              const billTableId = bill.mesaId || bill.mesa?._id || bill.mesa
+              const billTableId = safeMesaId(bill)
               return billTableId !== tId
             })
           )
 
           setSelectedBill((prev: any) => {
             if (prev) {
-              const prevTableId = prev.mesaId || prev.mesa?._id || prev.mesa
+              const prevTableId = safeMesaId(prev)
               if (prevTableId === tId) return null
             }
             return prev
@@ -251,7 +267,7 @@ export function CashierView() {
   useEffect(() => {
     if (!socket) return
 
-    const handlePagoQRConfirmado = (data: any) => {
+    const handlePagoQRConfirmado = (data: { pedidoId: string }) => {
       const paidId = data.pedidoId
       const currentSelectedId = selectedBill?.pedidoId || selectedBill?._id
 
@@ -316,14 +332,14 @@ export function CashierView() {
   const executePayment = async () => {
     setIsProcessing(true)
     try {
-      const pId = selectedBill.pedidoId || selectedBill._id
+      const pId = selectedBill?.pedidoId || selectedBill?._id
       let comprobanteBackend = null
 
       try {
-        const response: any = await api.post(`/pagos/${pId}/procesar`, {
+        const response = await api.post<{ comprobante: Order }>(`/pagos/${pId}/procesar`, {
           metodoPago: selectedMethod || 'QR' // Fallback a QR si se autoejecutó
         })
-        comprobanteBackend = response.comprobante
+        comprobanteBackend = (response as any).comprobante || (response as any).data?.comprobante
       } catch (err: any) {
         await api.put(`/pedidos/${pId}`, {
           estado: 'CERRADO',
@@ -332,7 +348,8 @@ export function CashierView() {
         })
       }
 
-      const tableId = selectedBill.mesaId || selectedBill.mesa?._id || selectedBill.mesa
+      if (!selectedBill) return;
+      const tableId = safeMesaId(selectedBill)
       if (tableId) {
         await tablesService.updateState(tableId, 'Disponible')
         console.log('[PAGO] mesa liberada', tableId)
@@ -341,7 +358,7 @@ export function CashierView() {
       console.log('[PAGO] estado mesa actualizado en BD')
 
       toast.success(
-        `Pago procesado con éxito para ${selectedBill.mesaNombre || selectedBill.mesa?.numero || 'Mesa'}`,
+        `Pago procesado con éxito para ${safeMesaName(selectedBill)}`,
         { description: 'Se liberó la mesa.' }
       )
 
@@ -390,14 +407,12 @@ export function CashierView() {
     if (!selectedBill) return
     setIsProcessing(true)
     try {
-      const pId = selectedBill.pedidoId || selectedBill._id
-      const mesaNameStr = selectedBill.mesaNombre || selectedBill.mesa?.numero || 'Mesa'
-      const codigoStr = selectedBill.codigo || `PED-${String(pId).slice(-4).toUpperCase()}`
-      const totalStr = (
-        (selectedBill.subtotalCierre || selectedBill.total || 0) -
-        (selectedBill.montoDescuento || 0) +
-        (selectedBill.montoPropina || 0)
-      ).toFixed(2)
+      const pId = String(selectedBill.pedidoId || selectedBill._id || '')
+      const mesaNameStr = safeMesaName(selectedBill)
+      const codigoStr = String(selectedBill.codigo || `PED-${pId.slice(-4).toUpperCase()}`);
+      const subtotal = Number(selectedBill.subtotalCierre || selectedBill.total || 0);
+      const totalStr = (subtotal - Number(selectedBill.montoDescuento || 0) + Number(selectedBill.montoPropina || 0)).toFixed(2);
+      
       await generateQrPdf({
         pedidoId: pId,
         mesaNombre: mesaNameStr,
@@ -414,7 +429,7 @@ export function CashierView() {
 
   const handleDownloadPDF = () => {
     if (!processedBill) return
-    generateReceiptPdf({ pedido: processedBill, cashierName })
+    generateReceiptPdf({ pedido: processedBill as any, cashierName })
   }
 
   const handleCloseRegister = async () => {
@@ -430,7 +445,7 @@ export function CashierView() {
 
     setIsProcessing(true)
     try {
-      const userId = currentUser.id || (currentUser as any)._id
+      const userId = currentUser?.id || currentUser?._id
       // SOLUCIÓN BUG 1: Enviamos el "reporte" con los stats para que el backend cree el CierreCaja en MongoDB
       await api.patch(`/usuarios/${userId}/estado`, { estado: false, reporte: stats })
       toast.success('Caja inhabilitada. Un administrador debe volver a habilitarla.')
@@ -447,7 +462,7 @@ export function CashierView() {
   const generateZReportPDF = () => {
     generateZReportPdf({
       cashierName,
-      cajeroId: currentUser?.id || (currentUser as any)?._id || 'N/A',
+      cajeroId: currentUser?.id || currentUser?._id || 'N/A',
       stats
     })
   }
@@ -486,18 +501,15 @@ export function CashierView() {
 
   let modalQRImage = ''
   if (selectedBill) {
-    const pId = selectedBill.pedidoId || selectedBill._id
-    const mesaNameStr = selectedBill.mesaNombre || selectedBill.mesa?.numero || 'Mesa'
-    const codigoStr = selectedBill.codigo || `PED-${String(pId).slice(-4).toUpperCase()}`
-    const totalStr = (
-      (selectedBill.subtotalCierre || selectedBill.total || 0) -
-      (selectedBill.montoDescuento || 0) +
-      (selectedBill.montoPropina || 0)
-    ).toFixed(2)
+    const pId = String(selectedBill.pedidoId || selectedBill._id || '')
+    const mesaNameStr = safeMesaName(selectedBill)
+    const codigoStr = String(selectedBill.codigo || `PED-${pId.slice(-4).toUpperCase()}`);
+    const subtotal = Number(selectedBill.subtotalCierre || selectedBill.total || 0);
+    const totalStr = (subtotal - Number(selectedBill.montoDescuento || 0) + Number(selectedBill.montoPropina || 0)).toFixed(2);
 
-    const baseUrl = (import.meta as any).env.VITE_APP_URL || window.location.origin
-    const simUrl = `${baseUrl}/pay-simulator?id=${pId}&mesa=${encodeURIComponent(mesaNameStr)}&total=${totalStr}&codigo=${codigoStr}`
-    modalQRImage = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(simUrl)}&color=4B2E2D`
+    const baseUrl = String((import.meta as any).env.VITE_APP_URL || window.location.origin);
+    const simUrl = `${baseUrl}/pay-simulator?id=${encodeURIComponent(pId)}&mesa=${encodeURIComponent(mesaNameStr)}&total=${encodeURIComponent(totalStr)}&codigo=${encodeURIComponent(codigoStr)}`;
+    modalQRImage = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(simUrl)}&color=4B2E2D`;
   }
 
   return (
@@ -598,13 +610,13 @@ export function CashierView() {
 
             <div className="flex-1 overflow-y-auto p-4 space-y-3 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-black/10">
               {pendingBills.map((bill) => {
-                const bId = bill.pedidoId || bill._id
+                const bId = (bill.pedidoId || bill._id || bill.codigo).toString()
                 const isSelected = (selectedBill?.pedidoId || selectedBill?._id) === bId
-                const mesaName = bill.mesaNombre || bill.mesa?.numero || 'Barra'
+                const mesaName = safeMesaName(bill)
                 const waiterName =
                   bill.meseroNombre ||
-                  (bill.usuario?.nombre
-                    ? `${bill.usuario.nombre} ${bill.usuario.apellido || ''}`
+                  (typeof bill.usuario === 'object' 
+                    ? `${bill.usuario?.nombre} ${bill.usuario?.apellido || ''}`
                     : 'Mesero')
                 const timeWaiting =
                   bill.tiempoEsperaMinutos !== undefined
@@ -619,10 +631,11 @@ export function CashierView() {
                     key={bId}
                     onClick={async () => {
                       try {
-                        const res: any = await api.get(
-                          `/pedidos?mesa=${bill.mesaId || bill.mesa?._id}&activo=true`
+                        const mesaIdTarget = safeMesaId(bill)
+                        const res = await api.get<Order[]>(
+                          `/pedidos?mesa=${mesaIdTarget}&activo=true`
                         )
-                        const fullOrder = (res.data || res)[0]
+                        const fullOrder = (res as any).data?.[0] || (res as any)[0]
                         setSelectedBill(fullOrder || bill)
                       } catch {
                         setSelectedBill(bill)
@@ -695,7 +708,7 @@ export function CashierView() {
                       Comprobante / Ticket
                     </p>
                     <h2 className="text-2xl font-black">
-                      {selectedBill.mesaNombre || selectedBill.mesa?.numero || 'Mesa'}
+                      {safeMesaName(selectedBill)}
                     </h2>
                   </div>
                   <div className="text-right">
@@ -740,9 +753,9 @@ export function CashierView() {
                 <h4 className="font-bold text-xs text-gray-400 uppercase tracking-widest mb-3">
                   Detalle de consumo
                 </h4>
-                <div className="space-y-3">
-                  {(selectedBill.items || selectedBill.detalles || []).map(
-                    (item: any, idx: number) => (
+                <div className="space-y-3"> {/* Use OrderDetail type */}
+                  {(selectedBill?.items || selectedBill?.detalles || [] as OrderDetail[]).map(
+                    (item: OrderDetail, idx: number) => (
                       <div
                         key={idx}
                         className="flex justify-between items-start text-sm border-b border-gray-100 pb-2 last:border-0"
@@ -750,21 +763,21 @@ export function CashierView() {
                         <div className="flex items-start gap-2">
                           <span className="font-bold text-gray-400 w-5">{item.cantidad}x</span>
                           <span className="font-bold text-[#4B2E2D]">
-                            {item.nombre || item.plato?.nombre || 'Plato'}
+                            {item.nombre || (typeof item.plato === 'object' ? item.plato?.nombre : 'Plato')}
                           </span>
                         </div>
                         <span className="font-bold text-[#4B2E2D] shrink-0">
                           Bs.{' '}
                           {(
                             item.subtotal ||
-                            (item.precioUnitario || item.plato?.precio || 0) * item.cantidad
+                            (item.precioUnitario || (typeof item.plato === 'object' ? item.plato?.precio : 0) || 0) * item.cantidad
                           ).toFixed(2)}
                         </span>
                       </div>
                     )
                   )}
                   
-                  {(selectedBill.mesa?.tipo === 'vip' || selectedBill.mesa?.type === 'vip') && (
+                  {(typeof selectedBill?.mesa === 'object' && (selectedBill?.mesa?.type === 'vip' || (selectedBill?.mesa as any)?.tipo === 'vip')) && (
                     <div className="mt-3 flex justify-between items-start text-sm border-b border-amber-200 pb-2 bg-amber-50 p-3 rounded-xl">
                       <div className="flex items-start gap-2">
                         <span className="font-bold text-amber-600 w-5">1x</span>
@@ -907,7 +920,7 @@ export function CashierView() {
                 <div className="flex justify-between items-center text-sm">
                   <span className="font-semibold text-gray-500">Mesa</span>
                   <span className="font-black text-[#4B2E2D]">
-                    {selectedBill.mesaNombre || selectedBill.mesa?.numero || 'Mesa'}
+                    {safeMesaName(selectedBill)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
@@ -1028,18 +1041,18 @@ export function CashierView() {
 
               <div className="flex justify-center mb-6">
                 <span className="bg-[#FCE4D6] text-[#4B2E2D] px-4 py-1.5 rounded-full font-black text-sm border border-[#E0D0C5] shadow-sm">
-                  {processedBill.mesaNombre || processedBill.mesa?.numero || 'Mesa'}
+                  {safeMesaName(processedBill)}
                 </span>
               </div>
 
               <div className="grid grid-cols-2 gap-3 mb-6 bg-gray-50 p-4 rounded-2xl border border-gray-100">
                 <div>
                   <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">
-                    Área / Sala
+                    Área / Sala {/* Use optional chaining and type assertion */}
                   </p>
                   <p className="text-xs font-black text-[#4B2E2D] truncate">
-                    {processedBill.mesa?.ubicacion?.nombre ||
-                      processedBill.mesa?.location ||
+                    {(typeof processedBill?.mesa === 'object' && processedBill.mesa?.ubicacion?.nombre) ||
+                      (processedBill?.mesa as any)?.location ||
                       'Principal'}
                   </p>
                 </div>
@@ -1049,8 +1062,8 @@ export function CashierView() {
                   </p>
                   <p className="text-xs font-black text-[#4B2E2D] truncate">
                     {processedBill.meseroNombre ||
-                      (processedBill.usuario?.nombre
-                        ? `${processedBill.usuario.nombre} ${processedBill.usuario.apellido || ''}`
+                      (typeof processedBill.usuario === 'object'
+                        ? `${processedBill.usuario?.nombre} ${processedBill.usuario?.apellido || ''}`
                         : 'Mesero')}
                   </p>
                 </div>
@@ -1078,13 +1091,13 @@ export function CashierView() {
               </div>
 
               <div className="mb-6 max-h-[120px] overflow-y-auto pr-2 space-y-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-black/10">
-                {(processedBill.items || processedBill.detalles || []).map(
+                {(processedBill?.items || processedBill?.detalles || []).map(
                   (item: any, idx: number) => (
-                    <div key={idx} className="flex justify-between items-start text-xs">
+                    <div key={idx} className="flex justify-between items-start text-xs"> {/* Use OrderDetail type */}
                       <div className="flex gap-2">
                         <span className="font-bold text-gray-400">{item.cantidad}x</span>
                         <span className="font-bold text-[#4B2E2D]">
-                          {item.nombre || item.plato?.nombre || 'Plato'}
+                          {item.nombre || (typeof item.plato === 'object' ? item.plato?.nombre : 'Plato')}
                         </span>
                       </div>
                       <div className="text-right">
@@ -1092,18 +1105,15 @@ export function CashierView() {
                           Bs.{' '}
                           {(
                             item.subtotal ||
-                            (item.precioUnitario || item.plato?.precio || 0) * item.cantidad
+                            (item.precioUnitario || (typeof item.plato === 'object' ? item.plato?.precio : 0) || 0) * item.cantidad
                           ).toFixed(2)}
                         </span>
-                        <p className="text-[9px] text-gray-400 font-medium">
-                          Bs. {(item.precioUnitario || item.plato?.precio || 0).toFixed(2)} c/u
-                        </p>
                       </div>
                     </div>
                   )
                 )}
                 
-                {(processedBill.mesa?.tipo === 'vip' || processedBill.mesa?.type === 'vip') && (
+                {(typeof processedBill?.mesa === 'object' && ((processedBill?.mesa as any)?.tipo === 'vip' || processedBill?.mesa?.type === 'vip')) && (
                   <div className="flex justify-between items-start text-xs bg-amber-50 p-2.5 rounded-lg border border-amber-100 mt-2">
                     <div className="flex gap-2">
                       <span className="font-bold text-amber-600">1x</span>

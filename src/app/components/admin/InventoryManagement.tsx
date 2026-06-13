@@ -19,6 +19,13 @@ import { IngredientModal } from './inventory/IngredientModal'
 
 // ─── Componente Orquestador ────────────────────────────────────────────────────
 
+export interface Recipe {
+  _id: string;
+  plato: any;
+  ingredientes: any[];
+  costoProduccion: number;
+}
+
 type ActiveTab = 'ingredientes' | 'recetas' | 'alertas'
 
 export function InventoryManagement() {
@@ -28,7 +35,7 @@ export function InventoryManagement() {
 
   // ─── Estado de ingredientes (fuente de verdad del orquestador) ───
   const [ingredients, setIngredients] = useState<Ingrediente[]>([])
-  const [recipes, setRecipes] = useState<any[]>([])
+  const [recipes, setRecipes] = useState<Recipe[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   const fetchInventoryData = async () => {

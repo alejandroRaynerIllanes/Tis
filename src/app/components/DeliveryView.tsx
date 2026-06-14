@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Bike, MapPin, Package, Navigation, LogOut, CheckCircle2, Clock, ShieldCheck, User, ChefHat, MessageSquare, Send, X, Phone } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { api, getStoredUser } from '../services/api'
@@ -56,6 +56,8 @@ export function DeliveryView() {
   const user = getStoredUser()
   const { socket } = useAppContext()
 
+  const userIdStr = user?.id?.toString() || (user as any)?._id?.toString()
+
   const [activeTab, setActiveTab] = useState<'disponibles' | 'activos' | 'historial'>('disponibles')
   const [orders, setOrders] = useState<GlobalOrder[]>([])
   const [isOnline, setIsOnline] = useState(true)
@@ -65,6 +67,7 @@ export function DeliveryView() {
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
   const [chatMessage, setChatMessage] = useState('')
   const [chatMessages, setChatMessages] = useState<Record<string, ChatMessage[]>>({})
+  const chatEndRef = useRef<HTMLDivElement>(null)
 
   const loadOrders = async () => {
     try {
@@ -94,14 +97,25 @@ export function DeliveryView() {
       if(isOnline && msg.sender === 'Cliente') toast.info('Mensaje nuevo del cliente')
     }
     
+    // Escucha exclusiva para cuando el cliente paga por QR
+    const handlePagoQR = (data: { pedidoId: string }) => {
+      setOrders(prev => {
+        const isMine = prev.some(o => o._id === data.pedidoId && o.repartidorId === userIdStr)
+        if (isMine) toast.success('📱 ¡El cliente acaba de pagar el pedido mediante QR!', { duration: 8000 })
+        return prev
+      })
+    }
+
     socket.on('delivery:nuevo_pedido', handleNuevo)
     socket.on('cocina:actualizar_tablero', loadOrders)
     socket.on('chat:nuevo_mensaje', handleNewMessage)
+    socket.on('delivery:pago_confirmado', handlePagoQR)
 
     return () => {
       socket.off('delivery:nuevo_pedido', handleNuevo)
       socket.off('cocina:actualizar_tablero', loadOrders)
       socket.off('chat:nuevo_mensaje', handleNewMessage)
+      socket.off('delivery:pago_confirmado', handlePagoQR)
     }
   }, [socket, isOnline])
 
@@ -109,7 +123,7 @@ export function DeliveryView() {
     setIsLoading(true)
     try {
       const payload: any = { estado: status }
-      if (assignMe) payload.repartidorId = user?.id
+      if (assignMe) payload.repartidorId = userIdStr
       
       await api.put(`/pedidos/${orderId}`, payload)
       
@@ -141,15 +155,23 @@ export function DeliveryView() {
     setChatMessage('')
   }
 
+  // Auto-scroll para el chat
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatMessages, activeChatId])
+
   const handleLogout = () => {
     localStorage.clear()
     navigate('/', { replace: true })
   }
 
   // Filtrado de estados
-  const disponibles = orders.filter(o => o.estado === 'Pendiente_de_Aceptacion')
-  const activos = orders.filter(o => ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO', 'EN_CAMINO'].includes(o.estado) && (o.repartidorId === user?.id || o.repartidorId === (user as any)?._id))
-  const historial = orders.filter(o => o.estado === 'CERRADO' && (o.repartidorId === user?.id || o.repartidorId === (user as any)?._id))
+  const disponibles = orders.filter(o => 
+    o.estado === 'Pendiente_de_Aceptacion' && 
+    (!o.repartidorId || o.repartidorId === userIdStr)
+  )
+  const activos = orders.filter(o => ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO', 'EN_CAMINO'].includes(o.estado) && o.repartidorId === userIdStr)
+  const historial = orders.filter(o => o.estado === 'CERRADO' && o.repartidorId === userIdStr)
 
   const getStatusBadge = (estado: string) => {
     switch(estado) {
@@ -390,6 +412,7 @@ export function DeliveryView() {
                           <p className="text-xs mt-1">Escribe para avisar al cliente que estás en camino.</p>
                       </div>
                   )}
+                  <div ref={chatEndRef} />
               </div>
               <div className="p-4 bg-white border-t border-gray-100 flex items-center gap-3">
                   <input type="text" value={chatMessage} onChange={e=>setChatMessage(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSendMessage()} className="flex-1 bg-gray-50 border border-gray-200 focus:bg-white focus:border-[#D96C4A] focus:ring-2 focus:ring-[#D96C4A]/20 rounded-full px-5 py-3 text-sm outline-none transition-all font-medium text-[#4B2E2D]" placeholder="Escribe un mensaje..." />

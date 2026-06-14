@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { User, MapPin, Package, Shield, ArrowLeft, LogOut, Plus, Trash2, Edit2, Loader2, Save, MessageSquare, X, Send } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { getStoredUser, api, setStoredUser, getToken } from '../services/api'
@@ -31,6 +31,7 @@ export function ClientProfile() {
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
   const [chatMessage, setChatMessage] = useState('')
   const [chatMessages, setChatMessages] = useState<Record<string, ChatMessage[]>>({})
+  const chatEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const loadData = async () => {
@@ -147,6 +148,10 @@ export function ClientProfile() {
     setChatMessages(prev => ({ ...prev, [activeChatId]: [...(prev[activeChatId] || []), msg] }))
     setChatMessage('')
   }
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatMessages, activeChatId])
 
   if (loading) {
     return (
@@ -397,6 +402,7 @@ export function ClientProfile() {
                           <p className="text-xs mt-1">Escribe para dar instrucciones adicionales de llegada.</p>
                       </div>
                   )}
+                  <div ref={chatEndRef} />
               </div>
               <div className="p-4 bg-white border-t border-gray-100 flex items-center gap-3">
                   <input type="text" value={chatMessage} onChange={e=>setChatMessage(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSendMessage()} className="flex-1 bg-gray-50 border border-gray-200 focus:bg-white focus:border-[#D96C4A] focus:ring-2 focus:ring-[#D96C4A]/20 rounded-full px-5 py-3 text-sm outline-none transition-all font-medium text-[#4B2E2D]" placeholder="Escribe un mensaje..." />

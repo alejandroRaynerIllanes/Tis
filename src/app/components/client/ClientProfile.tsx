@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { User, MapPin, Package, Shield, ArrowLeft, LogOut, Plus, Trash2, Edit2, Loader2, Save, MessageSquare, X, Send } from 'lucide-react'
 import { useNavigate } from 'react-router'
-import { getStoredUser, api, setStoredUser, getToken } from '../services/api'
+import { getStoredUser, api, setStoredUser, getToken } from '../../services/api'
 import { toast } from 'sonner'
-import { User as UserType, Address, Order, OrderDetail, ChatMessage } from '../types'
-import { usersService } from '../services/users.service'
-import { useAppContext } from '../context/AppContext'
+import { User as UserType, Address, Order, OrderDetail, ChatMessage } from '../../types'
+import { usersService } from '../../services/users.service'
+import { useAppContext } from '../../context/AppContext'
 
 export function ClientProfile() {
   const navigate = useNavigate()

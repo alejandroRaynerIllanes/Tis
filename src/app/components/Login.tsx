@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { useAuth } from '../hooks/useAuth'
 
 export function Login() {
+  const [activeTab, setActiveTab] = useState<'staff' | 'client'>('staff')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -29,8 +30,10 @@ export function Login() {
     setIsLoading(true)
 
     try {
-      // Obtenemos los datos completos (mejora de Gustavo)
-      const { role, token, user } = await authService.login(username.trim(), password)
+      // Obtenemos los datos completos invocando el método según el tab
+      const { role, token, user } = activeTab === 'staff'
+        ? await authService.loginStaff(username.trim(), password)
+        : await authService.loginClient(username.trim(), password)
 
       // Guardamos la sesión usando las utilidades de la API
       setToken(token)
@@ -97,6 +100,34 @@ export function Login() {
           <p className="text-center text-sm mb-8" style={{ color: '#6B3E2E' }}>
             Bienvenido · Inicia sesión para continuar
           </p>
+
+          {/* Selector de Tabs */}
+          <div className="flex bg-[#F5E6D3] p-1 rounded-xl mb-6">
+            <button
+              type="button"
+              onClick={() => setActiveTab('staff')}
+              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
+                activeTab === 'staff'
+                  ? 'bg-white shadow-sm'
+                  : 'hover:bg-white/50'
+              }`}
+              style={{ color: activeTab === 'staff' ? '#4B2E2D' : '#6B3E2E' }}
+            >
+              Soy Personal
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('client')}
+              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
+                activeTab === 'client'
+                  ? 'bg-white shadow-sm'
+                  : 'hover:bg-white/50'
+              }`}
+              style={{ color: activeTab === 'client' ? '#4B2E2D' : '#6B3E2E' }}
+            >
+              Soy Cliente
+            </button>
+          </div>
 
           <form onSubmit={handleLogin} className="space-y-5">
             <div>

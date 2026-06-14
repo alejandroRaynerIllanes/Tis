@@ -16,9 +16,9 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { useAppContext } from '../context/AppContext'
+import { useAppContext } from '../../context/AppContext'
 import { useEffect } from 'react'
-import { api } from '../services/api'
+import { api } from '../../services/api'
 
 export function VIPManagement() {
   const { tables } = useAppContext()

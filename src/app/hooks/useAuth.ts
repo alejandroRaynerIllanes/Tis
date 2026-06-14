@@ -24,7 +24,7 @@ export function useAuth() {
 
   const redirectByRole = useCallback(
     (role: string) => {
-      const normalizedRole = role.toLowerCase()
+      const normalizedRole = role.toLowerCase().trim()
       if (normalizedRole === 'admin' || normalizedRole === 'administrador') {
         navigate('/catalog', { replace: true })
       } else if (normalizedRole === 'waiter' || normalizedRole === 'mesero') {
@@ -35,8 +35,8 @@ export function useAuth() {
         navigate('/cashier-view', { replace: true })
       } else if (normalizedRole === 'delivery' || normalizedRole === 'repartidor') {
         navigate('/delivery', { replace: true })
-      } else if (normalizedRole === 'cliente') {
-        navigate('/', { replace: true })
+      } else if (normalizedRole === 'cliente' || normalizedRole === 'client') {
+        navigate('/perfil', { replace: true })
       } else {
         navigate('/en-construccion', { replace: true })
       }

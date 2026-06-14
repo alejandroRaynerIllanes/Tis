@@ -6,7 +6,9 @@ import { NotificationsProvider } from './context/NotificationsContext'
 import { Toaster } from 'sonner'
 
 const Login = lazy(() => import('./components/Login').then((m) => ({ default: m.Login })))
-const PublicMenu = lazy(() => import('./components/PublicMenu').then((m) => ({ default: m.PublicMenu })))
+const PublicMenu = lazy(() =>
+  import('./components/PublicMenu').then((m) => ({ default: m.PublicMenu }))
+)
 const Catalog = lazy(() => import('./components/Catalog').then((m) => ({ default: m.Catalog })))
 const WaiterView = lazy(() =>
   import('./components/WaiterView').then((m) => ({ default: m.WaiterView }))
@@ -26,7 +28,7 @@ const PaymentSimulator = lazy(() =>
   import('./components/PaymentSimulator').then((m) => ({ default: m.PaymentSimulator }))
 )
 const ClientProfile = lazy(() =>
-  import('./components/ClientProfile').then((m) => ({ default: m.ClientProfile }))
+  import('./components/client/ClientProfile').then((m) => ({ default: m.ClientProfile }))
 )
 const DeliveryView = lazy(() =>
   import('./components/DeliveryView').then((m) => ({ default: m.DeliveryView }))
@@ -88,7 +90,7 @@ export const router = createBrowserRouter([
       {
         path: 'catalog',
         element: (
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['admin', 'administrador']}>
             <Catalog />
           </ProtectedRoute>
         )
@@ -96,7 +98,7 @@ export const router = createBrowserRouter([
       {
         path: 'perfil',
         element: (
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['cliente', 'client']}>
             <ClientProfile />
           </ProtectedRoute>
         )
@@ -104,7 +106,7 @@ export const router = createBrowserRouter([
       {
         path: 'waiter-view',
         element: (
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['waiter', 'mesero']}>
             <WaiterView />
           </ProtectedRoute>
         )
@@ -112,7 +114,7 @@ export const router = createBrowserRouter([
       {
         path: 'chef-view',
         element: (
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['chef', 'cocinero']}>
             <ChefView />
           </ProtectedRoute>
         )
@@ -120,7 +122,7 @@ export const router = createBrowserRouter([
       {
         path: 'cashier-view',
         element: (
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['cashier', 'cajero']}>
             <CashierView />
           </ProtectedRoute>
         )
@@ -128,7 +130,7 @@ export const router = createBrowserRouter([
       {
         path: 'user-management',
         element: (
-          <ProtectedRoute requireAdmin>
+          <ProtectedRoute requireAdmin allowedRoles={['admin', 'administrador']}>
             <UserManagement />
           </ProtectedRoute>
         )
@@ -136,7 +138,7 @@ export const router = createBrowserRouter([
       {
         path: 'delivery',
         element: (
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['delivery', 'repartidor']}>
             <DeliveryView />
           </ProtectedRoute>
         )

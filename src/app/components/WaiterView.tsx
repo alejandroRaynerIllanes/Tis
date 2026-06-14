@@ -318,21 +318,13 @@ export function WaiterView({
     e.stopPropagation()
     if (n.meta?.actionType === 'deliver_order' && n.meta?.pedidoId) {
       try {
-        await ordersService.updateStatus(n.meta.pedidoId, 'ENTREGADO')
+        await ordersService.updateStatus(n.meta.pedidoId, 'SERVIDO')
         await loadInitialData()
         toast.success('Pedido entregado al cliente', {
           description: 'Ya puedes solicitar la cuenta desde la mesa.'
         })
       } catch (err) {
         console.error(err)
-        // Fallback to SERVIDO if ENTREGADO is not accepted
-        try {
-          await ordersService.updateStatus(n.meta.pedidoId, 'SERVIDO')
-          await loadInitialData()
-          toast.success('Pedido entregado al cliente', {
-            description: 'Ya puedes solicitar la cuenta desde la mesa.'
-          })
-        } catch (e2) {}
       }
     } else if (n.meta?.actionType === 'process_payment' && n.meta?.tableId) {
       handleTableClick(e as any, n.meta.tableId)

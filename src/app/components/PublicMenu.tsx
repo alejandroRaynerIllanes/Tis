@@ -141,10 +141,10 @@ export function PublicMenu() {
       
       const roleLower = role.toLowerCase()
       if (roleLower === 'admin' || roleLower === 'administrador') navigate('/catalog')
-      else if (roleLower === 'mesero') navigate('/waiter-view')
-      else if (roleLower === 'cocinero') navigate('/chef-view')
-      else if (roleLower === 'cajero') navigate('/cashier-view')
-      else if (roleLower === 'delivery') navigate('/delivery')
+      else if (roleLower === 'mesero' || roleLower === 'waiter') navigate('/waiter-view')
+      else if (roleLower === 'cocinero' || roleLower === 'chef') navigate('/chef-view')
+      else if (roleLower === 'cajero' || roleLower === 'cashier') navigate('/cashier-view')
+      else if (roleLower === 'delivery' || roleLower === 'repartidor') navigate('/delivery')
       else {
         setShowAuthModal(null)
         toast.success('Sesión iniciada correctamente')

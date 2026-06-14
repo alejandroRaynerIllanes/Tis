@@ -39,7 +39,7 @@ export function CheckoutStepper({ cart, cartTotal, currentUser, onClose, onOrder
         precioUnitario: c.product.precio || c.product.price
       }))
 
-      await api.post('/pedidos/checkout', {
+      const response: any = await api.post('/pedidos/checkout', {
         items,
         metodoPago: paymentMethod,
         metodoEntrega: 'delivery',
@@ -54,6 +54,16 @@ export function CheckoutStepper({ cart, cartTotal, currentUser, onClose, onOrder
 
       toast.success('¡Pedido realizado con éxito!')
       onOrderSuccess()
+
+      // Si eligió QR, le abrimos el simulador de pago con los datos de su pedido
+      if (paymentMethod === 'QR' && response.pedido) {
+        const pId = response.pedido.codigo || response.pedido._id
+        const totalStr = (cartTotal + deliveryInfo.cost).toFixed(2)
+        const baseUrl = String((import.meta as any).env.VITE_APP_URL || window.location.origin)
+        const simUrl = `${baseUrl}/pay-simulator?id=${encodeURIComponent(response.pedido._id)}&mesa=Delivery&total=${encodeURIComponent(totalStr)}&codigo=${encodeURIComponent(pId)}`
+        window.open(simUrl, '_blank')
+      }
+      
     } catch (error: any) {
       toast.error(error.response?.data?.mensaje || 'Error al procesar el pedido')
     }

@@ -51,7 +51,7 @@ interface AppContextType {
   confirmOrder: (tableId: string) => Promise<void>
   requestBill: (tableId: string) => void
   closeTable: (tableId: string) => void
-  reserveTable: (tableId: string, info: Omit<ReservationInfo, 'id' | 'endTime'>) => void
+  reserveTable: (tableId: string, info: Omit<ReservationInfo, 'id' | 'endTime' | 'vip'>) => void
   cancelReservation: (tableId: string, reservationId: string) => void
   getActiveReservation: (tableId: string) => ReservationInfo | null
   setProducts: React.Dispatch<React.SetStateAction<Product[]>>
@@ -112,6 +112,14 @@ const validarNombreMesa = (nombre: string): { valido: boolean; mensaje?: string 
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
+
+// Helper para reproducir sonido de notificación
+const playNotificationSound = () => {
+  try {
+    const audio = new Audio('/notification.mp3')
+    audio.play().catch((e) => console.warn('Reproducción de audio bloqueada por el navegador:', e))
+  } catch (error) {}
+}
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [products, setProducts] = useState<Product[]>([])
@@ -197,6 +205,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         items.forEach((item: any) => {
           const newStatus = item.status || item.estado
           if (newStatus === 'Cuenta Solicitada' || newStatus === 'Esperando pago') {
+            playNotificationSound()
+            
             const targetTableId = item.id || item._id || item.numero
             const added = addNotification({
               title: 'Cuenta Solicitada',
@@ -264,6 +274,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
       socket.on('mesas:alerta_listo', (payload: any) => {
         console.log('🔔 [WEBSOCKET] Alerta de pedido listo recibida en frontend:', payload)
+        playNotificationSound()
+        
         const added = addNotification({
           title: 'Pedido Listo',
           message: `El plato de la Mesa ${payload.mesaNombre || '?'} ya está terminado en cocina.`,
@@ -466,8 +478,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       guestCount: r.guestCount || r.cantidadPersonas || 1,
       date: dateStr,
       startTime,
-      endTime: calculateEndTime(startTime, duration),
-      vip: Boolean(r.vip)
+      endTime: calculateEndTime(startTime, duration)
     }
     return { tableId: tId.toString(), resInfo }
   }
@@ -482,7 +493,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setProducts(products.map((p) => (p.id === id ? { ...p, status } : p)))
   }
 
-  const addTableIfMissing = (newTable: Table) => {
+  const addTableIfMissing = (newTable: any) => {
     const newId = getTableId(newTable)
     setTables((current) => {
       if (current.some((t) => getTableId(t) === newId)) {
@@ -492,7 +503,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     })
   }
 
-  const mergeTable = (newTable: Table) => {
+  const mergeTable = (newTable: any) => {
     const newId = getTableId(newTable)
     setTables((current) => {
       const exists = current.some((t) => getTableId(t) === newId)
@@ -717,7 +728,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
 
         // 2. Formatear payload según modelo IPedido / IDetallePedido
-        const total = tableOrder.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
+        const table = tables.find(t => t.id === tableId)
+        const isVip = table?.type === 'vip' || (table as any)?.tipo === 'vip'
+        const cargoVip = isVip ? 100 : 0
+        const total = tableOrder.reduce((sum, item) => sum + item.product.price * item.quantity, 0) + cargoVip
+
         const payload = {
           mesa: tableId,
           usuario: userId,
@@ -776,8 +791,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     info: Omit<ReservationInfo, 'id' | 'endTime' | 'vip'>
   ) => {
     const table = tables.find((t) => t.id === tableId)
-    const tableType = table?.type || 'normal'
-    const isVipClient = tableType === 'vip'
 
     if (!info.startTime) throw new Error('Falta la hora de la reserva (startTime).')
     if (!info.date) throw new Error('Falta la fecha de la reserva.')
@@ -801,7 +814,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       guestCount: info.guestCount,
       date: info.date,
       time: info.startTime,
-      vip: isVipClient
+      vip: false // Añadido para cumplir con la interfaz del servicio, el backend lo ignorará
     }
 
     const created = await reservationsService.create(payload)

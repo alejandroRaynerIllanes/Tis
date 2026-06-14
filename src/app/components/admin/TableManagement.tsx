@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react'
 import { Plus, Edit2, Trash2, X, AlertTriangle } from 'lucide-react'
 import { useAppContext } from '../../context/AppContext'
 import { WaiterView } from '../WaiterView'
-import { MAX_VIP_TABLES } from '../../data/constants'
 import { toast } from 'sonner'
 import { locationsService } from '../../services/locations.service'
 import { tablesService } from '../../services/tables.service'
@@ -49,10 +48,9 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
     number: '',
     capacity: 2,
     locationId: 'interior',
-    tableType: 'normal' as 'vip' | 'normal'
+    tableType: 'normal'
   })
   const [tableToDelete, setTableToDelete] = useState<string | null>(null)
-  const [vipLimitError, setVipLimitError] = useState(false)
   const [tableError, setTableError] = useState<string | null>(null)
 
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false)
@@ -86,7 +84,6 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
       locationId: locations.length > 0 ? locations[0].id : 'interior',
       tableType: 'normal'
     })
-    setVipLimitError(false)
     setTableError(null)
     setIsTableModalOpen(true)
   }
@@ -101,9 +98,8 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
       number: String(getTableDisplayName(table)),
       capacity: table.capacity || 2,
       locationId: locId,
-      tableType: table.type || 'normal'
+      tableType: table.type || (table as any).tipo || 'normal'
     })
-    setVipLimitError(false)
     setTableError(null)
     setIsTableModalOpen(true)
   }
@@ -150,17 +146,6 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
       return
     }
 
-    if (tableFormData.tableType === 'vip') {
-      const currentVipTables = tables.filter((t) => t.type === 'vip')
-      const vipCount = tableEditingId
-        ? currentVipTables.filter((t) => t.id !== tableEditingId).length
-        : currentVipTables.length
-      if (vipCount >= MAX_VIP_TABLES) {
-        setVipLimitError(true)
-        return
-      }
-    }
-
     try {
       const payload: any = {
         name: tableFormData.number,
@@ -177,7 +162,6 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
         toast.success('Mesa creada correctamente.')
       }
 
-      setVipLimitError(false)
       setIsTableModalOpen(false)
     } catch (error) {
       console.error('Error al guardar la mesa:', error)
@@ -285,7 +269,6 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
             <button
               onClick={() => {
                 setIsTableModalOpen(false)
-                setVipLimitError(false)
               }}
               className="absolute top-4 right-4 text-[#4B2E2D]/50 hover:text-[#D0543A]"
             >
@@ -353,26 +336,16 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
                 <label className="block text-sm font-bold text-[#4B2E2D] mb-2">Tipo de Mesa</label>
                 <select
                   value={tableFormData.tableType}
-                  onChange={(e) => {
-                    setTableFormData({
-                      ...tableFormData,
-                      tableType: e.target.value as 'vip' | 'normal'
-                    })
-                    setVipLimitError(false)
-                  }}
+                  onChange={(e) =>
+                    setTableFormData({ ...tableFormData, tableType: e.target.value })
+                  }
                   className="w-full px-4 py-3 rounded-xl border-2 border-[#E57C5D] bg-white"
                   required
                 >
                   <option value="normal">Normal</option>
-                  <option value="vip">VIP</option>
+                  <option value="vip">VIP (Cargo extra 100 Bs)</option>
                 </select>
               </div>
-
-              {vipLimitError && (
-                <div className="bg-red-50 border-2 border-red-200 rounded-xl p-3">
-                  <p className="text-sm font-bold text-red-700">Límite de mesas VIP alcanzado.</p>
-                </div>
-              )}
 
               <div className="flex justify-end gap-4 mt-4">
                 <button
@@ -422,9 +395,6 @@ export function TableManagement({ locations, setLocations }: TableManagementProp
                   {locations.map((loc, index) => {
                     const tablesCount = tables.filter((t: any) => {
                       if (isDeletedTable(t)) return false
-                      const isVipLocation =
-                        loc.name.toLowerCase() === 'vip' || loc.name.toLowerCase() === 'zona vip'
-                      if (isVipLocation && t.type === 'vip') return true
                       return (
                         t.locationId === loc.id ||
                         t.locationId === loc._id ||

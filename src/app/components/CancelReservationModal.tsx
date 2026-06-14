@@ -1,5 +1,5 @@
 import React from 'react'
-import { X, XCircle, AlertTriangle, UserCheck, Crown, Clock, Users } from 'lucide-react'
+import { X, XCircle, AlertTriangle, UserCheck, Clock, Users } from 'lucide-react'
 import { Table, ReservationInfo } from '../context/AppContext'
 
 interface CancelReservationModalProps {
@@ -65,9 +65,6 @@ export function CancelReservationModal({
                   <div className="flex items-center gap-2 text-[#4B2E2D]">
                     <UserCheck size={13} strokeWidth={2.5} />
                     <span className="text-sm font-black">{reservation.clientName}</span>
-                    {reservation.vip && (
-                      <Crown size={12} className="text-yellow-500" strokeWidth={2.5} />
-                    )}
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="flex items-center gap-1.5 text-xs font-bold text-[#4B2E2D]/80">

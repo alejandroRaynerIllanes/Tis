@@ -1,20 +1,20 @@
 //src/app/components/admin/Dashboard.tsx
 import { useEffect, useState } from 'react'
 import { TrendingUp, TrendingDown, Menu } from 'lucide-react'
-import { api } from '../../services/api'
+import { dashboardService, DashboardData, CategoriaPopular, PlatoPopular, OrdenReciente } from '../../services/dashboard.service'
 
 interface DashboardProps {
   onOpenSidebar: () => void
 }
 
 export function Dashboard({ onOpenSidebar }: DashboardProps) {
-  const [dashboardData, setDashboardData] = useState<any>(null)
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchDashboard = async () => {
       try {
-        const data = await api.get('/dashboard/resumen')
+        const data = await dashboardService.getResumen()
         setDashboardData(data)
       } catch (error) {
         console.error('Error fetching dashboard', error)
@@ -38,7 +38,7 @@ export function Dashboard({ onOpenSidebar }: DashboardProps) {
 
   // Asignar colores aleatorios a las categorías del gráfico
   const catColors = ['#D0543A', '#E6A23C', '#6B3E2E', '#F2A98A', '#8C3A3A']
-  const categoriasFormateadas = categoriasPopulares.map((cat: any, i: number) => ({
+  const categoriasFormateadas = categoriasPopulares.map((cat: CategoriaPopular, i: number) => ({
     ...cat,
     color: catColors[i % catColors.length]
   }))
@@ -261,7 +261,7 @@ export function Dashboard({ onOpenSidebar }: DashboardProps) {
               </span>
             </div>
             <div className="space-y-3.5">
-              {platosMasVendidos.map((dish: any, idx: number) => (
+            {platosMasVendidos.map((dish: PlatoPopular, idx: number) => (
                 <div key={dish.nombre} className="flex items-center gap-3">
                   <span
                     className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 ${
@@ -294,7 +294,7 @@ export function Dashboard({ onOpenSidebar }: DashboardProps) {
                       <div
                         className="h-full rounded-full transition-all duration-700"
                         style={{
-                          width: `${Math.min((dish.cantidad / 50) * 100, 100)}%`,
+                        width: `${Math.min(((dish.cantidad || 0) / 50) * 100, 100)}%`,
                           background:
                             idx === 0
                               ? '#D0543A'
@@ -323,7 +323,7 @@ export function Dashboard({ onOpenSidebar }: DashboardProps) {
               </span>
             </div>
             <div className="flex flex-col gap-3 pt-1">
-              {categoriasFormateadas.map((cat: any, index: number) => (
+            {categoriasFormateadas.map((cat: CategoriaPopular & { color: string }, index: number) => (
                 <div key={cat.nombre} className="flex items-center gap-3">
                   <span className="w-5 text-center text-xs font-black text-[#4B2E2D]/30 shrink-0">
                     {index + 1}
@@ -364,7 +364,7 @@ export function Dashboard({ onOpenSidebar }: DashboardProps) {
 
           {/* Mobile: cards */}
           <div className="flex flex-col gap-3 sm:hidden">
-            {ordenesRecientes.map((order: any, index: number) => (
+            {ordenesRecientes.map((order: OrdenReciente, index: number) => (
               <div
                 key={index}
                 className="flex items-center justify-between bg-[#FCE4D6]/30 rounded-xl px-4 py-3 border border-[#FCE4D6]"
@@ -386,7 +386,7 @@ export function Dashboard({ onOpenSidebar }: DashboardProps) {
                             : 'bg-yellow-100 text-yellow-700'
                       }`}
                     >
-                      {order.status}
+                      {order.estado}
                     </span>
                   </div>
                 </div>
@@ -420,7 +420,7 @@ export function Dashboard({ onOpenSidebar }: DashboardProps) {
                 </tr>
               </thead>
               <tbody>
-                {ordenesRecientes.map((order: any, index: number) => (
+                {ordenesRecientes.map((order: OrdenReciente, index: number) => (
                   <tr
                     key={index}
                     className="border-b border-[#FCE4D6] hover:bg-[#FCE4D6]/30 transition-colors"

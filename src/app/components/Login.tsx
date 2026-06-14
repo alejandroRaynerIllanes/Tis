@@ -37,6 +37,7 @@ export function Login() {
       setStoredUser(user)
       localStorage.setItem('userRole', role)
 
+      // Redirigir correctamente según su rol global
       redirectByRole(role)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Error al iniciar sesión'

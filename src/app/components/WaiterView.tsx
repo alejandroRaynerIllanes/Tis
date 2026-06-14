@@ -13,7 +13,6 @@ import {
   Edit2,
   CalendarDays,
   UserCheck,
-  Crown,
   Bell,
   History
 } from 'lucide-react'
@@ -51,103 +50,99 @@ interface TableConfig {
   dotColor: string
 }
 
-function getTableConfig(state: string): TableConfig {
-  switch (state) {
-    case 'disponible':
-      return {
-        bgClass: 'bg-[#F5E6D3]',
-        borderClass: 'border-[#6B3E2E]/15',
-        cardStyle: {
-          background: '#F5E6D3',
-          boxShadow: '0 4px 14px -4px rgba(44,44,44,0.1), inset 0 1px 0 rgba(255,255,255,0.6)',
-          border: '1px solid rgba(107,62,46,0.15)'
-        },
-        textClass: 'text-[#2C2C2C]',
-        iconClass: 'opacity-70 text-[#2C2C2C]',
-        badgeStyle: {
-          background: 'rgba(44,44,44,0.08)',
-          border: '1px solid rgba(44,44,44,0.2)',
-          color: '#2C2C2C'
-        },
-        statusLabel: 'Disponible',
-        dotColor: '#F5E6D3'
-      }
-    case 'ocupada':
-      return {
-        bgClass: 'bg-[#D96C4A]',
-        borderClass: 'border-[#D96C4A]',
-        cardStyle: {
-          background: '#D96C4A',
-          boxShadow: '0 6px 18px -4px rgba(217,108,74,0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
-          border: '1px solid rgba(217,108,74,0.8)'
-        },
-        textClass: 'text-[#FFFFFF]',
-        iconClass: 'opacity-90 text-[#FFFFFF]',
-        badgeStyle: {
-          background: 'rgba(255,255,255,0.2)',
-          border: '1px solid rgba(255,255,255,0.4)',
-          color: '#FFFFFF'
-        },
-        statusLabel: 'Ocupada',
-        dotColor: '#D96C4A'
-      }
-    case 'esperando pago':
-      return {
-        bgClass: 'bg-[#E6A23C]',
-        borderClass: 'border-[#E6A23C]',
-        cardStyle: {
-          background: '#E6A23C',
-          boxShadow: '0 6px 18px -4px rgba(230,162,60,0.4), inset 0 1px 0 rgba(255,255,255,0.3)',
-          border: '1px solid rgba(230,162,60,0.8)'
-        },
-        textClass: 'text-[#2C2C2C]',
-        iconClass: 'opacity-80 text-[#2C2C2C]',
-        badgeStyle: {
-          background: 'rgba(44,44,44,0.1)',
-          border: '1px solid rgba(44,44,44,0.3)',
-          color: '#2C2C2C'
-        },
-        statusLabel: 'Esperando Pago',
-        dotColor: '#E6A23C'
-      }
-    case 'reservada':
-      return {
-        bgClass: 'bg-[#6B3E2E]',
-        borderClass: 'border-[#6B3E2E]',
-        cardStyle: {
-          background: '#6B3E2E',
-          boxShadow: '0 6px 18px -4px rgba(107,62,46,0.5), inset 0 1px 0 rgba(255,255,255,0.1)',
-          border: '1px solid rgba(107,62,46,0.9)'
-        },
-        textClass: 'text-[#FFFFFF]',
-        iconClass: 'opacity-90 text-[#FFFFFF]',
-        badgeStyle: {
-          background: 'rgba(255,255,255,0.15)',
-          border: '1px solid rgba(255,255,255,0.3)',
-          color: '#FFFFFF'
-        },
-        statusLabel: 'Reservada',
-        dotColor: '#6B3E2E'
-      }
-    default:
-      return {
-        bgClass: 'bg-white',
-        borderClass: 'border-gray-200',
-        cardStyle: {
-          background: '#FFFFFF',
-          border: '1px solid #E5E7EB'
-        },
-        textClass: 'text-gray-700',
-        iconClass: 'opacity-60 text-gray-700',
-        badgeStyle: {
-          background: '#FFFFFF',
-          border: '1px solid #E5E7EB',
-          color: '#374151'
-        },
-        statusLabel: '',
-        dotColor: '#ccc'
-      }
+const TABLE_CONFIGS: Record<string, TableConfig> = {
+  disponible: {
+    bgClass: 'bg-[#F5E6D3]',
+    borderClass: 'border-[#6B3E2E]/15',
+    cardStyle: {
+      background: '#F5E6D3',
+      boxShadow: '0 4px 14px -4px rgba(44,44,44,0.1), inset 0 1px 0 rgba(255,255,255,0.6)',
+      border: '1px solid rgba(107,62,46,0.15)'
+    },
+    textClass: 'text-[#2C2C2C]',
+    iconClass: 'opacity-70 text-[#2C2C2C]',
+    badgeStyle: {
+      background: 'rgba(44,44,44,0.08)',
+      border: '1px solid rgba(44,44,44,0.2)',
+      color: '#2C2C2C'
+    },
+    statusLabel: 'Disponible',
+    dotColor: '#F5E6D3'
+  },
+  ocupada: {
+    bgClass: 'bg-[#D96C4A]',
+    borderClass: 'border-[#D96C4A]',
+    cardStyle: {
+      background: '#D96C4A',
+      boxShadow: '0 6px 18px -4px rgba(217,108,74,0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
+      border: '1px solid rgba(217,108,74,0.8)'
+    },
+    textClass: 'text-[#FFFFFF]',
+    iconClass: 'opacity-90 text-[#FFFFFF]',
+    badgeStyle: {
+      background: 'rgba(255,255,255,0.2)',
+      border: '1px solid rgba(255,255,255,0.4)',
+      color: '#FFFFFF'
+    },
+    statusLabel: 'Ocupada',
+    dotColor: '#D96C4A'
+  },
+  'esperando pago': {
+    bgClass: 'bg-[#E6A23C]',
+    borderClass: 'border-[#E6A23C]',
+    cardStyle: {
+      background: '#E6A23C',
+      boxShadow: '0 6px 18px -4px rgba(230,162,60,0.4), inset 0 1px 0 rgba(255,255,255,0.3)',
+      border: '1px solid rgba(230,162,60,0.8)'
+    },
+    textClass: 'text-[#2C2C2C]',
+    iconClass: 'opacity-80 text-[#2C2C2C]',
+    badgeStyle: {
+      background: 'rgba(44,44,44,0.1)',
+      border: '1px solid rgba(44,44,44,0.3)',
+      color: '#2C2C2C'
+    },
+    statusLabel: 'Esperando Pago',
+    dotColor: '#E6A23C'
+  },
+  reservada: {
+    bgClass: 'bg-[#6B3E2E]',
+    borderClass: 'border-[#6B3E2E]',
+    cardStyle: {
+      background: '#6B3E2E',
+      boxShadow: '0 6px 18px -4px rgba(107,62,46,0.5), inset 0 1px 0 rgba(255,255,255,0.1)',
+      border: '1px solid rgba(107,62,46,0.9)'
+    },
+    textClass: 'text-[#FFFFFF]',
+    iconClass: 'opacity-90 text-[#FFFFFF]',
+    badgeStyle: {
+      background: 'rgba(255,255,255,0.15)',
+      border: '1px solid rgba(255,255,255,0.3)',
+      color: '#FFFFFF'
+    },
+    statusLabel: 'Reservada',
+    dotColor: '#6B3E2E'
   }
+};
+
+function getTableConfig(state: string): TableConfig {
+  return TABLE_CONFIGS[state.toLowerCase().trim()] || {
+    bgClass: 'bg-white',
+    borderClass: 'border-gray-200',
+    cardStyle: {
+      background: '#FFFFFF',
+      border: '1px solid #E5E7EB'
+    },
+    textClass: 'text-gray-700',
+    iconClass: 'opacity-60 text-gray-700',
+    badgeStyle: {
+      background: '#FFFFFF',
+      border: '1px solid #E5E7EB',
+      color: '#374151'
+    },
+    statusLabel: '',
+    dotColor: '#ccc'
+  };
 }
 
 function getStateIcon(state: TableStatus, size = 22) {
@@ -256,14 +251,8 @@ export function WaiterView({
       .toLowerCase()
       .trim()
 
-  // Identificar si el mesero es de la zona VIP
-  const isUserVipZone =
-    normalizeZone(userLocation) === 'vip' || normalizeZone(userLocation) === 'zona vip'
-
   // Buscar la ubicación exacta en el sistema (con sus mayúsculas originales) que coincide con la zona del mesero
-  const matchedUserLocation = isUserVipZone
-    ? 'VIP'
-    : LOCATIONS.find((loc: string) => normalizeZone(loc) === normalizeZone(userLocation)) ||
+  const matchedUserLocation = LOCATIONS.find((loc: string) => normalizeZone(loc) === normalizeZone(userLocation)) ||
       userLocation
 
   // Respaldo dinámico: Si el backend no envió la zona al hacer login, la buscamos
@@ -297,13 +286,6 @@ export function WaiterView({
 
   // Identificamos las mesas que le pertenecen a este mesero basado en su zona
   const myAllowedTables = tables.filter((t) => {
-    if (isUserVipZone) {
-      return (
-        t.type === 'vip' ||
-        normalizeZone(getTableLocation(t)) === 'vip' ||
-        normalizeZone(getTableLocation(t)) === 'zona vip'
-      )
-    }
     return normalizeZone(getTableLocation(t)) === normalizeZone(userLocation)
   })
 
@@ -336,21 +318,13 @@ export function WaiterView({
     e.stopPropagation()
     if (n.meta?.actionType === 'deliver_order' && n.meta?.pedidoId) {
       try {
-        await ordersService.updateStatus(n.meta.pedidoId, 'ENTREGADO')
+        await ordersService.updateStatus(n.meta.pedidoId, 'SERVIDO')
         await loadInitialData()
         toast.success('Pedido entregado al cliente', {
           description: 'Ya puedes solicitar la cuenta desde la mesa.'
         })
       } catch (err) {
         console.error(err)
-        // Fallback to SERVIDO if ENTREGADO is not accepted
-        try {
-          await ordersService.updateStatus(n.meta.pedidoId, 'SERVIDO')
-          await loadInitialData()
-          toast.success('Pedido entregado al cliente', {
-            description: 'Ya puedes solicitar la cuenta desde la mesa.'
-          })
-        } catch (e2) {}
       }
     } else if (n.meta?.actionType === 'process_payment' && n.meta?.tableId) {
       handleTableClick(e as any, n.meta.tableId)
@@ -730,13 +704,6 @@ export function WaiterView({
                         >
                           {tableName}
                         </span>
-                        {t.type === 'vip' && (
-                          <Crown
-                            size={16}
-                            className="text-yellow-300 drop-shadow-sm shrink-0 mt-1"
-                            strokeWidth={2.5}
-                          />
-                        )}
                       </div>
                       {tableLocation && (
                         <div
@@ -808,13 +775,6 @@ export function WaiterView({
                           <span className="text-[11px] font-black truncate">
                             {tableReservation.clientName}
                           </span>
-                          {tableReservation.vip && (
-                            <Crown
-                              size={10}
-                              className="shrink-0 text-yellow-300"
-                              strokeWidth={2.5}
-                            />
-                          )}
                         </div>
                         {tableReservations.length > 1 && (
                           <span className="text-[9px] font-black bg-white/25 px-1.5 py-0.5 rounded-full shrink-0">

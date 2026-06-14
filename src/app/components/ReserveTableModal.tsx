@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { CalendarDays, Crown, UserCheck, Users, X, MapPin, Clock } from 'lucide-react'
+import { CalendarDays, UserCheck, Users, X, MapPin, Clock } from 'lucide-react'
 import { Table } from '../context/AppContext'
 import { locationsService } from '../services/locations.service'
 
@@ -116,11 +116,6 @@ export function ReserveTableModal({ isOpen, table, onClose, onConfirm }: Reserve
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="font-black text-white text-lg leading-tight">Reservar Mesa</h2>
-                {table.type === 'vip' && (
-                  <span className="px-2 py-0.5 rounded-md bg-yellow-400/20 border border-yellow-400/30 text-yellow-300 text-[10px] font-black uppercase tracking-wide flex items-center gap-1">
-                    <Crown size={10} strokeWidth={2.5} /> VIP
-                  </span>
-                )}
               </div>
               <p className="text-[#F5E6D3] text-xs font-semibold mt-0.5">
                 {table.name} · Capacidad {table.capacity} pax
@@ -137,12 +132,15 @@ export function ReserveTableModal({ isOpen, table, onClose, onConfirm }: Reserve
 
         {/* Body */}
         <div className="p-6 space-y-4">
+
           {/* VIP Notice */}
           {table.type === 'vip' && (
-            <div className="flex items-start gap-2 p-3 rounded-xl bg-yellow-50 border border-yellow-200">
-              <Crown size={14} className="text-yellow-600 shrink-0 mt-0.5" strokeWidth={2.5} />
-              <p className="text-[11px] font-semibold text-yellow-800 leading-relaxed">
-                Esta es una mesa VIP. Solo clientes VIP pueden realizar reservas.
+            <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200">
+              <div className="bg-amber-100 p-1.5 rounded-lg shrink-0 mt-0.5">
+                <span className="text-amber-600 font-black text-[10px]">VIP</span>
+              </div>
+              <p className="text-[11px] font-semibold text-amber-800 leading-relaxed">
+                Mesa VIP: Tiene un cargo extra obligatorio de 100 Bs que se sumará a la cuenta final del consumo.
               </p>
             </div>
           )}

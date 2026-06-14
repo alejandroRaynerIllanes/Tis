@@ -6,6 +6,7 @@ import { NotificationsProvider } from './context/NotificationsContext'
 import { Toaster } from 'sonner'
 
 const Login = lazy(() => import('./components/Login').then((m) => ({ default: m.Login })))
+const PublicMenu = lazy(() => import('./components/PublicMenu').then((m) => ({ default: m.PublicMenu })))
 const Catalog = lazy(() => import('./components/Catalog').then((m) => ({ default: m.Catalog })))
 const WaiterView = lazy(() =>
   import('./components/WaiterView').then((m) => ({ default: m.WaiterView }))
@@ -23,6 +24,12 @@ const UnderConstruction = lazy(() =>
 )
 const PaymentSimulator = lazy(() =>
   import('./components/PaymentSimulator').then((m) => ({ default: m.PaymentSimulator }))
+)
+const ClientProfile = lazy(() =>
+  import('./components/ClientProfile').then((m) => ({ default: m.ClientProfile }))
+)
+const DeliveryView = lazy(() =>
+  import('./components/DeliveryView').then((m) => ({ default: m.DeliveryView }))
 )
 
 function RootLayout() {
@@ -67,6 +74,10 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
+        element: <PublicMenu />
+      },
+      {
+        path: 'login',
         element: <Login />
       },
       {
@@ -79,6 +90,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <Catalog />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'perfil',
+        element: (
+          <ProtectedRoute>
+            <ClientProfile />
           </ProtectedRoute>
         )
       },
@@ -111,6 +130,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute requireAdmin>
             <UserManagement />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'delivery',
+        element: (
+          <ProtectedRoute>
+            <DeliveryView />
           </ProtectedRoute>
         )
       },

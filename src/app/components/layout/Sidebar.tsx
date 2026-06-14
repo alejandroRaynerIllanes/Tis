@@ -17,7 +17,7 @@ export type AdminView =
   | 'menu'
   | 'users'
   | 'reports'
-  | 'vip-clients'
+  | 'clients'
   | 'waiters'
   | 'inventory'
 
@@ -36,7 +36,7 @@ const NAV_ITEMS: { view: AdminView; icon: React.ReactNode; label: string }[] = [
   { view: 'users', icon: <Users size={20} />, label: 'Usuarios' },
   { view: 'waiters', icon: <UserCheck size={20} />, label: 'Meseros Activos' },
   { view: 'reports', icon: <BarChart2 size={20} />, label: 'Reportes' },
-  { view: 'vip-clients', icon: <Crown size={20} />, label: 'Clientes VIP' },
+  { view: 'clients', icon: <Crown size={20} />, label: 'Clientes' },
   { view: 'inventory', icon: <Package size={20} />, label: 'Inventario' }
 ]
 

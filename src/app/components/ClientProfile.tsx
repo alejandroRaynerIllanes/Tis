@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react'
-import { User, MapPin, Package, Shield, ArrowLeft, LogOut, Plus, Trash2, Edit2, Loader2, Save } from 'lucide-react'
+import { User, MapPin, Package, Shield, ArrowLeft, LogOut, Plus, Trash2, Edit2, Loader2, Save, MessageSquare, X, Send } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { getStoredUser, api, setStoredUser, getToken } from '../services/api'
 import { toast } from 'sonner'
-import { User as UserType, Address, Order, OrderDetail } from '../types'
+import { User as UserType, Address, Order, OrderDetail, ChatMessage } from '../types'
 import { usersService } from '../services/users.service'
+import { useAppContext } from '../context/AppContext'
 
 export function ClientProfile() {
   const navigate = useNavigate()
   const user = getStoredUser()
+  const { socket } = useAppContext()
 
   const [activeTab, setActiveTab] = useState<'perfil' | 'direcciones' | 'historial' | 'seguridad'>('perfil')
   const [loading, setLoading] = useState(true)
@@ -25,6 +27,10 @@ export function ClientProfile() {
   // New Address Form
   const [showAddAddress, setShowAddAddress] = useState(false)
   const [newAddress, setNewAddress] = useState({ alias: 'Casa', detalle: '', referencia: '' })
+
+  const [activeChatId, setActiveChatId] = useState<string | null>(null)
+  const [chatMessage, setChatMessage] = useState('')
+  const [chatMessages, setChatMessages] = useState<Record<string, ChatMessage[]>>({})
 
   useEffect(() => {
     const loadData = async () => {
@@ -50,6 +56,17 @@ export function ClientProfile() {
       }
     }
     loadData()
+
+    if(!socket) return;
+    const handleNewMessage = (msg: ChatMessage) => {
+        setChatMessages(prev => ({ ...prev, [msg.pedidoId]: [...(prev[msg.pedidoId] || []), msg] }))
+        if(msg.sender === 'Repartidor') toast.info('Nuevo mensaje del repartidor')
+    }
+    socket.on('chat:nuevo_mensaje', handleNewMessage)
+    
+    return () => {
+      socket.off('chat:nuevo_mensaje', handleNewMessage)
+    }
   }, [user?.id])
 
   const handleUpdateProfile = async () => {
@@ -116,6 +133,19 @@ export function ClientProfile() {
   const handleLogout = () => {
     localStorage.clear()
     navigate('/', { replace: true })
+  }
+
+  const handleSendMessage = () => {
+    if(!chatMessage.trim() || !activeChatId) return;
+    const msg: ChatMessage = {
+        pedidoId: activeChatId,
+        sender: 'Cliente',
+        text: chatMessage,
+        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+    }
+    socket?.emit('chat:enviar_mensaje', msg)
+    setChatMessages(prev => ({ ...prev, [activeChatId]: [...(prev[activeChatId] || []), msg] }))
+    setChatMessage('')
   }
 
   if (loading) {
@@ -339,6 +369,44 @@ export function ClientProfile() {
           )}
         </section>
       </main>
+
+  {/* Modal de Chat para el Cliente */}
+  {activeChatId && (
+      <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex flex-col justify-end p-2 sm:p-4 animate-in fade-in">
+          <div className="bg-white w-full max-w-lg mx-auto rounded-3xl h-[70vh] flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-bottom-4">
+              <div className="bg-gradient-to-r from-[#4B2E2D] to-[#6B3E2E] p-5 flex justify-between items-center text-white">
+                  <div className="flex items-center gap-3">
+                      <MessageSquare size={22}/>
+                      <span className="font-black text-lg">Chat con Repartidor</span>
+                  </div>
+                  <button onClick={() => setActiveChatId(null)} className="p-1.5 hover:bg-white/20 rounded-full transition-colors"><X size={20}/></button>
+              </div>
+              <div className="flex-1 p-5 overflow-y-auto bg-[#F8F9FA] flex flex-col gap-3">
+                  {(chatMessages[activeChatId] || []).map((msg, i) => (
+                      <div key={i} className={`flex flex-col max-w-[80%] ${msg.sender === 'Cliente' ? 'self-end items-end' : 'self-start items-start'}`}>
+                          <div className={`p-3 rounded-2xl shadow-sm text-sm ${msg.sender === 'Cliente' ? 'bg-[#D96C4A] text-white rounded-br-none' : 'bg-white border border-gray-200 text-[#4B2E2D] font-medium rounded-bl-none'}`}>
+                              {msg.text}
+                          </div>
+                          <span className="text-[10px] font-bold text-gray-400 mt-1 px-1">{msg.time}</span>
+                      </div>
+                  ))}
+                  {(chatMessages[activeChatId] || []).length === 0 && (
+                      <div className="text-center text-gray-400 my-auto flex flex-col items-center">
+                          <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3"><MessageSquare size={20} className="text-gray-400"/></div>
+                          <p className="font-bold">No hay mensajes aún</p>
+                          <p className="text-xs mt-1">Escribe para dar instrucciones adicionales de llegada.</p>
+                      </div>
+                  )}
+              </div>
+              <div className="p-4 bg-white border-t border-gray-100 flex items-center gap-3">
+                  <input type="text" value={chatMessage} onChange={e=>setChatMessage(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSendMessage()} className="flex-1 bg-gray-50 border border-gray-200 focus:bg-white focus:border-[#D96C4A] focus:ring-2 focus:ring-[#D96C4A]/20 rounded-full px-5 py-3 text-sm outline-none transition-all font-medium text-[#4B2E2D]" placeholder="Escribe un mensaje..." />
+                  <button onClick={handleSendMessage} disabled={!chatMessage.trim()} className="w-12 h-12 bg-[#D96C4A] hover:bg-[#b5462f] text-white rounded-full flex items-center justify-center shrink-0 disabled:opacity-50 transition-colors shadow-md shadow-[#D96C4A]/30">
+                      <Send size={18} className="-ml-0.5" />
+                  </button>
+              </div>
+          </div>
+      </div>
+  )}
     </div>
   )
 }

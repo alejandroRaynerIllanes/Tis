@@ -1,10 +1,55 @@
 import React, { useState, useEffect } from 'react'
-import { Bike, MapPin, Package, Navigation, LogOut, CheckCircle2, Clock, ShieldCheck, User, ChefHat } from 'lucide-react'
+import { Bike, MapPin, Package, Navigation, LogOut, CheckCircle2, Clock, ShieldCheck, User, ChefHat, MessageSquare, Send, X, Phone } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { api, getStoredUser } from '../services/api'
 import { toast } from 'sonner'
 import { useAppContext } from '../context/AppContext'
-import { Order as GlobalOrder, User as GlobalUser } from '../types'
+import { Order as GlobalOrder, User as GlobalUser, ChatMessage } from '../types'
+import { MapContainer, TileLayer, Marker, Polyline, Popup } from 'react-leaflet'
+// @ts-ignore
+import 'leaflet/dist/leaflet.css'
+import L from 'leaflet'
+
+const userIcon = new L.Icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34]
+})
+
+const restaurantIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34]
+})
+
+const RESTAURANT_POS: [number, number] = [-17.3895, -66.1568]
+
+// Subcomponente inteligente para trazar la ruta del repartidor
+const RouteMap = ({ destination }: { destination: [number, number] }) => {
+  const [coords, setCoords] = useState<[number, number][]>([RESTAURANT_POS, destination])
+  useEffect(() => {
+    const fetchRoute = async () => {
+      try {
+        const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${RESTAURANT_POS[1]},${RESTAURANT_POS[0]};${destination[1]},${destination[0]}?overview=full&geometries=geojson`)
+        const data = await res.json()
+        if (data.routes && data.routes[0]) setCoords(data.routes[0].geometry.coordinates.map((c: any[]) => [c[1], c[0]]))
+      } catch (e) {}
+    }
+    fetchRoute()
+  }, [destination])
+  return (
+    <MapContainer center={destination} zoom={14} style={{width: '100%', height:'100%', zIndex: 0}}>
+      <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
+      <Marker position={RESTAURANT_POS} icon={restaurantIcon}><Popup>Restaurante</Popup></Marker>
+      <Marker position={destination} icon={userIcon}><Popup>Cliente</Popup></Marker>
+      <Polyline positions={coords} color="#3b82f6" weight={5} opacity={0.8} />
+    </MapContainer>
+  )
+}
 
 export function DeliveryView() {
   const navigate = useNavigate()
@@ -15,6 +60,11 @@ export function DeliveryView() {
   const [orders, setOrders] = useState<GlobalOrder[]>([])
   const [isOnline, setIsOnline] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
+  
+  const [activeMapId, setActiveMapId] = useState<string | null>(null)
+  const [activeChatId, setActiveChatId] = useState<string | null>(null)
+  const [chatMessage, setChatMessage] = useState('')
+  const [chatMessages, setChatMessages] = useState<Record<string, ChatMessage[]>>({})
 
   const loadOrders = async () => {
     try {
@@ -38,13 +88,20 @@ export function DeliveryView() {
       setOrders(prev => [pedido, ...prev.filter(p => p._id !== pedido._id)])
       if(isOnline) toast.info('¡Nuevo pedido de Delivery disponible!')
     }
+
+    const handleNewMessage = (msg: ChatMessage) => {
+      setChatMessages(prev => ({ ...prev, [msg.pedidoId]: [...(prev[msg.pedidoId] || []), msg] }))
+      if(isOnline && msg.sender === 'Cliente') toast.info('Mensaje nuevo del cliente')
+    }
     
     socket.on('delivery:nuevo_pedido', handleNuevo)
     socket.on('cocina:actualizar_tablero', loadOrders)
+    socket.on('chat:nuevo_mensaje', handleNewMessage)
 
     return () => {
       socket.off('delivery:nuevo_pedido', handleNuevo)
       socket.off('cocina:actualizar_tablero', loadOrders)
+      socket.off('chat:nuevo_mensaje', handleNewMessage)
     }
   }, [socket, isOnline])
 
@@ -69,6 +126,19 @@ export function DeliveryView() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleSendMessage = () => {
+    if(!chatMessage.trim() || !activeChatId) return;
+    const msg: ChatMessage = {
+        pedidoId: activeChatId,
+        sender: 'Repartidor',
+        text: chatMessage,
+        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+    }
+    socket?.emit('chat:enviar_mensaje', msg)
+    setChatMessages(prev => ({ ...prev, [activeChatId]: [...(prev[activeChatId] || []), msg] }))
+    setChatMessage('')
   }
 
   const handleLogout = () => {
@@ -227,7 +297,29 @@ export function DeliveryView() {
                   <span className="text-xl font-black text-[#D96C4A]">Bs. {order.total?.toFixed(2)}</span>
                 </div>
 
-                <div className="flex gap-2">
+              <div className="flex gap-2 mt-2">
+                {(order as any).coordenadasEntrega && (
+                    <button onClick={() => setActiveMapId(activeMapId === order._id ? null : (order._id || null))} className="flex-1 py-3 bg-blue-50 text-blue-600 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-100 transition-colors text-sm">
+                        <MapPin size={16}/> {activeMapId === order._id ? 'Ocultar Ruta' : 'Ver Ruta'}
+                    </button>
+                )}
+                <button onClick={() => setActiveChatId(order._id || null)} className="flex-1 py-3 bg-emerald-50 text-emerald-600 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-100 transition-colors text-sm">
+                    <MessageSquare size={16}/> Chat
+                </button>
+                {(order as any).clienteTelefono && (
+                    <a href={`tel:${(order as any).clienteTelefono}`} className="w-12 py-3 flex items-center justify-center bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-colors">
+                        <Phone size={16}/>
+                    </a>
+                )}
+              </div>
+
+              {activeMapId === order._id && (order as any).coordenadasEntrega && (
+                  <div className="h-56 w-full mt-2 rounded-2xl overflow-hidden border-2 border-blue-100 z-0 relative shadow-inner">
+                      <RouteMap destination={[(order as any).coordenadasEntrega.lat, (order as any).coordenadasEntrega.lng]} />
+                  </div>
+              )}
+
+              <div className="flex gap-2 mt-2">
                   {(order.estado === 'ABIERTO' || order.estado === 'EN_PREPARACION') && (
                     <div className="w-full py-4 bg-gray-100 text-gray-500 rounded-xl font-black text-center border-2 border-dashed border-gray-300 flex items-center justify-center gap-2">
                       <ChefHat size={18}/> Chef preparando...
@@ -270,6 +362,44 @@ export function DeliveryView() {
           )
         )}
       </div>
+
+  {/* Modal de Chat */}
+  {activeChatId && (
+      <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex flex-col justify-end p-2 sm:p-4 animate-in fade-in">
+          <div className="bg-white w-full max-w-lg mx-auto rounded-3xl h-[70vh] flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-bottom-4">
+              <div className="bg-gradient-to-r from-[#D96C4A] to-[#C25838] p-5 flex justify-between items-center text-white">
+                  <div className="flex items-center gap-3">
+                      <MessageSquare size={22}/>
+                      <span className="font-black text-lg">Chat con Cliente</span>
+                  </div>
+                  <button onClick={() => setActiveChatId(null)} className="p-1.5 hover:bg-white/20 rounded-full transition-colors"><X size={20}/></button>
+              </div>
+              <div className="flex-1 p-5 overflow-y-auto bg-[#F8F9FA] flex flex-col gap-3">
+                  {(chatMessages[activeChatId] || []).map((msg, i) => (
+                      <div key={i} className={`flex flex-col max-w-[80%] ${msg.sender === 'Repartidor' ? 'self-end items-end' : 'self-start items-start'}`}>
+                          <div className={`p-3 rounded-2xl shadow-sm text-sm ${msg.sender === 'Repartidor' ? 'bg-[#D96C4A] text-white rounded-br-none' : 'bg-white border border-gray-200 text-[#4B2E2D] font-medium rounded-bl-none'}`}>
+                              {msg.text}
+                          </div>
+                          <span className="text-[10px] font-bold text-gray-400 mt-1 px-1">{msg.time}</span>
+                      </div>
+                  ))}
+                  {(chatMessages[activeChatId] || []).length === 0 && (
+                      <div className="text-center text-gray-400 my-auto flex flex-col items-center">
+                          <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3"><MessageSquare size={20} className="text-gray-400"/></div>
+                          <p className="font-bold">No hay mensajes aún</p>
+                          <p className="text-xs mt-1">Escribe para avisar al cliente que estás en camino.</p>
+                      </div>
+                  )}
+              </div>
+              <div className="p-4 bg-white border-t border-gray-100 flex items-center gap-3">
+                  <input type="text" value={chatMessage} onChange={e=>setChatMessage(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSendMessage()} className="flex-1 bg-gray-50 border border-gray-200 focus:bg-white focus:border-[#D96C4A] focus:ring-2 focus:ring-[#D96C4A]/20 rounded-full px-5 py-3 text-sm outline-none transition-all font-medium text-[#4B2E2D]" placeholder="Escribe un mensaje..." />
+                  <button onClick={handleSendMessage} disabled={!chatMessage.trim()} className="w-12 h-12 bg-[#D96C4A] hover:bg-[#b5462f] text-white rounded-full flex items-center justify-center shrink-0 disabled:opacity-50 transition-colors shadow-md shadow-[#D96C4A]/30">
+                      <Send size={18} className="-ml-0.5" />
+                  </button>
+              </div>
+          </div>
+      </div>
+  )}
     </div>
   )
 }

@@ -97,6 +97,10 @@ export interface Order {
   fechaHoraBolivia?: string;
   fechaHora?: string;
   repartidorId?: string;
+  coordenadasEntrega?: { lat: number; lng: number };
+  direccionEntrega?: string;
+  referenciaEntrega?: string;
+  clienteTelefono?: string;
 }
 
 // ─── Tipos para el AppContext y Vistas Frontend ──────────────────────────────
@@ -140,4 +144,11 @@ export interface ReservationInfo {
   startTime: string;
   endTime: string;
   vip?: boolean;
+}
+
+export interface ChatMessage {
+  pedidoId: string;
+  sender: 'Repartidor' | 'Cliente';
+  text: string;
+  time: string;
 }

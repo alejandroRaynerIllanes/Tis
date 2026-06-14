@@ -45,6 +45,31 @@ function MapEvents({ onLocationSelected }: { onLocationSelected: (lat: number, l
 
 export function MapPicker({ onLocationSelect }: MapPickerProps) {
   const [userPos, setUserPos] = useState<[number, number] | null>(null)
+  const [routeCoords, setRouteCoords] = useState<[number, number][]>([])
+
+  // Llamada al motor de rutas (OSRM) para obtener calles reales
+  const fetchRealRoute = async (lat: number, lng: number) => {
+    try {
+      // OSRM recibe la longitud primero: lon,lat
+      const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${RESTAURANT_POS[1]},${RESTAURANT_POS[0]};${lng},${lat}?overview=full&geometries=geojson`)
+      const data = await res.json()
+      if (data.routes && data.routes[0]) {
+        // OSRM devuelve [lng, lat], Leaflet dibuja [lat, lng]
+        const coords = data.routes[0].geometry.coordinates.map((c: any[]) => [c[1], c[0]])
+        const distKm = parseFloat((data.routes[0].distance / 1000).toFixed(1))
+        const timeMin = Math.round(data.routes[0].duration / 60) + 10 // Preparación + tiempo de viaje real
+        
+        let cost = 5
+        if (distKm > 1.5) {
+          cost += Math.round((distKm - 1.5) * 3)
+        }
+        return { coords, distKm, timeMin, cost }
+      }
+    } catch (err) {
+      console.warn('OSRM error', err)
+    }
+    return null
+  }
 
   const calculateDistanceAndCost = (lat: number, lng: number) => {
     const R = 6371 // Radio de la Tierra en Km
@@ -67,10 +92,20 @@ export function MapPicker({ onLocationSelect }: MapPickerProps) {
     return { distance: distKm, time, cost }
   }
 
-  const handleLocationSelected = (lat: number, lng: number) => {
+  const handleLocationSelected = async (lat: number, lng: number) => {
     setUserPos([lat, lng])
+    
+    // 1. Cálculo rápido "A vuelo de pájaro" (mientras carga la ruta real)
     const { distance, time, cost } = calculateDistanceAndCost(lat, lng)
+    setRouteCoords([RESTAURANT_POS, [lat, lng]])
     onLocationSelect({ lat, lng, distance, time, cost })
+
+    // 2. Cálculo Real por Calles
+    const realRoute = await fetchRealRoute(lat, lng)
+    if (realRoute) {
+      setRouteCoords(realRoute.coords)
+      onLocationSelect({ lat, lng, distance: realRoute.distKm, time: realRoute.timeMin, cost: realRoute.cost })
+    }
   }
 
   const handleGetLocation = () => {
@@ -133,7 +168,7 @@ export function MapPicker({ onLocationSelect }: MapPickerProps) {
                 <Popup>Tu ubicación de entrega</Popup>
               </Marker>
               {/* Línea azul punteada de conexión */}
-              <Polyline positions={[RESTAURANT_POS, userPos]} color="#3b82f6" weight={4} dashArray="5, 10" />
+              <Polyline positions={routeCoords} color="#3b82f6" weight={5} opacity={0.8} />
             </>
           )}
           

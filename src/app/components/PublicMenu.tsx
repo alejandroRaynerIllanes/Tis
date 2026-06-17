@@ -17,15 +17,20 @@ import { platosService } from '../services/platos.service'
 import { categoriesService } from '../services/categories.service'
 import { api, getStoredUser, getToken, setToken, setStoredUser } from '../services/api'
 import { authService } from '../services/auth.service'
+import { inventarioService } from '../services/inventario.service'
 import { toast } from 'sonner'
+import { useAppContext } from '../context/AppContext'
 import { useNavigate } from 'react-router'
 import { CheckoutStepper } from './CheckoutStepper'
+import { checkAvailability } from '../utils/checkDishAvailability'
 
 export function PublicMenu() {
   const [dishes, setDishes] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
   const [cart, setCart] = useState<{ product: any; quantity: number }[]>([])
+  const [recipes, setRecipes] = useState<any[]>([])
   const [isCartOpen, setIsCartOpen] = useState(false)
+  const [inventory, setInventory] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState<string>('all')
 
@@ -49,6 +54,7 @@ export function PublicMenu() {
   })
 
   const navigate = useNavigate()
+  const { socket } = useAppContext()
 
   // 🔥 FIX: Usamos estados reactivos para que el menú se actualice instantáneamente al loguearse
   const [currentUser, setCurrentUser] = useState(getStoredUser())
@@ -59,7 +65,7 @@ export function PublicMenu() {
       try {
         // 🔥 Como ya liberamos las rutas en el backend, podemos usar los servicios oficiales
         // Esto asegura que la URL base de Axios se aplique correctamente (adiós pantallas en blanco).
-        const [catsData, platsData] = await Promise.all([
+        const [catsData, platsData, invData, recipesData] = await Promise.all([
           categoriesService.getAll().catch((err) => {
             console.error('❌ ERROR REAL AL TRAER CATEGORÍAS:', err.message || err)
             return []
@@ -67,6 +73,14 @@ export function PublicMenu() {
           platosService.getAll().catch((err) => {
             console.error('❌ ERROR REAL AL TRAER PLATOS:', err.message || err)
             return []
+        }),
+        inventarioService.getInventarioEstado().catch((err) => {
+          console.error('❌ ERROR AL TRAER INVENTARIO:', err)
+          return []
+        }),
+        inventarioService.getRecetas().catch((err) => {
+          console.error('❌ ERROR AL TRAER RECETAS:', err)
+          return []
           })
         ])
 
@@ -75,6 +89,8 @@ export function PublicMenu() {
         console.log('📦 DATOS RECIBIDOS DE PLATOS:', platsData)
 
         setCategories(Array.isArray(catsData) ? catsData : [])
+        setInventory(Array.isArray(invData) ? invData : [])
+        setRecipes(Array.isArray(recipesData) ? recipesData : [])
 
         const validPlats = Array.isArray(platsData) ? platsData : []
         setDishes(
@@ -93,6 +109,25 @@ export function PublicMenu() {
     fetchData()
   }, [])
 
+  // Sincronización en tiempo real del inventario
+  useEffect(() => {
+    if (!socket) return
+
+    const handleInventoryUpdate = () => {
+      inventarioService.getInventarioEstado()
+        .then(setInventory)
+        .catch(err => console.error('[PublicMenu] Error reloading inventory:', err))
+      inventarioService.getRecetas()
+        .then(setRecipes)
+        .catch(err => console.error('[PublicMenu] Error reloading recipes:', err))
+    }
+
+    socket.on('inventario:actualizado', handleInventoryUpdate)
+    return () => {
+      socket.off('inventario:actualizado', handleInventoryUpdate)
+    }
+  }, [socket])
+
   // Reiniciar paso y pre-llenar datos del usuario cuando se abre el carrito
   useEffect(() => {
     if (isCartOpen) {
@@ -101,8 +136,8 @@ export function PublicMenu() {
   }, [isCartOpen, currentUser])
 
   const addToCart = (product: any) => {
-    if (product.disponible === false || product.estado === 'Agotado' || product.estado === false) {
-      toast.error('Este producto está agotado.')
+    if (!checkAvailability(product, recipes, inventory)) {
+      toast.error('Este plato no está disponible actualmente.')
       return
     }
     setCart((prev) => {
@@ -189,14 +224,22 @@ export function PublicMenu() {
       toast.error('Debes aceptar los términos y condiciones')
       return
     }
+
+    if (!/^\d+$/.test(registerForm.telefono)) {
+      toast.error('Ingrese un número de teléfono válido.')
+      return
+    }
+
     setAuthLoading(true)
     try {
       await api.post('/clientes/auth/register', {
         nombre: registerForm.nombre,
-        apellidos: registerForm.apellido,
+        apellido: registerForm.apellido,
         email: registerForm.email,
         telefono: registerForm.telefono,
-        password: registerForm.password
+        password: registerForm.password,
+        rol: 'Cliente',
+        estado: true
       })
       toast.success('Registro exitoso. Iniciando sesión...')
       // Nota: Si has completado la refactorización de SOLID, aquí deberías usar authService.loginClient
@@ -415,8 +458,7 @@ export function PublicMenu() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {filteredDishes.map((dish) => {
-            const isAvailable =
-              dish.disponible !== false && dish.estado !== 'Agotado' && dish.estado !== false
+            const isAvailable = checkAvailability(dish, recipes, inventory)
             return (
               <div
                 key={dish.id}
@@ -435,8 +477,8 @@ export function PublicMenu() {
                   />
                   {!isAvailable && (
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                      <span className="bg-red-600 text-white font-black px-3 py-1 rounded-md tracking-widest shadow-lg transform -rotate-12">
-                        AGOTADO
+                      <span className="bg-red-600 text-white font-black px-3 py-1 rounded-md tracking-widest shadow-lg transform -rotate-12 flex items-center gap-1">
+                        🔴 Agotado
                       </span>
                     </div>
                   )}
@@ -470,7 +512,7 @@ export function PublicMenu() {
                         : { background: '#F3F4F6', color: '#9CA3AF' }
                     }
                   >
-                    <Plus size={18} /> {isAvailable ? 'Agregar al pedido' : 'Agotado'}
+                    {isAvailable ? <Plus size={18} /> : null} {isAvailable ? 'Agregar al pedido' : 'Agotado'}
                   </button>
                 </div>
               </div>
@@ -721,9 +763,10 @@ export function PublicMenu() {
                     <input
                       type="tel"
                       value={registerForm.telefono}
-                      onChange={(e) =>
-                        setRegisterForm({ ...registerForm, telefono: e.target.value })
-                      }
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '')
+                        setRegisterForm({ ...registerForm, telefono: val })
+                      }}
                       className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none"
                     />
                   </div>

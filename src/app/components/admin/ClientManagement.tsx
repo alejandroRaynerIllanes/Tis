@@ -13,10 +13,9 @@ export function ClientManagement() {
   useEffect(() => {
     const fetchClients = async () => {
       try {
-        const res = await api.get<GlobalUser[]>('/usuarios')
-        const usersData = (res as any).data || res || []
-        const clientUsers = usersData.filter((u: GlobalUser) => u.rol === 'Cliente')
-        setClients(clientUsers)
+        const res = await api.get<GlobalUser[]>('/clientes')
+        const clientsData = (res as any).data || res || []
+        setClients(clientsData)
       } catch (error) {
         console.error('Error fetching clients', error)
         toast.error('Error al cargar clientes')
@@ -29,7 +28,7 @@ export function ClientManagement() {
 
   const stats = useMemo(() => {
     const registrados = clients.length
-    const activos = clients.filter(c => c.estado).length
+    const activos = clients.filter(c => c.estado !== false).length
     const frecuentes = 0 // Inicialmente 0, se conectará al módulo Delivery
     return { registrados, activos, frecuentes }
   }, [clients])
@@ -37,12 +36,12 @@ export function ClientManagement() {
   const filteredClients = useMemo(() => {
     return clients.filter(c => {
       const matchesSearch =
-        `${c.nombre} ${c.apellido || ''}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        `${c.nombre} ${(c as any).apellidos || c.apellido || ''}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (c.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (c.telefono || '').includes(searchTerm)
+        ((c as any).telefono || '').includes(searchTerm)
 
       let matchesFilter = true
-      if (filter === 'activos') matchesFilter = c.estado === true
+      if (filter === 'activos') matchesFilter = c.estado !== false
       if (filter === 'frecuentes') matchesFilter = false // Aún no implementado
 
       return matchesSearch && matchesFilter
@@ -52,7 +51,7 @@ export function ClientManagement() {
   const handleDeleteClient = async (id: string) => {
     if (window.confirm('¿Estás seguro de eliminar este cliente? Se revocará su acceso.')) {
       try {
-        await api.delete(`/usuarios/${id}`)
+        await api.delete(`/clientes/${id}`)
         setClients(prev => prev.filter(c => (c._id || c.id) !== id))
         toast.success('Cliente eliminado exitosamente')
       } catch (error) {
@@ -140,7 +139,7 @@ export function ClientManagement() {
                           <div className="w-10 h-10 rounded-full bg-[#FCE4D6] text-[#D96C4A] flex items-center justify-center font-bold">
                             {client.nombre?.charAt(0).toUpperCase() || 'U'}
                           </div>
-                          <span className="font-bold text-[#4B2E2D]">{client.nombre} {client.apellido}</span>
+                          <span className="font-bold text-[#4B2E2D]">{client.nombre} {(client as any).apellidos || client.apellido || ''}</span>
                         </div>
                       </td>
                       <td className="py-4 px-6">
@@ -148,8 +147,8 @@ export function ClientManagement() {
                         <p className="text-xs text-gray-500">{(client as any).telefono || 'Sin teléfono'}</p>
                       </td>
                       <td className="py-4 px-6">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${client.estado ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
-                          {client.estado ? 'Activo' : 'Inactivo'}
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${client.estado !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
+                          {client.estado !== false ? 'Activo' : 'Inactivo'}
                         </span>
                       </td>
                       <td className="py-4 px-6 text-sm text-gray-500 font-medium">

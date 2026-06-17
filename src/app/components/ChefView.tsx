@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ChefHat, Clock, Play, CheckCircle2, Flame, AlertCircle, LogOut, User } from 'lucide-react'
+import { ChefHat, Clock, Play, CheckCircle2, Flame, AlertCircle, LogOut, User, Bike, MapPin } from 'lucide-react'
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router'
 import { getStoredUser, api } from '../services/api'
@@ -26,6 +26,7 @@ interface Order {
   status: OrderStatus
   items: OrderItem[]
   rawId?: string
+  isDelivery?: boolean
 }
 
 export function ChefView() {
@@ -47,7 +48,7 @@ export function ChefView() {
         .slice(-4)
         .toUpperCase()}`,
     rawId: o._id,
-    table: typeof o.mesa === 'object' && o.mesa !== null ? (o.mesa.numero || o.mesa.name || 'Mesa ?') : 'Mesa ?',
+    table: typeof o.mesa === 'object' && o.mesa !== null ? (o.mesa.numero || o.mesa.name || 'Mesa ?') : ((o as any).metodoEntrega === 'delivery' ? 'Delivery' : 'Mesa ?'),
     tableId: typeof o.mesa === 'object' && o.mesa !== null ? o.mesa._id || o.mesa.id : String(o.mesa || ''),
     waiter: typeof o.usuario === 'object' && o.usuario !== null ? `${o.usuario.nombre} ${o.usuario.apellido || ''}`.trim() : 'Mesero',
     time: new Date(o.fechaHora || o.createdAt || Date.now()).toLocaleTimeString('es-ES', {
@@ -60,6 +61,7 @@ export function ChefView() {
         : o.estado === 'EN_PREPARACION'
           ? 'En preparación'
           : 'Listo',
+    isDelivery: (o as any).metodoEntrega === 'delivery',
     items: (o.detalles || []).map((d: OrderDetail, idx: number) => ({
       id: typeof d.plato === 'object' && d.plato !== null ? d.plato._id || d.plato.id || String(idx) : String(d.plato || idx),
       name: d.nombre || (typeof d.plato === 'object' && d.plato !== null ? d.plato.nombre : 'Plato') || 'Plato',
@@ -222,25 +224,34 @@ export function ChefView() {
           : order.status === 'En preparación'
             ? 'border-l-[#D0543A]'
             : 'border-l-emerald-500 opacity-60 hover:opacity-100'
-      }`}
+      } ${order.isDelivery ? 'ring-2 ring-blue-200 ring-offset-2 bg-blue-50/10' : ''}`}
     >
       {/* Cabecera de la tarjeta */}
-      <div className="flex justify-between items-start border-b border-[#FCE4D6] pb-3">
+      <div className={`flex justify-between items-start border-b ${order.isDelivery ? 'border-blue-100' : 'border-[#FCE4D6]'} pb-3`}>
         <div>
-          <p className="text-[10px] font-bold text-[#4B2E2D]/50 uppercase tracking-widest mb-1">
-            Identificador
-          </p>
-          <div className="flex items-center gap-2 mb-1.5">
+          <div className="flex items-center gap-2 mb-1">
+            <p className="text-[10px] font-bold text-[#4B2E2D]/50 uppercase tracking-widest">
+              Identificador
+            </p>
+            {order.isDelivery && (
+              <span className="bg-blue-100 text-blue-700 text-[9px] font-black px-2 py-0.5 rounded-md uppercase flex items-center gap-1">
+                <Bike size={10} /> Delivery
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 mb-1">
             <h3 className="font-black text-2xl sm:text-3xl text-[#D0543A] leading-none tracking-tight">
               {order.id}
             </h3>
           </div>
-          <p className="text-sm font-bold text-[#4B2E2D]/60">{order.table}</p>
+          <p className={`text-sm font-bold flex items-center gap-1 ${order.isDelivery ? 'text-blue-600' : 'text-[#4B2E2D]/60'}`}>
+            {order.isDelivery ? <MapPin size={14} /> : null} {order.table}
+          </p>
           <p className="text-xs font-semibold text-[#4B2E2D]/50 flex items-center gap-1 mt-0.5">
-            <User size={12} /> {order.waiter}
+            <User size={12} /> {order.isDelivery ? 'Cliente / App' : order.waiter}
           </p>
         </div>
-        <div className="flex items-center gap-1 bg-[#FCE4D6]/50 px-2 py-1 rounded-lg text-[#4B2E2D]/80">
+        <div className={`flex items-center gap-1 px-2 py-1 rounded-lg ${order.isDelivery ? 'bg-blue-50 text-blue-700' : 'bg-[#FCE4D6]/50 text-[#4B2E2D]/80'}`}>
           <Clock size={14} />
           <span className="text-xs font-bold">{order.time}</span>
         </div>
@@ -351,7 +362,7 @@ export function ChefView() {
                         <span className="text-xs font-semibold text-red-800/60">Stock:</span>
                         <div className="text-right">
                           <span className="text-lg font-black text-red-600">{ing.stockActual}</span>
-                          <span className="text-xs font-bold text-red-600/80 ml-1">{ing.unidad || ing.unidadMedida || ''}</span>
+                          <span className="text-xs font-bold text-red-600/80 ml-1">{ing.unidad}</span>
                         </div>
                       </div>
                     </div>
@@ -376,7 +387,7 @@ export function ChefView() {
                         <span className="text-xs font-semibold text-amber-800/60">Stock:</span>
                         <div className="text-right">
                           <span className="text-lg font-black text-amber-600">{ing.stockActual}</span>
-                          <span className="text-xs font-bold text-amber-600/80 ml-1">{ing.unidad || ing.unidadMedida || ''}</span>
+                          <span className="text-xs font-bold text-amber-600/80 ml-1">{ing.unidad}</span>
                         </div>
                       </div>
                     </div>
@@ -401,7 +412,7 @@ export function ChefView() {
                         <span className="text-xs font-semibold text-emerald-800/60">Stock:</span>
                         <div className="text-right">
                           <span className="text-lg font-black text-emerald-600">{ing.stockActual}</span>
-                          <span className="text-xs font-bold text-emerald-600/80 ml-1">{ing.unidad || ing.unidadMedida || ''}</span>
+                          <span className="text-xs font-bold text-emerald-600/80 ml-1">{ing.unidad}</span>
                         </div>
                       </div>
                     </div>

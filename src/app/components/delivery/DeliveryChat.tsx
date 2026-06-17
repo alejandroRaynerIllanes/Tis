@@ -1,30 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { MessageSquare, Send, X } from 'lucide-react'
 import type { ChatMessage } from '../../types'
-import type { Socket } from 'socket.io-client'
 
 interface DeliveryChatProps {
   pedidoId: string
-  socket: Socket | null
+  messages: ChatMessage[]
+  onSendMessage: (text: string) => void
   onClose: () => void
 }
 
-export function DeliveryChat({ pedidoId, socket, onClose }: DeliveryChatProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+export function DeliveryChat({ pedidoId, messages, onSendMessage, onClose }: DeliveryChatProps) {
   const [draft, setDraft] = useState('')
   const endRef = useRef<HTMLDivElement>(null)
-
-  // Escuchar mensajes entrantes mientras el chat está abierto
-  useEffect(() => {
-    if (!socket) return
-    const handleNew = (msg: ChatMessage) => {
-      if (msg.pedidoId === pedidoId) {
-        setMessages((prev) => [...prev, msg])
-      }
-    }
-    socket.on('chat:nuevo_mensaje', handleNew)
-    return () => { socket.off('chat:nuevo_mensaje', handleNew) }
-  }, [socket, pedidoId])
 
   // Auto-scroll al último mensaje
   useEffect(() => {
@@ -32,15 +19,8 @@ export function DeliveryChat({ pedidoId, socket, onClose }: DeliveryChatProps) {
   }, [messages])
 
   const handleSend = () => {
-    if (!draft.trim() || !socket) return
-    const msg: ChatMessage = {
-      pedidoId,
-      sender: 'Repartidor',
-      text: draft.trim(),
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    }
-    socket.emit('chat:enviar_mensaje', msg)
-    setMessages((prev) => [...prev, msg])
+    if (!draft.trim()) return
+    onSendMessage(draft)
     setDraft('')
   }
 

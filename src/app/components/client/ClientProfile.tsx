@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { User as UserType, Address, Order, OrderDetail, ChatMessage } from '../../types'
 import { usersService } from '../../services/users.service'
 import { useAppContext } from '../../context/AppContext'
+import { DeliveryMap } from '../delivery/DeliveryMap'
 
 export function ClientProfile() {
   const navigate = useNavigate()
@@ -31,6 +32,7 @@ export function ClientProfile() {
   const [newAddress, setNewAddress] = useState({ alias: 'Casa', detalle: '', referencia: '' })
 
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
+  const [activeMapId, setActiveMapId] = useState<string | null>(null)
   const [chatMessage, setChatMessage] = useState('')
   const [chatMessages, setChatMessages] = useState<Record<string, ChatMessage[]>>({})
   const chatEndRef = useRef<HTMLDivElement>(null)
@@ -67,17 +69,32 @@ export function ClientProfile() {
     }
     loadData()
 
-    if(!socket) return;
+  }, [user?.id])
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleHistorial = (data: { pedidoId: string; mensajes: ChatMessage[] }) => {
+      setChatMessages((prev) => ({ ...prev, [data.pedidoId]: data.mensajes }))
+    }
     const handleNewMessage = (msg: ChatMessage) => {
         setChatMessages(prev => ({ ...prev, [msg.pedidoId]: [...(prev[msg.pedidoId] || []), msg] }))
         if(msg.sender === 'Repartidor') toast.info('Nuevo mensaje del repartidor')
     }
+    socket.on('chat:historial', handleHistorial)
     socket.on('chat:nuevo_mensaje', handleNewMessage)
     
     return () => {
+      socket.off('chat:historial', handleHistorial)
       socket.off('chat:nuevo_mensaje', handleNewMessage)
     }
-  }, [user?.id])
+  }, [socket])
+
+  useEffect(() => {
+    if (activeChatId && socket) {
+      socket.emit('join_order_room', activeChatId)
+    }
+  }, [activeChatId, socket])
 
   const handleUpdateProfile = async () => {
     if (!profileData.nombre.trim()) return toast.error('El nombre es obligatorio')
@@ -167,6 +184,58 @@ export function ClientProfile() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chatMessages, activeChatId])
 
+  const activeOrders = history.filter(o => !['CERRADO', 'CANCELADO'].includes(o.estado))
+  const pastOrders = history.filter(o => ['CERRADO', 'CANCELADO'].includes(o.estado))
+  const activeOrderDetails = history.find(o => o._id === activeChatId)
+
+  const renderOrderCard = (order: Order, isActive: boolean) => (
+    <div key={order._id} className={`border rounded-2xl p-5 hover:shadow-md transition-shadow ${isActive ? 'border-[#D96C4A] bg-[#FFF5F0]' : 'border-gray-100'}`}>
+      <div className="flex justify-between items-start mb-3">
+        <div>
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{new Date(order.fechaHoraBolivia || order.createdAt).toLocaleDateString()}</span>
+          <h4 className="font-black text-lg text-[#4B2E2D]">{order.codigo}</h4>
+        </div>
+        <span className={`px-3 py-1 rounded-full text-xs font-black uppercase ${order.estado === 'CERRADO' || order.estado === 'ENTREGADO' ? 'bg-emerald-100 text-emerald-700' : order.estado === 'CANCELADO' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700'}`}>
+          {order.estado === 'CERRADO' ? 'Pagado' : order.estado}
+        </span>
+      </div>
+      
+      <div className="bg-white/60 rounded-xl p-3 mb-3 space-y-1">
+        {order.detalles?.map((item: any, idx: number) => (
+          <div key={idx} className="flex justify-between text-sm">
+            <span className="font-medium text-gray-600"><span className="text-gray-400 font-bold mr-1">{item.cantidad}x</span> {item.plato?.nombre || 'Plato'}</span>
+            <span className="font-bold text-gray-700">Bs. {(item.subtotal || item.cantidad * (item.precioUnitario || item.plato?.precio)).toFixed(2)}</span>
+          </div>
+        ))}
+      </div>
+      
+      <div className="flex justify-between items-center pt-2">
+        <span className="text-xs font-bold text-gray-500 uppercase">Total Pagado</span>
+        <span className="text-xl font-black text-[#D96C4A]">Bs. {(order.total || 0).toFixed(2)}</span>
+      </div>
+      {(order as any).metodoEntrega === 'delivery' && isActive && (
+        <>
+          <div className="flex gap-2 mt-4">
+            {(order as any).coordenadasEntrega && (
+              <button onClick={() => setActiveMapId(activeMapId === order._id ? null : (order._id || null))} className="flex-1 py-3 bg-blue-50 text-blue-600 rounded-xl font-black flex items-center justify-center gap-2 hover:bg-blue-100 transition-colors shadow-sm text-sm">
+                <MapPin size={18} /> {activeMapId === order._id ? 'Ocultar Mapa' : 'Seguimiento GPS'}
+              </button>
+            )}
+            <button onClick={() => setActiveChatId(order._id || null)} className="flex-1 py-3 bg-[#D96C4A] hover:bg-[#C25838] text-white rounded-xl font-black flex items-center justify-center gap-2 transition-all shadow-lg shadow-[#D96C4A]/30 text-sm">
+              <MessageSquare size={18} /> Chat Delivery
+            </button>
+          </div>
+          
+          {activeMapId === order._id && (order as any).coordenadasEntrega && (
+            <div className="h-56 w-full mt-4 rounded-2xl overflow-hidden border-2 border-blue-100 relative shadow-inner z-0 animate-in fade-in slide-in-from-top-2">
+              <DeliveryMap destination={[(order as any).coordenadasEntrega.lat, (order as any).coordenadasEntrega.lng]} />
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center">
@@ -176,10 +245,25 @@ export function ClientProfile() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF7F2] font-sans text-gray-800">
+    <div className="min-h-screen font-sans text-gray-800 relative">
+      {/* Fondo con imagen elegante */}
+      <div 
+        className="fixed inset-0 z-0 pointer-events-none" 
+        style={{
+          backgroundImage: 'url(https://images.unsplash.com/photo-1414235077428-338989a2e8c0?q=80&w=2000)',
+          backgroundSize: 'cover', 
+          backgroundPosition: 'center',
+          backgroundAttachment: 'fixed',
+          filter: 'brightness(0.5)'
+        }}
+      />
+      <div className="absolute inset-0 bg-gradient-to-b from-[#4B2E2D]/80 to-black/80 z-0 pointer-events-none" />
+      
+      <div className="relative z-10 flex flex-col min-h-screen">
+
       {/* Header Simple */}
-      <header className="bg-white shadow-sm sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+      <header className="bg-white/95 backdrop-blur-md shadow-sm sticky top-0 z-40 border-b border-[#E0D0C5]/50">
+        <div className="max-w-7xl w-full mx-auto px-6 h-20 flex items-center justify-between">
           <button onClick={() => navigate('/')} className="flex items-center gap-2 text-gray-500 hover:text-[#D96C4A] font-bold transition-colors">
             <ArrowLeft size={20} /> Volver al Menú
           </button>
@@ -188,9 +272,9 @@ export function ClientProfile() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-8 flex flex-col md:flex-row gap-8">
+      <main className="max-w-7xl w-full mx-auto px-6 py-10 flex flex-col lg:flex-row gap-10">
         {/* Sidebar */}
-        <aside className="w-full md:w-80 shrink-0">
+        <aside className="w-full lg:w-80 xl:w-96 shrink-0">
           {/* Tarjeta de Usuario */}
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#E0D0C5] mb-6 text-center">
             <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#4B2E2D] to-[#D96C4A] text-white flex items-center justify-center font-black text-4xl shadow-xl mx-auto mb-4">
@@ -235,7 +319,7 @@ export function ClientProfile() {
           {activeTab === 'perfil' && (
             <div className="bg-white rounded-2xl shadow-sm border border-[#E0D0C5] p-6 sm:p-8 animate-in fade-in">
               <h3 className="text-2xl font-black text-[#4B2E2D] mb-6">Editar perfil</h3>
-              <div className="space-y-5 max-w-lg">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1.5">Nombre</label>
                   <input
@@ -279,13 +363,13 @@ export function ClientProfile() {
                       setOriginalProfileData({ ...profileData });
                       setIsEditing(true);
                     }}
-                    className="mt-4 px-6 py-3 bg-[#4B2E2D] hover:bg-[#3A2222] text-white font-bold rounded-xl shadow-lg transition-all flex items-center gap-2"
+                    className="mt-4 px-6 py-3 bg-[#4B2E2D] hover:bg-[#3A2222] text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center md:justify-start gap-2 md:col-span-2 w-fit"
                   >
                     <Edit2 size={18} />
                     Editar información
                   </button>
                 ) : (
-                  <div className="flex flex-wrap gap-3 mt-4">
+                  <div className="flex flex-wrap gap-3 mt-4 md:col-span-2">
                     <button
                       onClick={handleUpdateProfile}
                       disabled={saving}
@@ -345,9 +429,9 @@ export function ClientProfile() {
                 </form>
               )}
 
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 {addresses.length === 0 ? (
-                  <div className="text-center py-10 border-2 border-dashed border-gray-200 rounded-2xl">
+                  <div className="text-center py-10 border-2 border-dashed border-gray-200 rounded-2xl xl:col-span-2">
                     <MapPin size={40} className="mx-auto text-gray-300 mb-2" />
                     <p className="font-bold text-gray-500">No tienes direcciones guardadas.</p>
                   </div>
@@ -379,41 +463,32 @@ export function ClientProfile() {
             <div className="bg-white rounded-2xl shadow-sm border border-[#E0D0C5] p-6 sm:p-8 animate-in fade-in">
               <h3 className="text-2xl font-black text-[#4B2E2D] mb-6">Historial de pedidos ({history.length})</h3>
               
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                 {history.length === 0 ? (
-                  <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-2xl">
+                  <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-2xl xl:col-span-2">
                     <Package size={48} className="mx-auto text-gray-300 mb-3" />
                     <p className="font-bold text-gray-500">Sin pedidos en el historial.</p>
                     <p className="text-sm text-gray-400 mt-1">Tus compras aparecerán aquí.</p>
                   </div>
                 ) : (
-                  history.map((order) => (
-                    <div key={order._id} className="border border-gray-100 rounded-2xl p-5 hover:shadow-md transition-shadow">
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{new Date(order.fechaHoraBolivia || order.createdAt).toLocaleDateString()}</span>
-                          <h4 className="font-black text-lg text-[#4B2E2D]">{order.codigo}</h4>
+                  <>
+                    {activeOrders.length > 0 && (
+                      <div className="xl:col-span-2 mb-2">
+                        <h4 className="font-bold text-lg text-[#D96C4A] mb-3 flex items-center gap-2">Pedidos en curso</h4>
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                          {activeOrders.map(order => renderOrderCard(order, true))}
                         </div>
-                        <span className={`px-3 py-1 rounded-full text-xs font-black uppercase ${order.estado === 'CERRADO' || order.estado === 'ENTREGADO' ? 'bg-emerald-100 text-emerald-700' : order.estado === 'CANCELADO' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700'}`}>
-                          {order.estado === 'CERRADO' ? 'Pagado' : order.estado}
-                        </span>
                       </div>
-                      
-                      <div className="bg-gray-50 rounded-xl p-3 mb-3 space-y-1"> {/* Use OrderDetail type */}
-                        {order.detalles?.map((item: any, idx: number) => (
-                          <div key={idx} className="flex justify-between text-sm">
-                            <span className="font-medium text-gray-600"><span className="text-gray-400 font-bold mr-1">{item.cantidad}x</span> {item.plato?.nombre || 'Plato'}</span>
-                            <span className="font-bold text-gray-700">Bs. {(item.subtotal || item.cantidad * (item.precioUnitario || item.plato?.precio)).toFixed(2)}</span>
-                          </div>
-                        ))}
+                    )}
+                    {pastOrders.length > 0 && (
+                      <div className="xl:col-span-2">
+                        <h4 className="font-bold text-lg text-gray-500 mb-3 flex items-center gap-2 mt-4">Pedidos anteriores</h4>
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                          {pastOrders.map(order => renderOrderCard(order, false))}
+                        </div>
                       </div>
-                      
-                      <div className="flex justify-between items-center pt-2">
-                        <span className="text-xs font-bold text-gray-500 uppercase">Total Pagado</span>
-                        <span className="text-xl font-black text-[#D96C4A]">Bs. {(order.total || 0).toFixed(2)}</span>
-                      </div>
-                    </div>
-                  ))
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -423,12 +498,12 @@ export function ClientProfile() {
           {activeTab === 'seguridad' && (
             <div className="bg-white rounded-2xl shadow-sm border border-[#E0D0C5] p-6 sm:p-8 animate-in fade-in">
               <h3 className="text-2xl font-black text-[#4B2E2D] mb-6">Cambiar contraseña</h3>
-              <form onSubmit={handleUpdatePassword} className="space-y-5 max-w-lg">
-                <div>
+              <form onSubmit={handleUpdatePassword} className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
+                <div className="md:col-span-2">
                   <label className="block text-sm font-bold text-gray-700 mb-1.5">Contraseña actual</label>
                   <input type="password" required value={passForm.current} onChange={e => setPassForm({...passForm, current: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D96C4A]/50" />
                 </div>
-                <div className="pt-2">
+                <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1.5">Nueva contraseña</label>
                   <input type="password" required minLength={8} value={passForm.new} onChange={e => setPassForm({...passForm, new: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D96C4A]/50" />
                 </div>
@@ -436,7 +511,7 @@ export function ClientProfile() {
                   <label className="block text-sm font-bold text-gray-700 mb-1.5">Confirmar nueva contraseña</label>
                   <input type="password" required minLength={8} value={passForm.confirm} onChange={e => setPassForm({...passForm, confirm: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D96C4A]/50" />
                 </div>
-                <button type="submit" disabled={saving} className="mt-4 px-6 py-3 bg-[#4B2E2D] text-white font-bold rounded-xl shadow-md hover:bg-[#3A2222] transition-all flex items-center gap-2 disabled:opacity-50">
+                <button type="submit" disabled={saving} className="mt-4 px-6 py-3 bg-[#4B2E2D] text-white font-bold rounded-xl shadow-md hover:bg-[#3A2222] transition-all flex items-center justify-center md:justify-start gap-2 disabled:opacity-50 md:col-span-2 w-fit">
                   {saving ? <Loader2 size={18} className="animate-spin"/> : <Shield size={18} />}
                   Actualizar contraseña
                 </button>
@@ -453,7 +528,7 @@ export function ClientProfile() {
               <div className="bg-gradient-to-r from-[#4B2E2D] to-[#6B3E2E] p-5 flex justify-between items-center text-white">
                   <div className="flex items-center gap-3">
                       <MessageSquare size={22}/>
-                      <span className="font-black text-lg">Chat con Repartidor</span>
+                      <span className="font-black text-lg">Chat con Repartidor {activeOrderDetails ? `(${activeOrderDetails.codigo})` : ''}</span>
                   </div>
                   <button onClick={() => setActiveChatId(null)} className="p-1.5 hover:bg-white/20 rounded-full transition-colors"><X size={20}/></button>
               </div>
@@ -484,6 +559,7 @@ export function ClientProfile() {
           </div>
       </div>
   )}
+      </div>
     </div>
   )
 }

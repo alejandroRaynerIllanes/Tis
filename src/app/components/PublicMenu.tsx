@@ -37,7 +37,6 @@ export function PublicMenu() {
 
   // Formularios
   const [loginForm, setLoginForm] = useState({ email: '', password: '' })
-  const [loginTab, setLoginTab] = useState<'staff' | 'client'>('client')
   const [showPassword, setShowPassword] = useState(false)
   const [registerForm, setRegisterForm] = useState({
     nombre: '',
@@ -153,10 +152,7 @@ export function PublicMenu() {
     e.preventDefault()
     setAuthLoading(true)
     try {
-      const { role, token, user } =
-        loginTab === 'staff'
-          ? await authService.loginStaff(loginForm.email, loginForm.password)
-          : await authService.loginClient(loginForm.email, loginForm.password)
+      const { role, token, user } = await authService.login(loginForm.email, loginForm.password)
       setToken(token)
       setStoredUser(user)
 
@@ -622,30 +618,6 @@ export function PublicMenu() {
                   <p className="text-sm text-gray-500 mt-1">Inicia sesión para realizar pedidos</p>
                 </div>
 
-                {/* Selector de Tabs */}
-                <div className="flex bg-[#F5E6D3] p-1 rounded-xl mb-6">
-                  <button
-                    type="button"
-                    onClick={() => setLoginTab('staff')}
-                    className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
-                      loginTab === 'staff' ? 'bg-white shadow-sm' : 'hover:bg-white/50'
-                    }`}
-                    style={{ color: loginTab === 'staff' ? '#4B2E2D' : '#6B3E2E' }}
-                  >
-                    Soy Personal
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLoginTab('client')}
-                    className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
-                      loginTab === 'client' ? 'bg-white shadow-sm' : 'hover:bg-white/50'
-                    }`}
-                    style={{ color: loginTab === 'client' ? '#4B2E2D' : '#6B3E2E' }}
-                  >
-                    Soy Cliente
-                  </button>
-                </div>
-
                 <form onSubmit={handleLoginSubmit} className="space-y-4">
                   <div>
                     <label className="block text-sm font-bold text-[#4B2E2D] mb-1">
@@ -688,18 +660,16 @@ export function PublicMenu() {
                     {authLoading ? 'Verificando...' : 'Iniciar Sesión'}
                   </button>
                 </form>
-                {loginTab === 'client' && (
-                  <p className="text-center mt-6 text-sm text-gray-600">
-                    ¿No tienes cuenta?{' '}
-                    <button
-                      type="button"
-                      onClick={() => setShowAuthModal('register')}
-                      className="text-[#D96C4A] font-bold hover:underline"
-                    >
-                      Regístrate aquí
-                    </button>
-                  </p>
-                )}
+                <p className="text-center mt-6 text-sm text-gray-600">
+                  ¿No tienes cuenta?{' '}
+                  <button
+                    type="button"
+                    onClick={() => setShowAuthModal('register')}
+                    className="text-[#D96C4A] font-bold hover:underline"
+                  >
+                    Regístrate aquí
+                  </button>
+                </p>
               </>
             ) : (
               <>

@@ -7,7 +7,6 @@ import { toast } from 'sonner'
 import { useAuth } from '../hooks/useAuth'
 
 export function Login() {
-  const [activeTab, setActiveTab] = useState<'staff' | 'client'>('staff')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -30,10 +29,7 @@ export function Login() {
     setIsLoading(true)
 
     try {
-      // Obtenemos los datos completos invocando el método según el tab
-      const { role, token, user } = activeTab === 'staff'
-        ? await authService.loginStaff(username.trim(), password)
-        : await authService.loginClient(username.trim(), password)
+      const { role, token, user } = await authService.login(username.trim(), password)
 
       // Guardamos la sesión usando las utilidades de la API
       setToken(token)
@@ -101,34 +97,6 @@ export function Login() {
             Bienvenido · Inicia sesión para continuar
           </p>
 
-          {/* Selector de Tabs */}
-          <div className="flex bg-[#F5E6D3] p-1 rounded-xl mb-6">
-            <button
-              type="button"
-              onClick={() => setActiveTab('staff')}
-              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
-                activeTab === 'staff'
-                  ? 'bg-white shadow-sm'
-                  : 'hover:bg-white/50'
-              }`}
-              style={{ color: activeTab === 'staff' ? '#4B2E2D' : '#6B3E2E' }}
-            >
-              Soy Personal
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('client')}
-              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
-                activeTab === 'client'
-                  ? 'bg-white shadow-sm'
-                  : 'hover:bg-white/50'
-              }`}
-              style={{ color: activeTab === 'client' ? '#4B2E2D' : '#6B3E2E' }}
-            >
-              Soy Cliente
-            </button>
-          </div>
-
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
               <label
@@ -136,7 +104,7 @@ export function Login() {
                 className="block text-sm font-semibold mb-2"
                 style={{ color: '#4B2E2D' }}
               >
-                Usuario
+                Correo Electrónico
               </label>
               <div className="relative">
                 <User
@@ -146,7 +114,7 @@ export function Login() {
                 />
                 <input
                   id="username"
-                  type="text"
+                  type="email"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full pl-11 pr-4 py-3 rounded-lg font-medium transition-all duration-200 focus:outline-none"
@@ -155,9 +123,9 @@ export function Login() {
                     border: '2px solid rgba(217,108,74,0.25)',
                     color: '#4B2E2D'
                   }}
-                  placeholder="Ingresa tu usuario"
+                  placeholder="Ingresa tu correo electrónico"
                   disabled={isLoading}
-                  autoComplete="username"
+                  autoComplete="email"
                 />
               </div>
             </div>

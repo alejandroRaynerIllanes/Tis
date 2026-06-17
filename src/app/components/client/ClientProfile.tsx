@@ -15,9 +15,11 @@ export function ClientProfile() {
   const [activeTab, setActiveTab] = useState<'perfil' | 'direcciones' | 'historial' | 'seguridad'>('perfil')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [originalProfileData, setOriginalProfileData] = useState({ nombre: '', apellidos: '', email: '', telefono: '' })
 
   // Data
-  const [profileData, setProfileData] = useState({ nombre: '', email: '', telefono: '' })
+  const [profileData, setProfileData] = useState({ nombre: '', apellidos: '', email: '', telefono: '' })
   const [addresses, setAddresses] = useState<Address[]>([])
   const [history, setHistory] = useState<Order[]>([])
   
@@ -37,10 +39,17 @@ export function ClientProfile() {
     const loadData = async () => {
       if (!user?.id || !getToken()) return
       try {
-        // Obtener perfil actualizado desde el endpoint de sesión actual
-        const me = await usersService.getProfile();
+        // Obtener perfil actualizado desde el endpoint de clientes
+        let me: any = user;
+        try {
+          const res: any = await api.get(`/clientes/${user.id}`);
+          me = res.data || res;
+        } catch (fetchErr) {
+          console.warn('Could not fetch updated profile, using local storage user data.', fetchErr);
+        }
         setProfileData({ 
           nombre: me.nombre || '', 
+          apellidos: me.apellidos || me.apellido || '',
           email: me.email || '', 
           telefono: me.telefono || '' 
         })
@@ -74,9 +83,14 @@ export function ClientProfile() {
     if (!profileData.nombre.trim()) return toast.error('El nombre es obligatorio')
     setSaving(true)
     try {
-      await api.put(`/usuarios/${user?.id}`, { nombre: profileData.nombre, telefono: profileData.telefono })
+      await api.put(`/clientes/${user?.id}`, { 
+        nombre: profileData.nombre, 
+        apellidos: profileData.apellidos,
+        telefono: profileData.telefono 
+      })
       toast.success('Perfil actualizado correctamente') // Use UserType for setStoredUser
-      setStoredUser({ ...user, nombre: profileData.nombre, telefono: profileData.telefono } as any)
+      setStoredUser({ ...user, nombre: profileData.nombre, apellidos: profileData.apellidos, telefono: profileData.telefono } as any)
+      setIsEditing(false)
     } catch (e: any) {
       toast.error(e.message || 'Error al actualizar el perfil')
     } finally {
@@ -91,7 +105,7 @@ export function ClientProfile() {
     
     setSaving(true)
     try {
-      await api.put(`/usuarios/${user?.id}`, { password: passForm.new })
+      await api.put(`/clientes/${user?.id}`, { password: passForm.new })
       toast.success('Contraseña actualizada correctamente')
       setPassForm({ current: '', new: '', confirm: '' })
     } catch (e: any) {
@@ -108,7 +122,7 @@ export function ClientProfile() {
     setSaving(true)
     const updatedAddresses = [...addresses, { id: Date.now().toString(), ...newAddress }]
     try {
-      await api.put(`/usuarios/${user?.id}`, { direcciones: updatedAddresses })
+      await api.put(`/clientes/${user?.id}`, { direcciones: updatedAddresses })
       setAddresses(updatedAddresses)
       setShowAddAddress(false)
       setNewAddress({ alias: 'Casa', detalle: '', referencia: '' })
@@ -123,7 +137,7 @@ export function ClientProfile() {
   const handleDeleteAddress = async (id: string) => {
     const updatedAddresses = addresses.filter(a => a.id !== id)
     try {
-      await api.put(`/usuarios/${user?.id}`, { direcciones: updatedAddresses })
+      await api.put(`/clientes/${user?.id}`, { direcciones: updatedAddresses })
       setAddresses(updatedAddresses)
       toast.success('Dirección eliminada')
     } catch (e) {
@@ -200,7 +214,10 @@ export function ClientProfile() {
             ].map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => {
+                  setActiveTab(tab.id as any)
+                  setIsEditing(false)
+                }}
                 className={`flex items-center gap-3 px-6 py-4 text-sm font-bold transition-all ${activeTab === tab.id ? 'bg-[#FFF5F0] text-[#D96C4A] border-l-4 border-[#D96C4A]' : 'text-gray-500 hover:bg-gray-50 hover:text-[#4B2E2D] border-l-4 border-transparent'}`}
               >
                 {tab.icon} {tab.label}
@@ -220,8 +237,24 @@ export function ClientProfile() {
               <h3 className="text-2xl font-black text-[#4B2E2D] mb-6">Editar perfil</h3>
               <div className="space-y-5 max-w-lg">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Nombre completo</label>
-                  <input type="text" value={profileData.nombre} onChange={e => setProfileData({...profileData, nombre: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D96C4A]/50 font-medium" />
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Nombre</label>
+                  <input
+                    type="text"
+                    disabled={!isEditing}
+                    value={profileData.nombre}
+                    onChange={e => setProfileData({...profileData, nombre: e.target.value})}
+                    className={`w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D96C4A]/50 font-medium transition-all ${!isEditing ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-gray-50'}`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Apellidos</label>
+                  <input
+                    type="text"
+                    disabled={!isEditing}
+                    value={profileData.apellidos}
+                    onChange={e => setProfileData({...profileData, apellidos: e.target.value})}
+                    className={`w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D96C4A]/50 font-medium transition-all ${!isEditing ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-gray-50'}`}
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1.5">Correo electrónico</label>
@@ -230,12 +263,50 @@ export function ClientProfile() {
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1.5">Teléfono</label>
-                  <input type="tel" value={profileData.telefono} onChange={e => setProfileData({...profileData, telefono: e.target.value})} placeholder="Ej: 62729459" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D96C4A]/50 font-medium" />
+                  <input
+                    type="tel"
+                    disabled={!isEditing}
+                    value={profileData.telefono}
+                    onChange={e => setProfileData({...profileData, telefono: e.target.value})}
+                    placeholder="Ej: 62729459"
+                    className={`w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D96C4A]/50 font-medium transition-all ${!isEditing ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-gray-50'}`}
+                  />
                 </div>
-                <button onClick={handleUpdateProfile} disabled={saving} className="mt-4 px-6 py-3 bg-[#D96C4A] text-white font-bold rounded-xl shadow-lg hover:bg-[#C25838] transition-all flex items-center gap-2 disabled:opacity-50">
-                  {saving ? <Loader2 size={18} className="animate-spin"/> : <Save size={18} />}
-                  Guardar cambios
-                </button>
+
+                {!isEditing ? (
+                  <button
+                    onClick={() => {
+                      setOriginalProfileData({ ...profileData });
+                      setIsEditing(true);
+                    }}
+                    className="mt-4 px-6 py-3 bg-[#4B2E2D] hover:bg-[#3A2222] text-white font-bold rounded-xl shadow-lg transition-all flex items-center gap-2"
+                  >
+                    <Edit2 size={18} />
+                    Editar información
+                  </button>
+                ) : (
+                  <div className="flex flex-wrap gap-3 mt-4">
+                    <button
+                      onClick={handleUpdateProfile}
+                      disabled={saving}
+                      className="px-6 py-3 bg-[#D96C4A] text-white font-bold rounded-xl shadow-lg hover:bg-[#C25838] transition-all flex items-center gap-2 disabled:opacity-50"
+                    >
+                      {saving ? <Loader2 size={18} className="animate-spin"/> : <Save size={18} />}
+                      Guardar cambios
+                    </button>
+                    <button
+                      onClick={() => {
+                        setProfileData({ ...originalProfileData });
+                        setIsEditing(false);
+                      }}
+                      disabled={saving}
+                      className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-xl transition-all flex items-center gap-2"
+                    >
+                      <X size={18} />
+                      Cancelar
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}

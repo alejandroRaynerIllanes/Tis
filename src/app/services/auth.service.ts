@@ -26,6 +26,18 @@ function mapRole(backendRole: string): string {
 }
 
 export const authService = {
+  // Login unificado
+  async login(
+    usuario: string,
+    contraseña: string
+  ): Promise<{ user: AuthUser; role: string; token: string }> {
+    try {
+      return await this.loginStaff(usuario, contraseña)
+    } catch (error) {
+      return await this.loginClient(usuario, contraseña)
+    }
+  },
+
   // POST /auth/login para el Personal
   async loginStaff(
     usuario: string,

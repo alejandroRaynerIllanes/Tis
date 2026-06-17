@@ -5,6 +5,8 @@ import { useAppContext } from '../../context/AppContext'
 import { uploadService } from '../../services/upload.service'
 import { categoriesService } from '../../services/categories.service'
 import { platosService } from '../../services/platos.service'
+import { inventarioService } from '../../services/inventario.service'
+import { checkAvailability } from '../../utils/checkDishAvailability'
 import { toast } from 'sonner'
 
 export interface UICategory {
@@ -13,14 +15,15 @@ export interface UICategory {
 }
 
 export interface UIDish {
-  id: string
-  name: string
-  category: string
-  price: number
-  image: string
+  id?: string
+  name?: string
+  category?: string
+  price?: number
+  image?: string
   imagePublicId?: string
   description?: string
-  status: 'Disponible' | 'Agotado'
+  status?: string
+  [key: string]: any
 }
 
 interface BackendDish {
@@ -40,12 +43,42 @@ interface MenuManagementProps {
 }
 
 export function MenuManagement({ categories, setCategories }: MenuManagementProps) {
-  const { products: dishes, setProducts: setDishes, updateProductStatus } = useAppContext()
+  const { socket, products: dishes, setProducts: setDishes, updateProductStatus } = useAppContext()
   const [menuFilter, setMenuFilter] = useState<string>('all')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [itemToDelete, setItemToDelete] = useState<string | null>(null)
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null)
+
+  // Inventario local para validación en tiempo real
+  const [inventory, setInventory] = useState<any[]>([])
+  const [recipes, setRecipes] = useState<any[]>([])
+
+  const loadInventoryData = async () => {
+    try {
+      const [invData, recData] = await Promise.all([
+        inventarioService.getInventarioEstado().catch(() => []),
+        inventarioService.getRecetas().catch(() => [])
+      ])
+      setInventory(invData)
+      setRecipes(recData)
+    } catch (e) {
+      console.error('Error cargando inventario en MenuManagement', e)
+    }
+  }
+
+  useEffect(() => {
+    loadInventoryData()
+  }, [])
+
+  // Suscripción al Socket para refresco automático
+  useEffect(() => {
+    if (!socket) return
+    socket.on('inventario:actualizado', loadInventoryData)
+    return () => {
+      socket.off('inventario:actualizado', loadInventoryData)
+    }
+  }, [socket])
 
   const [formData, setFormData] = useState({
     title: '',
@@ -63,7 +96,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
       const data = await platosService.getAll()
       console.log('🍔 Datos crudos desde el backend:', data)
 
-      const platosFormateados: UIDish[] = data.map((p: BackendDish) => ({
+      const platosFormateados = data.map((p: BackendDish) => ({
         id: p._id,
         name: p.nombre,
         // El backend popula la categoría, así que extraemos el _id del objeto
@@ -80,7 +113,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
         status: (p.disponible ? 'Disponible' : 'Agotado') as 'Disponible' | 'Agotado'
       }))
 
-      setDishes(platosFormateados)
+      setDishes(platosFormateados as unknown as typeof dishes)
     } catch (error) {
       console.error('❌ Error CRÍTICO al cargar los platos:', error)
       toast.error('Error al cargar los platos desde el servidor.')
@@ -158,15 +191,15 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
   }, [isModalOpen])
 
   const handleOpenEditModal = (dish: UIDish) => {
-    setEditingId(dish.id)
+    setEditingId(dish.id || null)
     setIsPresetCategory(false)
     presetCategoryRef.current = ''
     setFormData({
-      title: dish.name,
-      category: dish.category,
+      title: dish.name || '',
+      category: dish.category || '',
       description: dish.description || '',
-      price: String(dish.price),
-      image: dish.image,
+      price: dish.price !== undefined ? String(dish.price) : '',
+      image: dish.image || '',
       imagePublicId: dish.imagePublicId || ''
     })
     setIsModalOpen(true)
@@ -222,7 +255,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
                   status: (platoActualizado.disponible ? 'Disponible' : 'Agotado') as
                     | 'Disponible'
                     | 'Agotado'
-                }
+                } as unknown as typeof dishes[0]
               : d
           )
         )
@@ -246,7 +279,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
             imagePublicId: platoCreado.imagenPublicId,
             description: platoCreado.descripcion,
             status: (platoCreado.disponible ? 'Disponible' : 'Agotado') as 'Disponible' | 'Agotado'
-          }
+          } as unknown as typeof dishes[0]
         ])
       }
 
@@ -435,8 +468,14 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
                 {categoryDishes.length > 0 ? (
                   <>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-                      {categoryDishes.map((dish) => (
-                        <div
+                      {categoryDishes.map((dish) => {
+                        const isManuallyActive = dish.status === 'Disponible';
+                        // Clonamos el plato forzándolo a estar "activo" manualmente, para evaluar puramente el inventario.
+                        const fakeDish = { ...dish, status: 'Disponible', disponible: true, estado: 'Disponible' };
+                        const isInventoryAvailable = checkAvailability(fakeDish, recipes, inventory);
+
+                        return (
+                          <div
                           key={dish.id}
                           className="bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col group border border-transparent hover:border-[#E57C5D]/30 transition-all duration-300 hover:shadow-2xl hover:-translate-y-1"
                         >
@@ -444,7 +483,7 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
                             <img
                               src={dish.image}
                               alt={dish.name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                              className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ${(!isManuallyActive || !isInventoryAvailable) ? 'grayscale opacity-80' : ''}`}
                             />
                             <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent opacity-60"></div>
                             <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full font-bold text-[#4B2E2D] shadow-sm">
@@ -462,20 +501,25 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
                               {dish.description || 'Sin descripción disponible.'}
                             </p>
                             <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                              <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-3 flex-1 min-w-0 pr-2">
                                 <button
                                   onClick={() => toggleStatus(dish.id)}
-                                  className={`w-12 h-6 rounded-full relative transition-colors duration-300 ${dish.status === 'Disponible' ? 'bg-[#E57C5D]' : 'bg-gray-300'}`}
+                                  className={`w-12 h-6 shrink-0 rounded-full relative transition-colors duration-300 ${isManuallyActive ? 'bg-[#E57C5D]' : 'bg-gray-300'}`}
                                 >
                                   <div
-                                    className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-300 ${dish.status === 'Disponible' ? 'translate-x-6' : 'translate-x-0'}`}
+                                    className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-300 ${isManuallyActive ? 'translate-x-6' : 'translate-x-0'}`}
                                   ></div>
                                 </button>
-                                <span
-                                  className={`text-sm font-bold ${dish.status === 'Disponible' ? 'text-[#E57C5D]' : 'text-gray-400'}`}
-                                >
-                                  {dish.status === 'Disponible' ? 'Activo' : 'Agotado'}
-                                </span>
+                                <div className="flex flex-col leading-none truncate">
+                                  <span className={`text-[11px] font-black uppercase tracking-wider ${isManuallyActive ? 'text-[#E57C5D]' : 'text-gray-400'}`}>
+                                    {isManuallyActive ? '🟢 Activo' : '⚫ Inactivo'}
+                                  </span>
+                                  {isManuallyActive && (
+                                    <span className={`text-[10px] font-bold mt-1.5 truncate ${isInventoryAvailable ? 'text-emerald-600' : 'text-red-500'}`}>
+                                      {isInventoryAvailable ? '✅ Stock Suficiente' : '🔴 Agotado por inventario'}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                               <div className="flex gap-2">
                                 <button
@@ -494,7 +538,8 @@ export function MenuManagement({ categories, setCategories }: MenuManagementProp
                             </div>
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                     <button
                       onClick={() => handleOpenAddModal(category.id)}

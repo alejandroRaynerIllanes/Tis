@@ -18,6 +18,8 @@ import { api } from '../services/api'
 import { useAppContext } from '../context/AppContext'
 import { platosService } from '../services/platos.service'
 import { ordersService } from '../services/orders.service'
+import { inventarioService } from '../services/inventario.service'
+import { checkAvailability } from '../utils/checkDishAvailability'
 
 interface TableSidePanelProps {
   isOpen: boolean
@@ -37,7 +39,8 @@ export function TableSidePanel({ isOpen, tableId, onClose, onOpenPayment }: Tabl
     clearOrder,
     updateOrderItemNote,
     confirmOrder,
-    requestBill
+    requestBill,
+    socket
   } = useAppContext()
 
   const [viewingMenu, setViewingMenu] = useState(false)
@@ -47,6 +50,8 @@ export function TableSidePanel({ isOpen, tableId, onClose, onOpenPayment }: Tabl
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [localProducts, setLocalProducts] = useState<any[]>([])
   const [backendOrder, setBackendOrder] = useState<any>(null)
+  const [recipes, setRecipes] = useState<any[]>([])
+  const [inventory, setInventory] = useState<any[]>([])
 
   // Resetear estados locales cada vez que se abre una mesa nueva
   useEffect(() => {
@@ -69,6 +74,14 @@ export function TableSidePanel({ isOpen, tableId, onClose, onOpenPayment }: Tabl
 
   // CARGA INICIAL INDEPENDIENTE: Garantiza que el menú cargue al abrir la mesa sin depender de otra vista
   useEffect(() => {
+    inventarioService.getInventarioEstado()
+      .then(setInventory)
+      .catch(() => setInventory([]))
+
+    inventarioService.getRecetas()
+      .then(setRecipes)
+      .catch(() => setRecipes([]))
+
     if (products && products.length > 0) {
       setLocalProducts(products)
     } else if (isOpen) {
@@ -82,7 +95,8 @@ export function TableSidePanel({ isOpen, tableId, onClose, onOpenPayment }: Tabl
             price: p.precio || p.price || 0,
             image: p.imagen || p.image || '',
             category: p.categoria?.nombre || p.categoria || 'General',
-            status: p.estado === false || p.estado === 'Inactivo' ? 'Agotado' : 'Disponible'
+          status: p.estado === false || p.estado === 'Inactivo' ? 'Agotado' : 'Disponible',
+          receta: p.receta || p.ingredientes || p.escandallo
           }))
           setLocalProducts(formattedData)
         } catch (error) {
@@ -92,6 +106,26 @@ export function TableSidePanel({ isOpen, tableId, onClose, onOpenPayment }: Tabl
       fetchProducts()
     }
   }, [products, isOpen])
+
+  // Sincronización en tiempo real del inventario
+  useEffect(() => {
+    if (!socket) return
+
+    const handleInventoryUpdate = () => {
+      inventarioService.getInventarioEstado()
+        .then(setInventory)
+        .catch(err => console.error('[TableSidePanel] Error reloading inventory:', err))
+
+      inventarioService.getRecetas()
+        .then(setRecipes)
+        .catch(err => console.error('[TableSidePanel] Error reloading recipes:', err))
+    }
+
+    socket.on('inventario:actualizado', handleInventoryUpdate)
+    return () => {
+      socket.off('inventario:actualizado', handleInventoryUpdate)
+    }
+  }, [socket])
 
   if (!isOpen || !tableId) return null
 
@@ -315,7 +349,7 @@ export function TableSidePanel({ isOpen, tableId, onClose, onOpenPayment }: Tabl
               </div>
               <div className="space-y-3">
                 {filteredDishes.map((dish) => {
-                  const isActive = dish.status === 'Disponible'
+                  const isActive = checkAvailability(dish, recipes, inventory)
                   return (
                     <div
                       key={dish.id}
@@ -329,8 +363,8 @@ export function TableSidePanel({ isOpen, tableId, onClose, onOpenPayment }: Tabl
                         />
                         {!isActive && (
                           <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-                            <span className="bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-sm">
-                              AGOTADO
+                      <span className="bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-sm flex items-center gap-1">
+                        🔴 Agotado
                             </span>
                           </div>
                         )}
@@ -353,14 +387,19 @@ export function TableSidePanel({ isOpen, tableId, onClose, onOpenPayment }: Tabl
                           Bs. {dish.price.toFixed(2)}
                         </span>
                       </div>
-                      {isActive && (
-                        <button
-                          onClick={() => addOrderItem(activeTable.id, dish)}
-                          className="w-10 h-10 rounded-full bg-[#FFF5F0] text-[#D0543A] hover:bg-[#D0543A] hover:text-white flex items-center justify-center transition-colors shadow-sm"
-                        >
-                          <Plus size={20} strokeWidth={3} />
-                        </button>
-                      )}
+                      <button
+                        onClick={() => {
+                          if (isActive) addOrderItem(activeTable.id, dish)
+                        }}
+                        disabled={!isActive}
+                        className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors shadow-sm ${
+                          isActive 
+                            ? 'bg-[#FFF5F0] text-[#D0543A] hover:bg-[#D0543A] hover:text-white' 
+                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        }`}
+                      >
+                        <Plus size={20} strokeWidth={3} />
+                      </button>
                     </div>
                   )
                 })}

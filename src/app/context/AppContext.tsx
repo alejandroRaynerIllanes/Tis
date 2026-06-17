@@ -160,14 +160,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     } as any
   }
 
-  // 🚀 REPARACIÓN CRÍTICA: Función para inicializar Sockets SOLO cuando ya hay sesión
+  // 🚀 REPARACIÓN CRÍTICA: Función para inicializar Sockets para todos (visitantes y autenticados)
   const initSocket = useCallback(() => {
     const token = getToken()
-    if (!token) return // Si no hay token, aborta
 
     if (socketRef.current) {
       // Actualizamos el token en la instancia existente por si el usuario cambió de sesión
-      socketRef.current.auth = { token }
+      socketRef.current.auth = token ? { token } : {}
       if (!socketRef.current.connected) {
         console.log('🔄 Forzando reconexión del socket...')
         socketRef.current.connect()
@@ -180,7 +179,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       const socket = io(socketUrl, {
-        auth: { token },
+        auth: token ? { token } : {},
         reconnection: true,
         reconnectionAttempts: Infinity,
         reconnectionDelay: 2000
@@ -331,11 +330,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   // Cargador maestro sincronizado
   const loadInitialData = useCallback(async () => {
+    // Conectamos el socket siempre para recibir eventos públicos como inventario:actualizado
+    initSocket()
+
     const token = getToken()
     if (!token) return
-
-    // Conectamos el socket justo cuando estamos seguros de que tenemos sesión
-    initSocket()
 
     try {
       const [fetchedTables, fetchedProducts, fetchedOrders, fetchedReservations] =

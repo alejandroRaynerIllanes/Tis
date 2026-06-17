@@ -79,7 +79,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   const response = await fetch(`${API_BASE_URL}${endpoint}`, config)
 
   // Si el token expiró, limpiar sesión
-  if (response.status === 401) {
+  if (response.status === 401 && !skipAuth) {
     clearToken()
     clearStoredUser()
     localStorage.removeItem('userRole')

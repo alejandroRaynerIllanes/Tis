@@ -351,7 +351,7 @@ export function ChefView() {
                         <span className="text-xs font-semibold text-red-800/60">Stock:</span>
                         <div className="text-right">
                           <span className="text-lg font-black text-red-600">{ing.stockActual}</span>
-                          <span className="text-xs font-bold text-red-600/80 ml-1">{ing.unidad}</span>
+                          <span className="text-xs font-bold text-red-600/80 ml-1">{ing.unidad || ing.unidadMedida || ''}</span>
                         </div>
                       </div>
                     </div>
@@ -376,7 +376,7 @@ export function ChefView() {
                         <span className="text-xs font-semibold text-amber-800/60">Stock:</span>
                         <div className="text-right">
                           <span className="text-lg font-black text-amber-600">{ing.stockActual}</span>
-                          <span className="text-xs font-bold text-amber-600/80 ml-1">{ing.unidad}</span>
+                          <span className="text-xs font-bold text-amber-600/80 ml-1">{ing.unidad || ing.unidadMedida || ''}</span>
                         </div>
                       </div>
                     </div>
@@ -401,7 +401,7 @@ export function ChefView() {
                         <span className="text-xs font-semibold text-emerald-800/60">Stock:</span>
                         <div className="text-right">
                           <span className="text-lg font-black text-emerald-600">{ing.stockActual}</span>
-                          <span className="text-xs font-bold text-emerald-600/80 ml-1">{ing.unidad}</span>
+                          <span className="text-xs font-bold text-emerald-600/80 ml-1">{ing.unidad || ing.unidadMedida || ''}</span>
                         </div>
                       </div>
                     </div>

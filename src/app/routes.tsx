@@ -33,6 +33,9 @@ const ClientProfile = lazy(() =>
 const DeliveryView = lazy(() =>
   import('./components/DeliveryView').then((m) => ({ default: m.DeliveryView }))
 )
+const ResetPassword = lazy(() =>
+  import('./components/ResetPassword').then((m) => ({ default: m.ResetPassword }))
+)
 
 function RootLayout() {
   return (
@@ -81,6 +84,10 @@ export const router = createBrowserRouter([
       {
         path: 'login',
         element: <Login />
+      },
+      {
+        path: 'reset-password',
+        element: <ResetPassword />
       },
       {
         // RUTA PÚBLICA AÑADIDA AQUÍ

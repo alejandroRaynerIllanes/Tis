@@ -11,7 +11,8 @@ import {
   ChefHat,
   Trash2,
   Eye,
-  EyeOff
+  EyeOff,
+  Loader2
 } from 'lucide-react'
 import { platosService } from '../services/platos.service'
 import { categoriesService } from '../services/categories.service'
@@ -37,12 +38,42 @@ export function PublicMenu() {
   // Flag para saber si mostramos el carrito o el proceso de pago
   const [isCheckoutStarted, setIsCheckoutStarted] = useState(false)
 
-  const [showAuthModal, setShowAuthModal] = useState<'login' | 'register' | null>(null)
+  const [showAuthModal, setShowAuthModal] = useState<'login' | 'register' | 'forgot-password' | null>(null)
   const [authLoading, setAuthLoading] = useState(false)
 
   // Formularios
   const [loginForm, setLoginForm] = useState({ email: '', password: '' })
   const [showPassword, setShowPassword] = useState(false)
+
+  // Forgot Password modal states
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [forgotLoading, setForgotLoading] = useState(false)
+
+  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!forgotEmail.trim()) {
+      toast.error('Por favor, ingresa tu correo electrónico')
+      return
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(forgotEmail.trim())) {
+      toast.error('Por favor, ingresa un correo electrónico válido')
+      return
+    }
+
+    setForgotLoading(true)
+    try {
+      const res: any = await api.post('/auth/forgot-password', { email: forgotEmail.trim() })
+      toast.success(res.mensaje || 'Si el correo está registrado, se enviará un enlace de recuperación')
+      setShowAuthModal('login')
+      setForgotEmail('')
+    } catch (err: any) {
+      toast.error(err.message || 'Error al procesar la solicitud')
+    } finally {
+      setForgotLoading(false)
+    }
+  }
   const [registerForm, setRegisterForm] = useState({
     nombre: '',
     apellido: '',
@@ -647,7 +678,10 @@ export function PublicMenu() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-md p-8 relative shadow-2xl">
             <button
-              onClick={() => setShowAuthModal(null)}
+              onClick={() => {
+                setShowAuthModal(null)
+                setForgotEmail('')
+              }}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
             >
               <X size={24} />
@@ -674,9 +708,19 @@ export function PublicMenu() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-[#4B2E2D] mb-1">
-                      Contraseña
-                    </label>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="block text-sm font-bold text-[#4B2E2D]">
+                        Contraseña
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowAuthModal('forgot-password')}
+                        className="text-xs font-bold hover:underline focus:outline-none"
+                        style={{ color: '#D96C4A' }}
+                      >
+                        ¿Olvidaste tu contraseña?
+                      </button>
+                    </div>
                     <div className="relative">
                       <input
                         type={showPassword ? 'text' : 'password'}
@@ -710,6 +754,57 @@ export function PublicMenu() {
                     className="text-[#D96C4A] font-bold hover:underline"
                   >
                     Regístrate aquí
+                  </button>
+                </p>
+              </>
+            ) : showAuthModal === 'forgot-password' ? (
+              <>
+                <div className="text-center mb-6">
+                  <h2 className="text-2xl font-black text-[#4B2E2D]">¿Olvidaste tu contraseña?</h2>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Ingresa tu correo electrónico y te enviaremos las instrucciones para restablecer tu contraseña.
+                  </p>
+                </div>
+
+                <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-bold text-[#4B2E2D] mb-1">
+                      Correo Electrónico
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      disabled={forgotLoading}
+                      placeholder="ejemplo@correo.com"
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#D96C4A]/20 outline-none font-medium"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={forgotLoading}
+                    className="w-full py-3.5 bg-[#4B2E2D] text-white rounded-xl font-bold hover:bg-[#3A2222] transition-colors mt-2 flex items-center justify-center gap-2"
+                  >
+                    {forgotLoading ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin" />
+                        Enviando...
+                      </>
+                    ) : (
+                      'Enviar'
+                    )}
+                  </button>
+                </form>
+
+                <p className="text-center mt-6 text-sm text-gray-600">
+                  <button
+                    type="button"
+                    onClick={() => setShowAuthModal('login')}
+                    className="text-[#D96C4A] font-bold hover:underline"
+                  >
+                    Volver al inicio de sesión
                   </button>
                 </p>
               </>

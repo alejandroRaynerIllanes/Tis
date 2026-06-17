@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import { User, Lock, Eye, EyeOff, ChefHat, AlertCircle } from 'lucide-react'
+import { User, Lock, Eye, EyeOff, ChefHat, AlertCircle, X, Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { authService } from '../services/auth.service'
-import { setToken, setStoredUser } from '../services/api'
+import { setToken, setStoredUser, api } from '../services/api'
 import { toast } from 'sonner'
 import { useAuth } from '../hooks/useAuth'
 
@@ -12,8 +12,40 @@ export function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+
+  // Forgot Password modal states
+  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false)
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [forgotLoading, setForgotLoading] = useState(false)
+
   const navigate = useNavigate()
   const { redirectByRole } = useAuth()
+
+  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!forgotEmail.trim()) {
+      toast.error('Por favor, ingresa tu correo electrónico')
+      return
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(forgotEmail.trim())) {
+      toast.error('Por favor, ingresa un correo electrónico válido')
+      return
+    }
+
+    setForgotLoading(true)
+    try {
+      const res: any = await api.post('/auth/forgot-password', { email: forgotEmail.trim() })
+      toast.success(res.mensaje || 'Si el correo está registrado, se enviará un enlace de recuperación')
+      setIsForgotModalOpen(false)
+      setForgotEmail('')
+    } catch (err: any) {
+      toast.error(err.message || 'Error al procesar la solicitud')
+    } finally {
+      setForgotLoading(false)
+    }
+  }
 
   useEffect(() => {
     const userRole = localStorage.getItem('userRole')
@@ -131,13 +163,23 @@ export function Login() {
             </div>
 
             <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-semibold mb-2"
-                style={{ color: '#4B2E2D' }}
-              >
-                Contraseña
-              </label>
+              <div className="flex justify-between items-center mb-2">
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-semibold"
+                  style={{ color: '#4B2E2D' }}
+                >
+                  Contraseña
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setIsForgotModalOpen(true)}
+                  className="text-xs font-bold hover:underline focus:outline-none"
+                  style={{ color: '#D96C4A' }}
+                >
+                  ¿Olvidaste tu contraseña?
+                </button>
+              </div>
               <div className="relative">
                 <Lock
                   className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
@@ -204,6 +246,79 @@ export function Login() {
           </p>
         </div>
       </div>
+
+      {/* Modal de Recuperación de Contraseña */}
+      {isForgotModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div
+            className="bg-white rounded-2xl w-full max-w-md p-8 relative shadow-2xl border"
+            style={{ borderColor: 'rgba(217,108,74,0.2)' }}
+          >
+            <button
+              onClick={() => {
+                setIsForgotModalOpen(false)
+                setForgotEmail('')
+              }}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+              disabled={forgotLoading}
+            >
+              <X size={24} />
+            </button>
+
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-black text-[#4B2E2D]">¿Olvidaste tu contraseña?</h2>
+              <p className="text-sm text-gray-500 mt-2">
+                Ingresa tu correo electrónico y te enviaremos las instrucciones para restablecer tu contraseña.
+              </p>
+            </div>
+
+            <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-[#4B2E2D] mb-1">
+                  Correo Electrónico
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  disabled={forgotLoading}
+                  placeholder="ejemplo@correo.com"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#D96C4A]/20 outline-none font-medium"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsForgotModalOpen(false)
+                    setForgotEmail('')
+                  }}
+                  disabled={forgotLoading}
+                  className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold rounded-xl transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={forgotLoading}
+                  className="flex-1 py-3 bg-[#4B2E2D] text-white font-bold rounded-xl hover:bg-[#3A2222] transition-colors flex items-center justify-center gap-2"
+                >
+                  {forgotLoading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Enviando...
+                    </>
+                  ) : (
+                    'Enviar'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

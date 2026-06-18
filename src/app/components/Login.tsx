@@ -5,6 +5,7 @@ import { authService } from '../services/auth.service'
 import { setToken, setStoredUser, api } from '../services/api'
 import { toast } from 'sonner'
 import { useAuth } from '../hooks/useAuth'
+import { GoogleLogin } from '@react-oauth/google'
 
 export function Login() {
   const [username, setUsername] = useState('')
@@ -20,6 +21,35 @@ export function Login() {
 
   const navigate = useNavigate()
   const { redirectByRole } = useAuth()
+
+  const handleGoogleSuccess = async (credentialResponse: any) => {
+    if (!credentialResponse.credential) {
+      toast.error('No se recibió la credencial de Google')
+      return
+    }
+    setIsLoading(true)
+    setError('')
+    try {
+      const { role, token, user } = await authService.loginGoogle(credentialResponse.credential)
+
+      setToken(token)
+      setStoredUser(user)
+      localStorage.setItem('userRole', role)
+
+      toast.success('Sesión iniciada con Google correctamente')
+      redirectByRole(role)
+    } catch (err: any) {
+      const msg = err.message || 'Error al autenticar con Google'
+      setError(msg)
+      toast.error(msg)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleGoogleError = () => {
+    toast.error('Error al iniciar sesión con Google')
+  }
 
   const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -240,6 +270,25 @@ export function Login() {
               {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </button>
           </form>
+
+          <div className="relative my-6 flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300"></div>
+            </div>
+            <span className="relative bg-white px-4 text-xs font-semibold uppercase tracking-wider text-[#6B3E2E] z-10">
+              O continúa con
+            </span>
+          </div>
+
+          <div className="flex justify-center w-full">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={handleGoogleError}
+              shape="pill"
+              text="signin_with"
+              width="320"
+            />
+          </div>
 
           <p className="text-center text-[#4B2E2D]/40 text-xs font-medium mt-6">
             © 2026 Sabor & Gestión · Todos los derechos reservados

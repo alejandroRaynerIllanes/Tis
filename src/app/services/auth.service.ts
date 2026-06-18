@@ -91,6 +91,32 @@ export const authService = {
     return { user: userObj, role, token: data.token }
   },
 
+  // POST /clientes/auth/google para Clientes con Google
+  async loginGoogle(
+    googleToken: string
+  ): Promise<{ user: AuthUser; role: string; token: string }> {
+    const data = await api.post<any>(
+      '/clientes/auth/google',
+      { token: googleToken },
+      { skipAuth: true }
+    )
+
+    const clientUser = data.cliente || data.usuario
+    const userObj = {
+      ...clientUser,
+      id: clientUser?.id || clientUser?._id,
+      rol: clientUser?.rol || 'Cliente'
+    } as unknown as AuthUser
+
+    setToken(data.token)
+    setStoredUser(userObj)
+
+    const role = mapRole(userObj.rol)
+    localStorage.setItem('userRole', role)
+
+    return { user: userObj, role, token: data.token }
+  },
+
   logout(): void {
     // 1. Limpiar funciones nativas
     clearToken()

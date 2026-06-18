@@ -20,6 +20,7 @@ import { api, getStoredUser, getToken, setToken, setStoredUser } from '../servic
 import { authService } from '../services/auth.service'
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router'
+import { GoogleLogin } from '@react-oauth/google'
 import { CheckoutStepper } from './CheckoutStepper'
 
 export function PublicMenu() {
@@ -177,6 +178,45 @@ export function PublicMenu() {
       return
     }
     setIsCheckoutStarted(true)
+  }
+
+  const handleGoogleSuccess = async (credentialResponse: any) => {
+    if (!credentialResponse.credential) {
+      toast.error('No se recibió la credencial de Google')
+      return
+    }
+    setAuthLoading(true)
+    try {
+      const { role, token, user } = await authService.loginGoogle(credentialResponse.credential)
+      setToken(token)
+      setStoredUser(user)
+
+      // Actualizar vista inmediatamente
+      setUserToken(token)
+      setCurrentUser(user as any)
+      localStorage.setItem('userRole', role)
+
+      toast.success('Sesión iniciada con Google correctamente')
+
+      const roleLower = role.toLowerCase().trim()
+      if (roleLower === 'admin' || roleLower === 'administrador') navigate('/catalog')
+      else if (roleLower === 'mesero' || roleLower === 'waiter') navigate('/waiter-view')
+      else if (roleLower === 'cocinero' || roleLower === 'chef') navigate('/chef-view')
+      else if (roleLower === 'cajero' || roleLower === 'cashier') navigate('/cashier-view')
+      else if (roleLower === 'delivery' || roleLower === 'repartidor') navigate('/delivery')
+      else if (roleLower === 'cliente' || roleLower === 'client') navigate('/perfil')
+      else {
+        setShowAuthModal(null)
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error al iniciar sesión con Google')
+    } finally {
+      setAuthLoading(false)
+    }
+  }
+
+  const handleGoogleError = () => {
+    toast.error('Error al iniciar sesión con Google')
   }
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
@@ -718,6 +758,26 @@ export function PublicMenu() {
                     {authLoading ? 'Verificando...' : 'Iniciar Sesión'}
                   </button>
                 </form>
+
+                <div className="relative my-6 flex items-center justify-center">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-200"></div>
+                  </div>
+                  <span className="relative bg-white px-4 text-xs font-semibold uppercase tracking-wider text-gray-500 z-10">
+                    O continúa con
+                  </span>
+                </div>
+
+                <div className="flex justify-center w-full">
+                  <GoogleLogin
+                    onSuccess={handleGoogleSuccess}
+                    onError={handleGoogleError}
+                    shape="pill"
+                    text="signin_with"
+                    width="320"
+                  />
+                </div>
+
                 <p className="text-center mt-6 text-sm text-gray-600">
                   ¿No tienes cuenta?{' '}
                   <button

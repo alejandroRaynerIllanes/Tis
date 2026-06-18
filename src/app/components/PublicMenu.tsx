@@ -527,7 +527,7 @@ export function PublicMenu() {
       {/* MODAL DEL CARRITO Y CHECKOUT */}
       {isCartOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 sm:p-6">
-          <div className="bg-white w-full max-w-[500px] h-[85vh] sm:h-auto max-h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+          <div className="bg-white w-full max-w-[500px] h-[90vh] sm:h-[700px] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
             {!isCheckoutStarted ? (
               <>
                 <div className="p-6 border-b flex items-center justify-between bg-[#FCE4D6]/30 shrink-0">

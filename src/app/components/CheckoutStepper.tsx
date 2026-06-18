@@ -94,7 +94,8 @@ export function CheckoutStepper({ cart, cartTotal, currentUser, onClose, onOrder
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 min-h-0">
+      {/* El contenedor principal ahora utiliza flexbox al 100% de la altura disponible */}
+      <div className="flex-1 overflow-y-auto p-6 min-h-0 flex flex-col">
         {/* PASO 1: METODO */}
         {step === 1 && (
           <div className="space-y-4">
@@ -111,22 +112,28 @@ export function CheckoutStepper({ cart, cartTotal, currentUser, onClose, onOrder
 
         {/* PASO 2: MAPA */}
         {step === 2 && (
-          <div className="space-y-4">
-            <h3 className="text-xl font-black text-[#4B2E2D]">Selecciona tu ubicación</h3>
-            <MapPicker onLocationSelect={(data) => setDeliveryInfo(prev => ({ ...prev, ...data }))} />
+          <div className="flex flex-col h-full flex-1 min-h-0">
+            <h3 className="text-xl font-black text-[#4B2E2D] shrink-0 mb-4">Selecciona tu ubicación</h3>
             
-            <div className="space-y-3 mt-4">
-              <input placeholder="Dirección (Ej. Av. América #456)" value={deliveryInfo.address} onChange={e => setDeliveryInfo({...deliveryInfo, address: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#D96C4A]/20 outline-none" />
-              <input placeholder="Referencia (Ej. Portón azul)" value={deliveryInfo.reference} onChange={e => setDeliveryInfo({...deliveryInfo, reference: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#D96C4A]/20 outline-none" />
-            </div>
-
-            {deliveryInfo.distance > 0 && (
-              <div className="grid grid-cols-3 gap-2 bg-[#FCE4D6]/30 p-4 rounded-xl border border-[#FCE4D6]">
-                <div className="text-center"><p className="text-[10px] font-bold text-gray-500 uppercase">Distancia</p><p className="font-black text-[#4B2E2D]">{deliveryInfo.distance} km</p></div>
-                <div className="text-center border-x border-[#E0D0C5]"><p className="text-[10px] font-bold text-gray-500 uppercase">Tiempo</p><p className="font-black text-[#4B2E2D]">{deliveryInfo.time} min</p></div>
-                <div className="text-center"><p className="text-[10px] font-bold text-gray-500 uppercase">Costo</p><p className="font-black text-[#D96C4A]">Bs. {deliveryInfo.cost}</p></div>
+            {/* Este div genera un scroll independiente evitando que los botones de abajo se pierdan */}
+            <div className="flex-1 overflow-y-auto min-h-0 space-y-4 pr-1 pb-1">
+              <div className="shrink-0">
+                <MapPicker onLocationSelect={(data) => setDeliveryInfo(prev => ({ ...prev, ...data }))} />
               </div>
-            )}
+              
+              <div className="space-y-3 mt-4 shrink-0">
+                <input placeholder="Dirección (Ej. Av. América #456)" value={deliveryInfo.address} onChange={e => setDeliveryInfo({...deliveryInfo, address: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#D96C4A]/20 outline-none" />
+                <input placeholder="Referencia (Ej. Portón azul)" value={deliveryInfo.reference} onChange={e => setDeliveryInfo({...deliveryInfo, reference: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#D96C4A]/20 outline-none" />
+              </div>
+
+              {deliveryInfo.distance > 0 && (
+                <div className="grid grid-cols-3 gap-2 bg-[#FCE4D6]/30 p-4 rounded-xl border border-[#FCE4D6] shrink-0">
+                  <div className="text-center"><p className="text-[10px] font-bold text-gray-500 uppercase">Distancia</p><p className="font-black text-[#4B2E2D]">{deliveryInfo.distance} km</p></div>
+                  <div className="text-center border-x border-[#E0D0C5]"><p className="text-[10px] font-bold text-gray-500 uppercase">Tiempo</p><p className="font-black text-[#4B2E2D]">{deliveryInfo.time} min</p></div>
+                  <div className="text-center"><p className="text-[10px] font-bold text-gray-500 uppercase">Costo</p><p className="font-black text-[#D96C4A]">Bs. {deliveryInfo.cost}</p></div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

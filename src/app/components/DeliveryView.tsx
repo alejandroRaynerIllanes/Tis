@@ -132,7 +132,9 @@ export function DeliveryView() {
 
   // ─── Derivados ───
   const disponibles = orders.filter(
-    (o) => o.estado === 'Pendiente_de_Aceptacion' && (!o.repartidorId || o.repartidorId === userIdStr)
+    (o) => o.estado === 'Pendiente_de_Aceptacion' && 
+           (!o.repartidorId || o.repartidorId === userIdStr) &&
+           (o.metodoPago !== 'QR' || (o as any).pagoConfirmado)
   )
   const activos = orders.filter(
     (o) => ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO', 'EN_CAMINO'].includes(o.estado) && o.repartidorId === userIdStr

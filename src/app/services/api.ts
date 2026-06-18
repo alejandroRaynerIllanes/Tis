@@ -5,7 +5,11 @@
 
 // 🔥 FIX INTELIGENTE: Si estás probando en tu PC (localhost), usará tu backend local automáticamente.
 const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-const API_BASE_URL = isLocal ? 'http://localhost:3000/api' : ((import.meta as any).env.VITE_API_URL || 'https://sabor-gestion-backend-7.onrender.com/api')
+let base = isLocal ? 'http://localhost:3000/api' : ((import.meta as any).env.VITE_API_URL || 'https://sabor-gestion-backend-7.onrender.com/api');
+if (!base.endsWith('/api')) {
+  base = base.replace(/\/+$/, '') + '/api';
+}
+const API_BASE_URL = base;
 
 interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown

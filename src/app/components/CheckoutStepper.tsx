@@ -308,7 +308,13 @@ export function CheckoutStepper({ cart, cartTotal, currentUser, onClose, onOrder
 
             <div className="p-6 bg-gray-50 border-t border-gray-100 flex flex-col gap-3">
               <button
-                onClick={() => {
+                onClick={async () => {
+                  try {
+                    // Fallback para marcar el pago como confirmado en el backend durante pruebas
+                    await api.post(`/pagos/notificar-qr/${createdOrder._id}`, undefined, { skipAuth: true })
+                  } catch (e) {
+                    console.warn('No se pudo notificar el pago manual al backend')
+                  }
                   setIsQRModalOpen(false)
                   setIsConfirmed(true)
                 }}

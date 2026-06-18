@@ -4,6 +4,7 @@ import { MapPicker } from './MapPicker'
 import { api } from '../services/api'
 import { toast } from 'sonner'
 import { User } from '../types'
+import { useAppContext } from '../context/AppContext'
 
 interface CheckoutStepperProps {
   cart: any[]
@@ -27,6 +28,9 @@ export function CheckoutStepper({ cart, cartTotal, currentUser, onClose, onOrder
   const [simulatorUrl, setSimulatorUrl] = useState<string>('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [isQRModalOpen, setIsQRModalOpen] = useState(false)
+  const [isConfirmed, setIsConfirmed] = useState(false)
+  
+  const { socket } = useAppContext()
 
   useEffect(() => {
     if (currentUser) {
@@ -37,6 +41,24 @@ export function CheckoutStepper({ cart, cartTotal, currentUser, onClose, onOrder
       })
     }
   }, [currentUser])
+
+  useEffect(() => {
+    if (!socket || !createdOrder?._id) return
+
+    const handlePagoRecibido = (data: { pedidoId: string }) => {
+      if (data.pedidoId === createdOrder._id) {
+        setIsQRModalOpen(false)
+        setIsConfirmed(true)
+      }
+    }
+
+    const eventName = `pedido:pago_recibido:${createdOrder._id}`
+    socket.on(eventName, handlePagoRecibido)
+
+    return () => {
+      socket.off(eventName, handlePagoRecibido)
+    }
+  }, [socket, createdOrder])
 
   const processCheckout = async () => {
     setIsProcessing(true)
@@ -84,7 +106,8 @@ export function CheckoutStepper({ cart, cartTotal, currentUser, onClose, onOrder
         setSimulatorUrl(simUrl)
         setIsQRModalOpen(true)
       } else {
-        onOrderSuccess()
+        setCreatedOrder(response.pedido)
+        setIsConfirmed(true)
       }
       
     } catch (error: any) {
@@ -287,13 +310,120 @@ export function CheckoutStepper({ cart, cartTotal, currentUser, onClose, onOrder
               <button
                 onClick={() => {
                   setIsQRModalOpen(false)
-                  onOrderSuccess()
+                  setIsConfirmed(true)
                 }}
                 className="w-full py-4 rounded-xl bg-[#D96C4A] hover:bg-[#C25838] text-white font-black shadow-lg shadow-[#D96C4A]/30 transition-all flex items-center justify-center gap-2"
               >
                 <CheckCircle2 size={22} /> He realizado el pago
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CONFIRMACIÓN DE PEDIDO */}
+      {isConfirmed && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col relative">
+            
+            {/* Header Verde de Éxito */}
+            <div className="relative bg-[#00B274] px-6 pt-8 pb-6 text-center text-white shrink-0">
+              <button
+                onClick={onOrderSuccess}
+                className="absolute right-4 top-4 text-white/80 hover:text-white transition-colors"
+              >
+                <X size={20} />
+              </button>
+              <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-md">
+                <CheckCircle2 size={36} className="text-[#00B274]" />
+              </div>
+              <h2 className="text-2xl font-black mb-1">¡Pedido Confirmado!</h2>
+              <div className="inline-block bg-white/20 px-3 py-1 rounded-full text-xs font-black tracking-wider uppercase">
+                {createdOrder?.codigo || `PED-${String(createdOrder?._id || '').slice(-4).toUpperCase()}`}
+              </div>
+            </div>
+
+            {/* Contenido del Pedido */}
+            <div className="p-6 space-y-4 overflow-y-auto max-h-[50vh] shrink">
+              {/* Productos */}
+              <div>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                  Productos Solicitados
+                </p>
+                <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 space-y-2">
+                  {cart.map((item, idx) => (
+                    <div key={idx} className="flex justify-between items-center text-sm font-bold text-gray-700">
+                      <span>{item.quantity}x {item.product.nombre || item.product.name}</span>
+                      <span className="text-gray-400">
+                        Bs. {((item.product.precio || item.product.price) * item.quantity).toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Grid Método & Tipo */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">
+                    Método
+                  </p>
+                  <p className="text-sm font-black text-[#4B2E2D]">{paymentMethod}</p>
+                </div>
+                <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">
+                    Tipo
+                  </p>
+                  <p className="text-sm font-black text-[#4B2E2D]">Delivery</p>
+                </div>
+              </div>
+
+              {/* Dirección */}
+              <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">
+                  Dirección
+                </p>
+                <p className="text-sm font-black text-[#4B2E2D] line-clamp-2">
+                  {deliveryInfo.address || 'Ubicación seleccionada'}
+                </p>
+              </div>
+
+              {/* Tiempo Estimado */}
+              <div className="bg-blue-50 text-blue-700 px-4 py-3 rounded-2xl flex items-center gap-2 text-sm font-bold border border-blue-100">
+                <Clock size={18} className="shrink-0" />
+                <span>Tiempo estimado: ~{deliveryInfo.time || 20} min</span>
+              </div>
+
+              {/* Desglose de Precios */}
+              <div className="bg-[#FCE4D6]/20 border border-[#FCE4D6]/50 rounded-2xl p-4 space-y-2">
+                <div className="flex justify-between text-xs font-bold text-gray-500">
+                  <span>Subtotal</span>
+                  <span>Bs. {cartTotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-xs font-bold text-gray-500">
+                  <span>Costo Delivery</span>
+                  <span>Bs. {deliveryInfo.cost.toFixed(2)}</span>
+                </div>
+                <div className="border-t border-[#FCE4D6]/30 my-2"></div>
+                <div className="flex justify-between items-center text-sm font-black text-[#4B2E2D]">
+                  <span>TOTAL</span>
+                  <span className="text-xl text-[#D0543A]">
+                    Bs. {(cartTotal + deliveryInfo.cost).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Botón de Acción */}
+            <div className="p-6 border-t border-gray-50 bg-white shrink-0">
+              <button
+                onClick={onOrderSuccess}
+                className="w-full py-4 rounded-2xl bg-[#D96C4A] hover:bg-[#C25838] text-white font-black text-lg shadow-xl shadow-[#D96C4A]/30 transition-all flex items-center justify-center gap-2 active:scale-95"
+              >
+                <CheckCircle2 size={20} /> Aceptar
+              </button>
+            </div>
+
           </div>
         </div>
       )}

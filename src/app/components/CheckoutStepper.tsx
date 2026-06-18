@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Bike, MapPin, Info, Clock, ArrowRight, QrCode, Banknote, ChevronLeft, X } from 'lucide-react'
+import { Bike, MapPin, Info, Clock, ArrowRight, QrCode, Banknote, ChevronLeft, X, CheckCircle2, Loader2 } from 'lucide-react'
 import { MapPicker } from './MapPicker'
 import { api } from '../services/api'
 import { toast } from 'sonner'
@@ -26,6 +26,7 @@ export function CheckoutStepper({ cart, cartTotal, currentUser, onClose, onOrder
   const [qrUrl, setQrUrl] = useState<string>('')
   const [simulatorUrl, setSimulatorUrl] = useState<string>('')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [isQRModalOpen, setIsQRModalOpen] = useState(false)
 
   useEffect(() => {
     if (currentUser) {
@@ -62,28 +63,26 @@ export function CheckoutStepper({ cart, cartTotal, currentUser, onClose, onOrder
 
       toast.success('¡Pedido realizado con éxito!')
 
-      // Si eligió QR, le abrimos la vista de QR integrado (Paso 6)
+      // Si eligió QR, abrimos el modal de QR integrado
       if (paymentMethod === 'QR' && response.pedido) {
-        try {
-          const qrResponse: any = await api.post(`/pagos/generar-qr/${response.pedido._id}`)
-          setQrUrl(qrResponse.qrUrl)
-        } catch (qrErr) {
-          // Fallback en caso de fallo al generar el QR en el servidor
-          const datosPago = `SABOR_GESTION_ID_${response.pedido._id}_TOTAL_${(cartTotal + deliveryInfo.cost).toFixed(2)}`
-          setQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(datosPago)}`)
-        }
-
         const pId = response.pedido.codigo || response.pedido._id
         const totalStr = (cartTotal + deliveryInfo.cost).toFixed(2)
         const baseUrl = String(window.location.origin)
         const simUrl = `${baseUrl}/pay-simulator?id=${encodeURIComponent(response.pedido._id)}&mesa=Delivery&total=${encodeURIComponent(totalStr)}&codigo=${encodeURIComponent(pId)}`
         
-        setCreatedOrder(response.pedido)
-        setSimulatorUrl(simUrl)
-        setStep(6)
+        // Generamos el QR codificando la URL del simulador para que se abra al escanear con el celular
+        const qrCodeImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(simUrl)}&color=4B2E2D`
         
-        // Abrimos el simulador en una pestaña nueva para facilitar la simulación al usuario
-        window.open(simUrl, '_blank')
+        try {
+          await api.post(`/pagos/generar-qr/${response.pedido._id}`, { qrUrl: qrCodeImageUrl })
+        } catch (qrErr) {
+          console.warn('No se pudo reportar el link de QR al backend:', qrErr)
+        }
+
+        setCreatedOrder(response.pedido)
+        setQrUrl(qrCodeImageUrl)
+        setSimulatorUrl(simUrl)
+        setIsQRModalOpen(true)
       } else {
         onOrderSuccess()
       }
@@ -201,44 +200,6 @@ export function CheckoutStepper({ cart, cartTotal, currentUser, onClose, onOrder
           </div>
         )}
 
-        {/* PASO 6: PAGO QR */}
-        {step === 6 && createdOrder && (
-          <div className="space-y-6 flex flex-col items-center text-center animate-in zoom-in-95 duration-300 pb-4">
-            <div>
-              <h3 className="text-2xl font-black text-[#4B2E2D]">Escanea y Paga</h3>
-              <p className="text-gray-500 text-sm mt-1">Usa tu aplicación bancaria para realizar el pago</p>
-            </div>
-            
-            <div className="bg-white p-4 rounded-3xl shadow-sm border-2 border-gray-100 relative">
-               <img src={qrUrl} alt="QR de Pago" className="w-[200px] h-[200px] object-contain" />
-            </div>
-
-            <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 w-full text-left space-y-2">
-              <div className="flex justify-between items-center text-sm border-b border-gray-200 pb-2">
-                 <span className="font-semibold text-gray-500">Nro. Pedido</span>
-                 <span className="font-black text-[#D96C4A]">{createdOrder.codigo || 'PENDIENTE'}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm border-b border-gray-200 pb-2">
-                 <span className="font-semibold text-gray-500">Monto a Pagar</span>
-                 <span className="font-black text-[#4B2E2D]">Bs. {(cartTotal + deliveryInfo.cost).toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                 <span className="font-semibold text-gray-500">Delivery a</span>
-                 <span className="font-black text-[#4B2E2D] truncate max-w-[150px]">{billingInfo.name}</span>
-              </div>
-            </div>
-
-            <p className="text-xs font-bold text-gray-400 mt-2">
-              ¿Estás desde el celular y no puedes escanear la pantalla?
-            </p>
-            <button 
-              onClick={() => window.open(simulatorUrl, '_blank')} 
-              className="px-6 py-2.5 bg-[#4B2E2D] text-white rounded-xl font-bold shadow-md hover:bg-[#3A2222] transition-colors w-full"
-            >
-              Simular Pago Manual
-            </button>
-          </div>
-        )}
       </div>
 
       {/* FOOTER FIJO PARA ACCIONES */}
@@ -262,11 +223,78 @@ export function CheckoutStepper({ cart, cartTotal, currentUser, onClose, onOrder
               {isProcessing ? 'Procesando...' : 'Confirmar Pedido'}
             </button>
           )}
-          {step === 6 && (
-            <button onClick={() => {
-              onOrderSuccess()
-            }} className="w-full py-4 bg-[#D96C4A] text-white rounded-xl font-black text-lg shadow-lg hover:bg-[#b5462f] transition-all">Terminar y Cerrar</button>
-          )}
+        </div>
+      )}
+
+      {/* MODAL DE PAGO QR PARA DELIVERY */}
+      {isQRModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+            <div className="relative bg-gradient-to-b from-gray-50 to-white px-6 pt-6 pb-4 border-b border-gray-100 text-center">
+              <button
+                onClick={() => setIsQRModalOpen(false)}
+                disabled={isProcessing}
+                className="absolute left-6 top-6 text-gray-500 hover:text-gray-800 transition-colors flex items-center gap-1 text-sm font-bold disabled:opacity-50"
+              >
+                <X size={18} /> Cancelar
+              </button>
+              <div className="w-14 h-14 bg-gradient-to-br from-[#4B2E2D] to-[#6B3E2E] rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-[#4B2E2D]/20">
+                <QrCode size={28} className="text-white" />
+              </div>
+              <h2 className="text-2xl font-black text-[#4B2E2D]">Pago con QR</h2>
+              <p className="text-sm font-bold text-gray-400 mt-1">Escanee el código para pagar</p>
+            </div>
+
+            <div className="p-8 flex flex-col items-center">
+              <div className="w-full bg-gray-50 rounded-2xl p-4 mb-6 border border-gray-100 space-y-2">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-semibold text-gray-500">Negocio</span>
+                  <span className="font-black text-[#4B2E2D]">Sabor & Gestión</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-semibold text-gray-500">Cliente</span>
+                  <span className="font-black text-[#4B2E2D] truncate max-w-[150px]">
+                    {billingInfo.name}
+                  </span>
+                </div>
+                <div className="pt-2 mt-2 border-t border-dashed border-gray-200 flex justify-between items-center">
+                  <span className="font-black text-[#4B2E2D] uppercase tracking-wider text-xs">
+                    Total a Pagar
+                  </span>
+                  <span className="font-black text-2xl text-[#4B2E2D]">
+                    Bs. {(cartTotal + deliveryInfo.cost).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="w-full border-t border-dashed border-gray-200 mb-6"></div>
+
+              <div className="bg-white p-3 rounded-3xl shadow-sm border-2 border-gray-100 mb-6">
+                <a href={simulatorUrl} target="_blank" rel="noopener noreferrer" title="Haz clic para abrir el simulador">
+                  <img
+                    src={qrUrl}
+                    alt="Código QR de pago"
+                    className="w-[180px] h-[180px] object-contain hover:scale-105 transition-transform"
+                  />
+                </a>
+              </div>
+              <p className="text-xs font-bold text-gray-500 text-center max-w-[280px] leading-relaxed">
+                Escanee este código QR con su aplicación bancaria (o cámara del celular) para acceder al pago seguro simulado. También puede hacer clic sobre la imagen.
+              </p>
+            </div>
+
+            <div className="p-6 bg-gray-50 border-t border-gray-100 flex flex-col gap-3">
+              <button
+                onClick={() => {
+                  setIsQRModalOpen(false)
+                  onOrderSuccess()
+                }}
+                className="w-full py-4 rounded-xl bg-[#D96C4A] hover:bg-[#C25838] text-white font-black shadow-lg shadow-[#D96C4A]/30 transition-all flex items-center justify-center gap-2"
+              >
+                <CheckCircle2 size={22} /> He realizado el pago
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

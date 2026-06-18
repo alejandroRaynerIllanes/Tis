@@ -92,9 +92,7 @@ export const authService = {
   },
 
   // POST /clientes/auth/google para Clientes con Google
-  async loginGoogle(
-    googleToken: string
-  ): Promise<{ user: AuthUser; role: string; token: string }> {
+  async loginGoogle(googleToken: string): Promise<{ user: AuthUser; role: string; token: string }> {
     const data = await api.post<any>(
       '/clientes/auth/google',
       { token: googleToken },

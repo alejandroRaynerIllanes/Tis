@@ -105,3 +105,5 @@ export function Catalog() {
     </div>
   )
 }
+
+// se cancela todo

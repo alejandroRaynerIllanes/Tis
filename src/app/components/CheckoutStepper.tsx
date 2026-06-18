@@ -61,19 +61,37 @@ export function CheckoutStepper({ cart, cartTotal, currentUser, onClose, onOrder
       })
 
       toast.success('¡Pedido realizado con éxito!')
-      onOrderSuccess()
 
-      // Si eligió QR, le abrimos el simulador de pago con los datos de su pedido
+      // Si eligió QR, le abrimos la vista de QR integrado (Paso 6)
       if (paymentMethod === 'QR' && response.pedido) {
+        try {
+          const qrResponse: any = await api.post(`/pagos/generar-qr/${response.pedido._id}`)
+          setQrUrl(qrResponse.qrUrl)
+        } catch (qrErr) {
+          // Fallback en caso de fallo al generar el QR en el servidor
+          const datosPago = `SABOR_GESTION_ID_${response.pedido._id}_TOTAL_${(cartTotal + deliveryInfo.cost).toFixed(2)}`
+          setQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(datosPago)}`)
+        }
+
         const pId = response.pedido.codigo || response.pedido._id
         const totalStr = (cartTotal + deliveryInfo.cost).toFixed(2)
-        const baseUrl = String((import.meta as any).env.VITE_APP_URL || window.location.origin)
+        const baseUrl = String(window.location.origin)
         const simUrl = `${baseUrl}/pay-simulator?id=${encodeURIComponent(response.pedido._id)}&mesa=Delivery&total=${encodeURIComponent(totalStr)}&codigo=${encodeURIComponent(pId)}`
+        
+        setCreatedOrder(response.pedido)
+        setSimulatorUrl(simUrl)
+        setStep(6)
+        
+        // Abrimos el simulador en una pestaña nueva para facilitar la simulación al usuario
         window.open(simUrl, '_blank')
+      } else {
+        onOrderSuccess()
       }
       
     } catch (error: any) {
       toast.error(error.response?.data?.mensaje || 'Error al procesar el pedido')
+    } finally {
+      setIsProcessing(false)
     }
   }
 

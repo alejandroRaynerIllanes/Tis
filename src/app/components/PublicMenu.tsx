@@ -554,11 +554,11 @@ export function PublicMenu() {
 
       {/* DRAWER DEL CARRITO */}
       {isCartOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-end">
-          <div className="bg-white w-full max-w-md h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md max-h-[90vh] shadow-2xl rounded-3xl flex flex-col animate-in zoom-in-95 duration-300 overflow-hidden">
             {!isCheckoutStarted ? (
               <>
-                <div className="p-6 border-b flex items-center justify-between bg-[#FCE4D6]/30">
+                <div className="p-6 border-b flex items-center justify-between bg-[#FCE4D6]/30 shrink-0">
                   <div className="flex items-center gap-3">
                     <ShoppingCart className="text-[#D96C4A]" size={24} />
                     <h2 className="text-xl font-black text-[#4B2E2D]">Tu Pedido</h2>
@@ -638,7 +638,7 @@ export function PublicMenu() {
                 </div>
 
                 {cart.length > 0 && (
-                  <div className="p-6 bg-white border-t shadow-[0_-10px_20px_rgba(0,0,0,0.05)] animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <div className="p-6 bg-white border-t shadow-[0_-10px_20px_rgba(0,0,0,0.05)] animate-in fade-in slide-in-from-bottom-2 duration-300 shrink-0">
                     <div className="flex justify-between items-center mb-6">
                       <span className="text-gray-500 font-bold">Total a pagar:</span>
                       <span className="text-2xl font-black text-[#4B2E2D]">

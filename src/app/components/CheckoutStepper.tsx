@@ -87,9 +87,9 @@ export function CheckoutStepper({ cart, cartTotal, currentUser, onClose, onOrder
   const deliveryQRImage = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(simUrl)}&color=4B2E2D`
 
   return (
-    <div className="flex flex-col h-full animate-in slide-in-from-right duration-300">
+    <div className="flex flex-col h-full animate-in fade-in duration-300 overflow-hidden">
       {/* Header del Stepper */}
-      <div className="p-6 border-b flex items-center justify-between bg-[#FCE4D6]/30">
+      <div className="p-6 border-b flex items-center justify-between bg-[#FCE4D6]/30 shrink-0">
         <div className="flex items-center gap-3">
           <button onClick={() => step > 1 ? setStep(s => s - 1) : onClose()} className="p-1 text-[#4B2E2D]/50 hover:text-[#D96C4A] transition-colors rounded-full hover:bg-white">
             <ChevronLeft size={20} />
@@ -134,7 +134,6 @@ export function CheckoutStepper({ cart, cartTotal, currentUser, onClose, onOrder
                 <div className="text-center"><p className="text-[10px] font-bold text-gray-500 uppercase">Costo</p><p className="font-black text-[#D96C4A]">Bs. {deliveryInfo.cost}</p></div>
               </div>
             )}
-            <button disabled={!deliveryInfo.address || deliveryInfo.distance === 0} onClick={() => setStep(3)} className="w-full py-4 bg-[#D96C4A] text-white rounded-xl font-black disabled:opacity-50">Confirmar Ubicación</button>
           </div>
         )}
 
@@ -145,7 +144,6 @@ export function CheckoutStepper({ cart, cartTotal, currentUser, onClose, onOrder
             <input placeholder="Nombre completo" value={billingInfo.name} onChange={e => setBillingInfo({...billingInfo, name: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none" />
             <input placeholder="Teléfono" type="tel" value={billingInfo.phone} onChange={e => setBillingInfo({...billingInfo, phone: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none" />
             <input placeholder="Correo (Opcional)" type="email" value={billingInfo.email} onChange={e => setBillingInfo({...billingInfo, email: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none" />
-            <button disabled={!billingInfo.name || !billingInfo.phone} onClick={() => setStep(4)} className="w-full py-4 bg-[#D96C4A] text-white rounded-xl font-black">Continuar a Pago</button>
           </div>
         )}
 
@@ -165,7 +163,6 @@ export function CheckoutStepper({ cart, cartTotal, currentUser, onClose, onOrder
               </div>
               <div><h4 className="font-black text-[#4B2E2D] flex items-center gap-2"><Banknote size={18} /> Efectivo</h4><p className="text-xs text-gray-500">Pago contra entrega del pedido.</p></div>
             </button>
-            <button onClick={() => setStep(5)} className="w-full py-4 bg-[#D96C4A] text-white rounded-xl font-black mt-4">Revisar Pedido</button>
           </div>
         )}
 
@@ -190,6 +187,23 @@ export function CheckoutStepper({ cart, cartTotal, currentUser, onClose, onOrder
               <div className="flex justify-between text-sm text-[#D96C4A]"><span className="font-bold">Costo Delivery</span><span className="font-bold">Bs. {deliveryInfo.cost.toFixed(2)}</span></div>
               <div className="flex justify-between items-center pt-3 border-t border-gray-200"><span className="font-black text-lg text-[#4B2E2D]">Total</span><span className="font-black text-3xl text-[#D0543A]">Bs. {(cartTotal + deliveryInfo.cost).toFixed(2)}</span></div>
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* FOOTER FIJO PARA ACCIONES */}
+      {step > 1 && (
+        <div className="p-5 sm:p-6 bg-white border-t border-gray-100 shrink-0 shadow-[0_-10px_20px_rgba(0,0,0,0.05)]">
+          {step === 2 && (
+            <button disabled={!deliveryInfo.address || deliveryInfo.distance === 0} onClick={() => setStep(3)} className="w-full py-4 bg-[#D96C4A] text-white rounded-xl font-black disabled:opacity-50 transition-all hover:bg-[#b5462f]">Confirmar Ubicación</button>
+          )}
+          {step === 3 && (
+            <button disabled={!billingInfo.name || !billingInfo.phone} onClick={() => setStep(4)} className="w-full py-4 bg-[#D96C4A] text-white rounded-xl font-black disabled:opacity-50 transition-all hover:bg-[#b5462f]">Continuar a Pago</button>
+          )}
+          {step === 4 && (
+            <button onClick={() => setStep(5)} className="w-full py-4 bg-[#D96C4A] text-white rounded-xl font-black transition-all hover:bg-[#b5462f]">Revisar Pedido</button>
+          )}
+          {step === 5 && (
             <button
               onClick={() => {
                 if (paymentMethod === 'QR') {
@@ -199,13 +213,13 @@ export function CheckoutStepper({ cart, cartTotal, currentUser, onClose, onOrder
                 }
               }}
               disabled={isProcessing}
-              className="w-full py-4 bg-[#D96C4A] text-white rounded-xl font-black text-lg shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full py-4 bg-[#D96C4A] text-white rounded-xl font-black text-lg shadow-lg disabled:opacity-60 disabled:cursor-not-allowed transition-all hover:bg-[#b5462f]"
             >
               {isProcessing ? 'Procesando...' : 'Confirmar Pedido'}
             </button>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* MODAL DE CONFIRMACIÓN */}
       {isConfirmed && (

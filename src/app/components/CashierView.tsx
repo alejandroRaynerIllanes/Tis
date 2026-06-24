@@ -495,8 +495,10 @@ export function CashierView() {
       (selectedBill.montoPropina || 0)
     ).toFixed(2)
 
-    const baseUrl = (import.meta as any).env.VITE_APP_URL || window.location.origin
-    const simUrl = `${baseUrl}/pay-simulator?id=${pId}&mesa=${encodeURIComponent(mesaNameStr)}&total=${totalStr}&codigo=${codigoStr}`
+    // Ponemos el link EXACTO de tu deploy del frontend
+    const deployLink = 'https://quirquinita.onrender.com/' 
+    
+    const simUrl = `${deployLink}/pay-simulator?id=${pId}&mesa=${encodeURIComponent(mesaNameStr)}&total=${totalStr}&codigo=${codigoStr}`
     modalQRImage = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(simUrl)}&color=4B2E2D`
   }
 

@@ -26,9 +26,20 @@ function mapRole(backendRole: string): string {
 }
 
 export const authService = {
-  // POST /auth/login
-  // CAMBIO AQUÍ: Agregamos 'token: string' al Promise de retorno
+  // Login unificado
   async login(
+    usuario: string,
+    contraseña: string
+  ): Promise<{ user: AuthUser; role: string; token: string }> {
+    try {
+      return await this.loginStaff(usuario, contraseña)
+    } catch (error) {
+      return await this.loginClient(usuario, contraseña)
+    }
+  },
+
+  // POST /auth/login para el Personal
+  async loginStaff(
     usuario: string,
     contraseña: string
   ): Promise<{ user: AuthUser; role: string; token: string }> {
@@ -41,15 +52,67 @@ export const authService = {
       { skipAuth: true }
     )
 
-    // Guardar en localStorage usando tus funciones de api.ts
     setToken(data.token)
     setStoredUser(data.usuario)
 
     const role = mapRole(data.usuario.rol)
     localStorage.setItem('userRole', role)
 
-    // CAMBIO AQUÍ: Retornamos también el token para que Login.tsx lo vea
     return { user: data.usuario, role, token: data.token }
+  },
+
+  // POST /clientes/auth/login para Clientes
+  async loginClient(
+    usuario: string,
+    contraseña: string
+  ): Promise<{ user: AuthUser; role: string; token: string }> {
+    const data = await api.post<any>(
+      '/clientes/auth/login',
+      {
+        email: usuario,
+        password: contraseña
+      },
+      { skipAuth: true }
+    )
+
+    const clientUser = data.cliente || data.usuario
+    const userObj = {
+      ...clientUser,
+      id: clientUser?.id || clientUser?._id,
+      rol: clientUser?.rol || 'Cliente'
+    } as unknown as AuthUser
+
+    setToken(data.token)
+    setStoredUser(userObj)
+
+    const role = mapRole(userObj.rol)
+    localStorage.setItem('userRole', role)
+
+    return { user: userObj, role, token: data.token }
+  },
+
+  // POST /clientes/auth/google para Clientes con Google
+  async loginGoogle(googleToken: string): Promise<{ user: AuthUser; role: string; token: string }> {
+    const data = await api.post<any>(
+      '/clientes/auth/google',
+      { token: googleToken },
+      { skipAuth: true }
+    )
+
+    const clientUser = data.cliente || data.usuario
+    const userObj = {
+      ...clientUser,
+      id: clientUser?.id || clientUser?._id,
+      rol: clientUser?.rol || 'Cliente'
+    } as unknown as AuthUser
+
+    setToken(data.token)
+    setStoredUser(userObj)
+
+    const role = mapRole(userObj.rol)
+    localStorage.setItem('userRole', role)
+
+    return { user: userObj, role, token: data.token }
   },
 
   logout(): void {

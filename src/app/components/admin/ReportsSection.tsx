@@ -252,40 +252,6 @@ Pagos Anulados: 0
     }
   }
 
-  // 4. Reporte de Clientes VIP
-  const handleReporteVIP = async () => {
-    setIsGenerating(4)
-    toast.loading('Generando cartera VIP...', { id: 'rep4' })
-    try {
-      const res: any = await api.get('/reservas')
-      const reservas = res.data || res || []
-
-      const vipReservas = reservas.filter((r: any) => r.vip === true)
-
-      const datosTabla = vipReservas.map((r: any) => {
-        const fecha = new Date(r.fecha).toLocaleDateString()
-        return [
-          r.clienteNombre,
-          r.codigo || 'S/N',
-          fecha,
-          r.hora || 'S/H',
-          `${r.cantidadPersonas || 1} pax`
-        ]
-      })
-
-      generarReporteProfesional(
-        'Historial de Reservas VIP',
-        ['Nombre del Cliente VIP', 'Código Reserva', 'Fecha Asignada', 'Hora', 'Acompañantes'],
-        datosTabla
-      )
-      toast.success('Reporte VIP generado', { id: 'rep4' })
-    } catch (error) {
-      toast.error('Error al consultar clientes VIP', { id: 'rep4' })
-    } finally {
-      setIsGenerating(null)
-    }
-  }
-
   // Array configurado con las funciones reales
   const REPORTS_LIST = [
     {
@@ -308,13 +274,6 @@ Pagos Anulados: 0
       description: 'Ranking del menú con cantidades y categorías.',
       icon: FileText,
       action: handleReportePlatos
-    },
-    {
-      id: 4,
-      name: 'Reporte de Reservas VIP',
-      description: 'Historial de visitas y consumo de clientes preferenciales.',
-      icon: FileText,
-      action: handleReporteVIP
     }
   ]
 

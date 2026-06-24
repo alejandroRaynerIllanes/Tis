@@ -28,6 +28,7 @@ export const inventarioService = {
    */
   getInventarioEstado(): Promise<Ingrediente[]> {
     return api.get<Ingrediente[]>('/inventario/estado')
+    return api.get<Ingrediente[]>('/inventario/estado', { skipAuth: true })
   },
 
   /**
@@ -36,6 +37,7 @@ export const inventarioService = {
    */
   getRecetas(): Promise<any[]> {
     return api.get<any[]>('/inventario/recetas')
+    return api.get<any[]>('/inventario/recetas', { skipAuth: true })
   },
 
   /**

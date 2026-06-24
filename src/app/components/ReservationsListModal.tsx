@@ -1,4 +1,4 @@
-import { CalendarDays, Clock, Users, X, XCircle, UserCheck, Crown } from 'lucide-react'
+import { CalendarDays, Clock, Users, X, XCircle, UserCheck } from 'lucide-react'
 import { MouseEvent } from 'react'
 import { ReservationInfo, Table } from '../context/AppContext'
 
@@ -89,9 +89,6 @@ export function ReservationsListModal({
                       <span className="font-black text-[#4B2E2D] text-base">
                         {reservation.clientName}
                       </span>
-                      {reservation.vip && (
-                        <Crown size={14} className="text-yellow-500" strokeWidth={2.5} />
-                      )}
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3 text-xs">

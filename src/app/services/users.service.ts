@@ -14,6 +14,8 @@ export interface BackendUser {
   rol: string
   estado: boolean
   zona?: string
+  telefono?: string
+  direcciones?: any[]
   createdAt?: string
   updatedAt?: string
 }
@@ -41,6 +43,11 @@ export interface UpdateUserPayload {
 }
 
 export const usersService = {
+  // Obtener el perfil del usuario actual (basado en token)
+  async getProfile(): Promise<BackendUser> {
+    return api.get<BackendUser>('/usuarios/perfil')
+  },
+
   // GET /usuarios — Listar todos los usuarios
   async getAll(): Promise<BackendUser[]> {
     return api.get<BackendUser[]>('/usuarios')

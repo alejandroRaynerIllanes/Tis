@@ -26,7 +26,7 @@ export function ProtectedRoute({
       return
     }
 
-    const normalizedRole = userRole.toLowerCase()
+    const normalizedRole = userRole.toLowerCase().trim()
     const isAdmin = normalizedRole === 'admin' || normalizedRole === 'administrador'
 
     // Si requiere admin y el usuario no es admin → no autorizado
@@ -38,7 +38,16 @@ export function ProtectedRoute({
 
     // Si se especifican roles permitidos y el rol del usuario no coincide → no autorizado
     if (allowedRoles && allowedRoles.length > 0) {
-      const isRoleAllowed = allowedRoles.some((r) => r.toLowerCase() === normalizedRole)
+      const isRoleAllowed = allowedRoles.some((r) => {
+        const normR = r.toLowerCase().trim()
+        if (normR === 'cliente' || normR === 'client') {
+          return normalizedRole === 'cliente' || normalizedRole === 'client'
+        }
+        if (normR === 'admin' || normR === 'administrador') {
+          return normalizedRole === 'admin' || normalizedRole === 'administrador'
+        }
+        return normR === normalizedRole
+      })
       if (!isRoleAllowed) {
         setIsAuthorized(false)
         setIsChecking(false)

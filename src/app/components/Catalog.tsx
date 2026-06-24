@@ -12,7 +12,7 @@ import { CategoryManagement } from './admin/CategoryManagement'
 import { TableManagement } from './admin/TableManagement'
 import { UserManagement } from './admin/UserManagement'
 import { ReportsSection } from './admin/ReportsSection'
-import { VIPClients } from './VIPClients'
+import { ClientManagement } from './admin/ClientManagement'
 import { ActiveWaitersSection } from './admin/ActiveWaitersSection'
 import { InventoryManagement } from './admin/InventoryManagement'
 import { useAppContext } from '../context/AppContext'
@@ -94,8 +94,8 @@ export function Catalog() {
           <UserManagement />
         ) : activeView === 'reports' ? (
           <ReportsSection />
-        ) : activeView === 'vip-clients' ? (
-          <VIPClients />
+        ) : (activeView as string) === 'clients' || (activeView as string) === 'vip-clients' ? (
+          <ClientManagement />
         ) : activeView === 'waiters' ? (
           <ActiveWaitersSection />
         ) : activeView === 'inventory' ? (
@@ -105,3 +105,5 @@ export function Catalog() {
     </div>
   )
 }
+
+// se cancela todo

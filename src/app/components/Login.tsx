@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { User, Lock, Eye, EyeOff, ChefHat, AlertCircle } from 'lucide-react'
+import { User, Lock, Eye, EyeOff, ChefHat, AlertCircle, X, Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { authService } from '../services/auth.service'
-import { setToken, setStoredUser } from '../services/api'
+import { setToken, setStoredUser, api } from '../services/api'
 import { toast } from 'sonner'
 import { useAuth } from '../hooks/useAuth'
+import { GoogleLogin } from '@react-oauth/google'
 
 export function Login() {
   const [username, setUsername] = useState('')
@@ -12,8 +13,69 @@ export function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+
+  // Forgot Password modal states
+  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false)
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [forgotLoading, setForgotLoading] = useState(false)
+
   const navigate = useNavigate()
   const { redirectByRole } = useAuth()
+
+  const handleGoogleSuccess = async (credentialResponse: any) => {
+    if (!credentialResponse.credential) {
+      toast.error('No se recibió la credencial de Google')
+      return
+    }
+    setIsLoading(true)
+    setError('')
+    try {
+      const { role, token, user } = await authService.loginGoogle(credentialResponse.credential)
+
+      setToken(token)
+      setStoredUser(user)
+      localStorage.setItem('userRole', role)
+
+      toast.success('Sesión iniciada con Google correctamente')
+      redirectByRole(role)
+    } catch (err: any) {
+      const msg = err.message || 'Error al autenticar con Google'
+      setError(msg)
+      toast.error(msg)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleGoogleError = () => {
+    toast.error('Error al iniciar sesión con Google')
+  }
+
+  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!forgotEmail.trim()) {
+      toast.error('Por favor, ingresa tu correo electrónico')
+      return
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(forgotEmail.trim())) {
+      toast.error('Por favor, ingresa un correo electrónico válido')
+      return
+    }
+
+    setForgotLoading(true)
+    try {
+      const res: any = await api.post('/auth/forgot-password', { email: forgotEmail.trim() })
+      toast.success(res.mensaje || 'Si el correo está registrado, se enviará un enlace de recuperación')
+      setIsForgotModalOpen(false)
+      setForgotEmail('')
+    } catch (err: any) {
+      toast.error(err.message || 'Error al procesar la solicitud')
+    } finally {
+      setForgotLoading(false)
+    }
+  }
 
   useEffect(() => {
     const userRole = localStorage.getItem('userRole')
@@ -29,7 +91,6 @@ export function Login() {
     setIsLoading(true)
 
     try {
-      // Obtenemos los datos completos (mejora de Gustavo)
       const { role, token, user } = await authService.login(username.trim(), password)
 
       // Guardamos la sesión usando las utilidades de la API
@@ -37,6 +98,7 @@ export function Login() {
       setStoredUser(user)
       localStorage.setItem('userRole', role)
 
+      // Redirigir correctamente según su rol global
       redirectByRole(role)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Error al iniciar sesión'
@@ -104,7 +166,7 @@ export function Login() {
                 className="block text-sm font-semibold mb-2"
                 style={{ color: '#4B2E2D' }}
               >
-                Usuario
+                Correo Electrónico
               </label>
               <div className="relative">
                 <User
@@ -114,7 +176,7 @@ export function Login() {
                 />
                 <input
                   id="username"
-                  type="text"
+                  type="email"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full pl-11 pr-4 py-3 rounded-lg font-medium transition-all duration-200 focus:outline-none"
@@ -123,21 +185,31 @@ export function Login() {
                     border: '2px solid rgba(217,108,74,0.25)',
                     color: '#4B2E2D'
                   }}
-                  placeholder="Ingresa tu usuario"
+                  placeholder="Ingresa tu correo electrónico"
                   disabled={isLoading}
-                  autoComplete="username"
+                  autoComplete="email"
                 />
               </div>
             </div>
 
             <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-semibold mb-2"
-                style={{ color: '#4B2E2D' }}
-              >
-                Contraseña
-              </label>
+              <div className="flex justify-between items-center mb-2">
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-semibold"
+                  style={{ color: '#4B2E2D' }}
+                >
+                  Contraseña
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setIsForgotModalOpen(true)}
+                  className="text-xs font-bold hover:underline focus:outline-none"
+                  style={{ color: '#D96C4A' }}
+                >
+                  ¿Olvidaste tu contraseña?
+                </button>
+              </div>
               <div className="relative">
                 <Lock
                   className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
@@ -199,11 +271,103 @@ export function Login() {
             </button>
           </form>
 
+          <div className="relative my-6 flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300"></div>
+            </div>
+            <span className="relative bg-white px-4 text-xs font-semibold uppercase tracking-wider text-[#6B3E2E] z-10">
+              O continúa con
+            </span>
+          </div>
+
+          <div className="flex justify-center w-full">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={handleGoogleError}
+              shape="pill"
+              text="signin_with"
+              width="320"
+            />
+          </div>
+
           <p className="text-center text-[#4B2E2D]/40 text-xs font-medium mt-6">
             © 2026 Sabor & Gestión · Todos los derechos reservados
           </p>
         </div>
       </div>
+
+      {/* Modal de Recuperación de Contraseña */}
+      {isForgotModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div
+            className="bg-white rounded-2xl w-full max-w-md p-8 relative shadow-2xl border"
+            style={{ borderColor: 'rgba(217,108,74,0.2)' }}
+          >
+            <button
+              onClick={() => {
+                setIsForgotModalOpen(false)
+                setForgotEmail('')
+              }}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+              disabled={forgotLoading}
+            >
+              <X size={24} />
+            </button>
+
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-black text-[#4B2E2D]">¿Olvidaste tu contraseña?</h2>
+              <p className="text-sm text-gray-500 mt-2">
+                Ingresa tu correo electrónico y te enviaremos las instrucciones para restablecer tu contraseña.
+              </p>
+            </div>
+
+            <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-[#4B2E2D] mb-1">
+                  Correo Electrónico
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  disabled={forgotLoading}
+                  placeholder="ejemplo@correo.com"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#D96C4A]/20 outline-none font-medium"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsForgotModalOpen(false)
+                    setForgotEmail('')
+                  }}
+                  disabled={forgotLoading}
+                  className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold rounded-xl transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={forgotLoading}
+                  className="flex-1 py-3 bg-[#4B2E2D] text-white font-bold rounded-xl hover:bg-[#3A2222] transition-colors flex items-center justify-center gap-2"
+                >
+                  {forgotLoading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Enviando...
+                    </>
+                  ) : (
+                    'Enviar'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

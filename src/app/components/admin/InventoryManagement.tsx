@@ -19,16 +19,23 @@ import { IngredientModal } from './inventory/IngredientModal'
 
 // ─── Componente Orquestador ────────────────────────────────────────────────────
 
+export interface Recipe {
+  _id: string;
+  plato: any;
+  ingredientes: any[];
+  costoProduccion: number;
+}
+
 type ActiveTab = 'ingredientes' | 'recetas' | 'alertas'
 
 export function InventoryManagement() {
-  const { socket } = useAppContext()
+  const { socket, products: dishes } = useAppContext()
   const [activeTab, setActiveTab] = useState<ActiveTab>('ingredientes')
   const [searchTerm, setSearchTerm] = useState('')
 
   // ─── Estado de ingredientes (fuente de verdad del orquestador) ───
   const [ingredients, setIngredients] = useState<Ingrediente[]>([])
-  const [recipes, setRecipes] = useState<any[]>([])
+  const [recipes, setRecipes] = useState<Recipe[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   const fetchInventoryData = async () => {
@@ -113,6 +120,21 @@ export function InventoryManagement() {
 
   // ─── Derivados ───
   const lowStockIngredients = ingredients.filter(ing => ing.estado === 'Agotado' || ing.estado === 'Bajo')
+
+  // ─── Funciones Auxiliares ───
+  const getPlatosAfectados = (ingredienteId: string) => {
+    const recetasAfectadas = recipes.filter(r => 
+      r.ingredientes?.some((i: any) => {
+        const id = i.ingrediente?._id || i.ingrediente || i.item?._id || i.item;
+        return id === ingredienteId;
+      })
+    );
+    
+    return recetasAfectadas.map(r => {
+      const platoId = r.plato?._id || r.plato;
+      return dishes.find(d => d.id === platoId)?.name || r.plato?.nombre || 'Plato desconocido';
+    });
+  };
 
   // ─── Tabs config ───
   const TABS = [
@@ -200,6 +222,7 @@ export function InventoryManagement() {
               ) : (
                 lowStockIngredients.map((ing) => {
                   const isAgotado = ing.estado === 'Agotado';
+                  const platosAfectados = getPlatosAfectados(ing._id);
                   return (
                     <div key={ing._id} className={`bg-white rounded-3xl p-6 shadow-md border hover:shadow-xl transition-all flex flex-col ${isAgotado ? 'border-red-400' : 'border-orange-400'}`}>
                       <div className="flex justify-between items-start mb-5">
@@ -223,11 +246,28 @@ export function InventoryManagement() {
                         </div>
                         <div className="flex justify-between items-center pt-1">
                           <span className="text-sm font-semibold text-gray-500">Estado</span>
-                          <span className={`text-xs font-black px-3 py-1 rounded-full ${isAgotado ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'}`}>
-                            {isAgotado ? 'Stock Crítico' : 'Stock Bajo'}
+                          <span className={`text-xs font-black px-3 py-1 rounded-full border shadow-sm ${isAgotado ? 'bg-red-50 text-red-600 border-red-200' : 'bg-amber-50 text-amber-600 border-amber-200'}`}>
+                            {isAgotado ? '🔴 Agotado' : '🟡 Stock Bajo'}
                           </span>
                         </div>
                       </div>
+
+                      {platosAfectados.length > 0 && (
+                        <div className="mb-6 bg-red-50/50 border border-red-100 rounded-xl p-3 w-full">
+                          <p className="text-[10px] uppercase font-bold text-red-800/70 mb-2 tracking-wider flex items-center gap-1">
+                            🍽 Platos afectados ({platosAfectados.length})
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {platosAfectados.map((plato, idx) => (
+                              <span key={idx} className={`bg-white text-[#4B2E2D] border ${isAgotado ? 'border-red-100' : 'border-amber-100'} text-xs px-2.5 py-1 rounded-md shadow-sm font-bold flex items-center gap-1`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${isAgotado ? 'bg-red-500' : 'bg-amber-500'} shrink-0`}></span>
+                                <span className="truncate">{plato}</span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       <div className="mt-auto">
                         <button
                           onClick={() => openStockModal(ing)}

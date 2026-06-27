@@ -56,8 +56,14 @@ export function DeliveryView() {
 
   useEffect(() => {
     if (!socket) return
+    
+    const getRepIdLocal = (rep: any) => {
+      if (!rep) return null
+      return typeof rep === 'object' ? (rep._id || rep.id)?.toString() : rep.toString()
+    }
 
     const handleNuevo = (pedido: GlobalOrder) => {
+      if ((pedido as any).metodoEntrega !== 'delivery') return
       setOrders((prev) => [pedido, ...prev.filter((p) => p._id !== pedido._id)])
       if (isOnline) toast.info('¡Nuevo pedido de Delivery disponible!')
     }
@@ -65,7 +71,7 @@ export function DeliveryView() {
     const handlePagoQR = (data: { pedidoId: string }) => {
       setOrders((prev) => {
         const isMine = prev.some(
-          (o) => o._id === data.pedidoId && o.repartidorId === userIdStr
+          (o) => o._id === data.pedidoId && getRepIdLocal(o.repartidorId) === userIdStr
         )
         if (isMine) toast.success('📱 ¡El cliente acaba de pagar el pedido mediante QR!', { duration: 8000 })
         return prev
@@ -84,6 +90,7 @@ export function DeliveryView() {
     }
 
     socket.on('delivery:nuevo_pedido', handleNuevo)
+    socket.on('delivery:pedido_asignado', handleNuevo)
     socket.on('cocina:actualizar_tablero', loadOrders)
     socket.on('delivery:pago_confirmado', handlePagoQR)
     socket.on('chat:nuevo_mensaje', handleChatMsg)
@@ -91,12 +98,25 @@ export function DeliveryView() {
 
     return () => {
       socket.off('delivery:nuevo_pedido', handleNuevo)
+      socket.off('delivery:pedido_asignado', handleNuevo)
       socket.off('cocina:actualizar_tablero', loadOrders)
       socket.off('delivery:pago_confirmado', handlePagoQR)
       socket.off('chat:nuevo_mensaje', handleChatMsg)
       socket.off('chat:historial', handleHistorial)
     }
   }, [socket, isOnline])
+
+  // Sincronizar estado "isOnline" con el backend para la asignación automática
+  useEffect(() => {
+    const updateStatus = async () => {
+      try {
+        await api.put('/delivery/status', { isAvailable: isOnline })
+      } catch (err) {
+        console.error('Error sincronizando estado de delivery:', err)
+      }
+    }
+    updateStatus()
+  }, [isOnline])
 
   // ─── Acciones ───
   const handleUpdateStatus = async (orderId: string, status: string, assignMe = false) => {
@@ -131,15 +151,24 @@ export function DeliveryView() {
   }
 
   // ─── Derivados ───
-  const disponibles = orders.filter(
-    (o) => o.estado === 'Pendiente_de_Aceptacion' && 
-           (!o.repartidorId || o.repartidorId === userIdStr) &&
-           (o.metodoPago !== 'QR' || (o as any).pagoConfirmado)
-  )
+  const getRepId = (rep: any) =>
+    typeof rep === 'object' ? (rep?._id || rep?.id)?.toString() : rep?.toString()
+
+  const disponibles = orders.filter((o) => {
+    // Siempre mostramos pedidos pendientes para que cualquier delivery lo pueda aceptar
+    if (o.estado === 'Pendiente_de_Aceptacion') return true
+    // Si ya está en proceso pero no tiene repartidor asignado, lo mostramos como "huérfano"
+    if (!o.repartidorId && ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO', 'En_Cocina', 'Repartidor_Esperando'].includes(o.estado)) return true
+    return false
+  })
   const activos = orders.filter(
-    (o) => ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO', 'EN_CAMINO'].includes(o.estado) && o.repartidorId === userIdStr
+    (o) =>
+      ['ABIERTO', 'EN_PREPARACION', 'ENTREGADO', 'EN_CAMINO', 'En_Cocina', 'Repartidor_Esperando', 'En_Transito', 'Senal_Debil'].includes(o.estado) &&
+      getRepId(o.repartidorId) === userIdStr
   )
-  const historial = orders.filter((o) => o.estado === 'CERRADO' && o.repartidorId === userIdStr)
+  const historial = orders.filter(
+    (o) => ['CERRADO', 'CANCELADO'].includes(o.estado) && getRepId(o.repartidorId) === userIdStr
+  )
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] font-sans flex flex-col pb-20 relative overflow-x-hidden">

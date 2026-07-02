@@ -1,5 +1,6 @@
+//src/app/components/CheckoutStepper.tsx
 import React, { useState, useEffect } from 'react'
-import { Bike, MapPin, Info, Clock, ArrowRight, QrCode, Banknote, ChevronLeft, X, CheckCircle2, Loader2 } from 'lucide-react'
+import { Bike, MapPin, Info, Clock, ArrowRight, QrCode, Banknote, ChevronLeft, X, CheckCircle2, Loader2, AlertTriangle } from 'lucide-react'
 import { MapPicker } from './MapPicker'
 import { api } from '../services/api'
 import { toast } from 'sonner'
@@ -29,6 +30,9 @@ export function CheckoutStepper({ cart, cartTotal, currentUser, onClose, onOrder
   const [isProcessing, setIsProcessing] = useState(false)
   const [isQRModalOpen, setIsQRModalOpen] = useState(false)
   const [isConfirmed, setIsConfirmed] = useState(false)
+  
+  // 🛡️ NUEVO ESTADO: Para atrapar y mostrar los errores de inventario en el checkout
+  const [inventoryErrors, setInventoryErrors] = useState<string[]>([])
   
   const { socket } = useAppContext()
 
@@ -62,6 +66,7 @@ export function CheckoutStepper({ cart, cartTotal, currentUser, onClose, onOrder
 
   const processCheckout = async () => {
     setIsProcessing(true)
+    setInventoryErrors([]) // Limpiamos errores previos al reintentar
 
     try {
       const items = cart.map(c => ({
@@ -92,7 +97,6 @@ export function CheckoutStepper({ cart, cartTotal, currentUser, onClose, onOrder
         const baseUrl = String(window.location.origin)
         const simUrl = `${baseUrl}/pay-simulator?id=${encodeURIComponent(response.pedido._id)}&mesa=Delivery&total=${encodeURIComponent(totalStr)}&codigo=${encodeURIComponent(pId)}`
         
-        // Generamos el QR codificando la URL del simulador para que se abra al escanear con el celular
         const qrCodeImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(simUrl)}&color=4B2E2D`
         
         try {
@@ -111,7 +115,13 @@ export function CheckoutStepper({ cart, cartTotal, currentUser, onClose, onOrder
       }
       
     } catch (error: any) {
-      toast.error(error.response?.data?.mensaje || 'Error al procesar el pedido')
+      // 🛡️ ATRAPAR ERROR DE INVENTARIO: Verificamos si el backend envió el arreglo de errores
+      const respData = error.response?.data
+      if (respData && respData.errores && Array.isArray(respData.errores)) {
+        setInventoryErrors(respData.errores) // Levantamos el modal rojo
+      } else {
+        toast.error(respData?.mensaje || 'Error al procesar el pedido')
+      }
     } finally {
       setIsProcessing(false)
     }
@@ -246,6 +256,41 @@ export function CheckoutStepper({ cart, cartTotal, currentUser, onClose, onOrder
               {isProcessing ? 'Procesando...' : 'Confirmar Pedido'}
             </button>
           )}
+        </div>
+      )}
+
+      {/* 🛑 MODAL DE ALERTA DE INVENTARIO PARA EL CLIENTE/DELIVERY */}
+      {inventoryErrors.length > 0 && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col">
+            <div className="bg-red-50 px-6 pt-8 pb-6 text-center border-b border-red-100 shrink-0">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm border-2 border-red-200">
+                <AlertTriangle size={32} className="text-red-600" />
+              </div>
+              <h2 className="text-2xl font-black text-red-700 mb-2 leading-tight">Platos no<br/>disponibles</h2>
+              <p className="text-sm font-bold text-red-500/80 leading-relaxed px-2">
+                Lo sentimos, no tenemos los ingredientes suficientes en cocina para preparar su orden actual:
+              </p>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[40vh] bg-gray-50/50">
+              <div className="space-y-3">
+                {inventoryErrors.map((err, idx) => (
+                  <div key={idx} className="bg-white p-4 rounded-xl border border-red-100 shadow-sm flex items-start gap-3 text-sm font-bold text-gray-700">
+                    <span className="text-red-500 shrink-0 mt-0.5">•</span>
+                    <span className="leading-snug">{err}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="p-6 border-t border-gray-100 bg-white shrink-0">
+              <button
+                onClick={() => setInventoryErrors([])}
+                className="w-full py-4 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-black text-lg shadow-lg shadow-red-600/30 transition-all active:scale-95"
+              >
+                Volver y modificar pedido
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

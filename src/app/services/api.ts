@@ -109,9 +109,11 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   }
 
   if (!response.ok) {
-    const errMsg =
-      data?.message || data?.error || data?.mensaje || data?.msg || `Error ${response.status}`
-    throw new Error(errMsg)
+    // 🔥 CAMBIO AQUÍ: No lances solo un Error con un string. 
+    // Crea un objeto error que contenga la respuesta completa del servidor.
+    const error = new Error(data?.mensaje || data?.message || `Error ${response.status}`);
+    (error as any).response = { data }; // Adjuntamos los datos (donde viene tu arreglo 'errores')
+    throw error;
   }
 
   return data as T

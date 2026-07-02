@@ -100,9 +100,10 @@ export function CashierView() {
         propinas = 0,
         pagosProcesados = 0
       closed.forEach((o: Order) => {
-        const orderTotal = Number(o.total || 0)
+        const sub = Number(o.subtotalCierre || o.total || 0)
         const desc = Number(o.montoDescuento || 0)
         const prop = Number(o.montoPropina || 0)
+        const orderTotal = (desc > 0 || prop > 0) ? Math.max(0, sub - desc + prop) : Number(o.total || 0)
         const metodo = String(o.metodoPago || '').trim().toLowerCase()
 
         totalDia += orderTotal

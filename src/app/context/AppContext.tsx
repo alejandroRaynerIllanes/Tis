@@ -765,7 +765,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           await ordersService.create(payload)
           updateTableStatus(tableId, 'Ocupada')
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error al confirmar pedido:', error)
         throw error
       }

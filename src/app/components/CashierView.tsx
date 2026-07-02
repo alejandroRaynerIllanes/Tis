@@ -44,6 +44,53 @@ const safeMesaId = (pedido: any): string => {
   return String(pedido.mesa || '');
 };
 
+const getBillSubtotal = (bill: any): number => {
+  if (!bill) return 0
+  const items = bill.items || bill.detalles || []
+  if (items.length > 0) {
+    const itemsSum = items.reduce((sum: number, item: any) => {
+      const p = Number(item.precioUnitario || (typeof item.plato === 'object' ? item.plato?.precio : 0) || 0)
+      const q = Number(item.cantidad || 1)
+      return sum + (item.subtotal ? Number(item.subtotal) : p * q)
+    }, 0)
+    if (itemsSum > 0) return itemsSum
+  }
+  if (bill.subtotalCierre !== undefined && bill.subtotalCierre !== null && Number(bill.subtotalCierre) > 0) {
+    return Number(bill.subtotalCierre)
+  }
+  if (bill.subtotal !== undefined && bill.subtotal !== null && Number(bill.subtotal) > 0) {
+    return Number(bill.subtotal)
+  }
+  return Number(bill.total || 0)
+}
+
+const getBillDiscount = (bill: any): number => {
+  if (!bill) return 0
+  const val = bill.montoDescuento !== undefined && bill.montoDescuento !== null
+    ? bill.montoDescuento
+    : bill.descuento
+  return Number(val || 0)
+}
+
+const getBillTip = (bill: any): number => {
+  if (!bill) return 0
+  const val = bill.montoPropina !== undefined && bill.montoPropina !== null
+    ? bill.montoPropina
+    : bill.propina
+  return Number(val || 0)
+}
+
+const getBillTotal = (bill: any): number => {
+  if (!bill) return 0
+  const sub = getBillSubtotal(bill)
+  const desc = getBillDiscount(bill)
+  const prop = getBillTip(bill)
+  if (desc > 0 || prop > 0) {
+    return Number(Math.max(0, sub - desc + prop).toFixed(2))
+  }
+  return Number(bill.total || 0)
+}
+
 // ─── COMPONENTE PRINCIPAL ───────────────────────────────────────────────────
 
 export function CashierView() {
@@ -99,12 +146,12 @@ export function CashierView() {
         descuentos = 0,
         propinas = 0,
         pagosProcesados = 0
-      closed.forEach((o: Order) => {
-        const sub = Number(o.subtotalCierre || o.total || 0)
-        const desc = Number(o.montoDescuento || 0)
-        const prop = Number(o.montoPropina || 0)
-        const orderTotal = (desc > 0 || prop > 0) ? Math.max(0, sub - desc + prop) : Number(o.total || 0)
-        const metodo = String(o.metodoPago || '').trim().toLowerCase()
+      closed.forEach((o: any) => {
+        const sub = getBillSubtotal(o)
+        const desc = getBillDiscount(o)
+        const prop = getBillTip(o)
+        const orderTotal = getBillTotal(o)
+        const metodo = String(o.metodoPago || o.metodo_pago || '').trim().toLowerCase()
 
         totalDia += orderTotal
         descuentos += desc
@@ -348,10 +395,10 @@ export function CashierView() {
       const pId = selectedBill?.pedidoId || selectedBill?._id
       let comprobanteBackend = null
 
-      const subtotalVal = Number(selectedBill?.subtotalCierre || selectedBill?.total || 0)
-      const descVal = Number(selectedBill?.montoDescuento || 0)
-      const propVal = Number(selectedBill?.montoPropina || 0)
-      const calculatedTotal = Math.max(0, subtotalVal - descVal + propVal)
+      const subtotalVal = getBillSubtotal(selectedBill)
+      const descVal = getBillDiscount(selectedBill)
+      const propVal = getBillTip(selectedBill)
+      const calculatedTotal = getBillTotal(selectedBill)
 
       const payload = {
         metodoPago: selectedMethod || 'QR',
@@ -823,26 +870,26 @@ export function CashierView() {
                   <div className="flex justify-between items-center text-sm">
                     <span className="font-semibold text-gray-500">Subtotal</span>
                     <span className="font-bold text-[#4B2E2D]">
-                      Bs. {(selectedBill.subtotalCierre || selectedBill.total || 0).toFixed(2)}
+                      Bs. {getBillSubtotal(selectedBill).toFixed(2)}
                     </span>
                   </div>
-                  {(selectedBill.montoDescuento || 0) > 0 && (
+                  {getBillDiscount(selectedBill) > 0 && (
                     <div className="flex justify-between items-center text-sm text-green-600">
                       <span className="font-semibold flex items-center gap-1">
                         <Percent size={12} /> Descuento aplicado
                       </span>
                       <span className="font-bold">
-                        - Bs. {(selectedBill.montoDescuento || 0).toFixed(2)}
+                        - Bs. {getBillDiscount(selectedBill).toFixed(2)}
                       </span>
                     </div>
                   )}
-                  {(selectedBill.montoPropina || 0) > 0 && (
+                  {getBillTip(selectedBill) > 0 && (
                     <div className="flex justify-between items-center text-sm text-[#D96C4A]">
                       <span className="font-semibold flex items-center gap-1">
                         <Wallet size={12} /> Propina sugerida
                       </span>
                       <span className="font-bold">
-                        + Bs. {(selectedBill.montoPropina || 0).toFixed(2)}
+                        + Bs. {getBillTip(selectedBill).toFixed(2)}
                       </span>
                     </div>
                   )}
@@ -851,12 +898,7 @@ export function CashierView() {
                       Total a Cobrar
                     </span>
                     <span className="font-black text-3xl text-[#D0543A] leading-none">
-                      Bs.{' '}
-                      {(
-                        (selectedBill.subtotalCierre || selectedBill.total || 0) -
-                        (selectedBill.montoDescuento || 0) +
-                        (selectedBill.montoPropina || 0)
-                      ).toFixed(2)}
+                      Bs. {getBillTotal(selectedBill).toFixed(2)}
                     </span>
                   </div>
                 </div>

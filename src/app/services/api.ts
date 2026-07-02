@@ -4,12 +4,14 @@
 // Por defecto asumimos que las rutas del backend están bajo '/api'
 
 // 🔥 FIX INTELIGENTE: Si estás probando en tu PC (localhost), usará tu backend local automáticamente.
-const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-let base = isLocal ? 'http://localhost:3000/api' : ((import.meta as any).env.VITE_API_URL || 'https://sabor-gestion-backend-7.onrender.com/api');
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+let base = isLocal
+  ? 'http://localhost:3000/api'
+  : (import.meta as any).env.VITE_API_URL || 'https://sabor-gestion-backend-7.onrender.com/api'
 if (!base.endsWith('/api')) {
-  base = base.replace(/\/+$/, '') + '/api';
+  base = base.replace(/\/+$/, '') + '/api'
 }
-const API_BASE_URL = base;
+const API_BASE_URL = base
 
 interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown
@@ -87,7 +89,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     clearToken()
     clearStoredUser()
     localStorage.removeItem('userRole')
-    
+
     // 🔥 FIX: Solo redirigir si NO estamos ya en la página de inicio, para evitar bucles infinitos
     if (window.location.pathname !== '/') {
       window.location.href = '/'

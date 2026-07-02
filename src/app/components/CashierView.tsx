@@ -100,13 +100,25 @@ export function CashierView() {
         propinas = 0,
         pagosProcesados = 0
       closed.forEach((o: Order) => {
-        totalDia += o.total || 0
-        descuentos += o.montoDescuento || 0
-        propinas += o.montoPropina || 0
+        const orderTotal = Number(o.total || 0)
+        const desc = Number(o.montoDescuento || 0)
+        const prop = Number(o.montoPropina || 0)
+        const metodo = String(o.metodoPago || '').trim().toLowerCase()
+
+        totalDia += orderTotal
+        descuentos += desc
+        propinas += prop
         pagosProcesados += 1
-        if (o.metodoPago === 'Efectivo') efectivo += o.total || 0
-        if (o.metodoPago === 'Tarjeta') tarjeta += o.total || 0
-        if (o.metodoPago === 'QR') qr += o.total || 0
+
+        if (metodo === 'efectivo') {
+          efectivo += orderTotal
+        } else if (metodo === 'tarjeta') {
+          tarjeta += orderTotal
+        } else if (metodo === 'qr' || metodo === 'pago qr') {
+          qr += orderTotal
+        } else {
+          efectivo += orderTotal
+        }
       })
 
       setPendingBills((prev) => {
@@ -335,16 +347,27 @@ export function CashierView() {
       const pId = selectedBill?.pedidoId || selectedBill?._id
       let comprobanteBackend = null
 
+      const subtotalVal = Number(selectedBill?.subtotalCierre || selectedBill?.total || 0)
+      const descVal = Number(selectedBill?.montoDescuento || 0)
+      const propVal = Number(selectedBill?.montoPropina || 0)
+      const calculatedTotal = Math.max(0, subtotalVal - descVal + propVal)
+
+      const payload = {
+        metodoPago: selectedMethod || 'QR',
+        montoDescuento: descVal,
+        montoPropina: propVal,
+        subtotalCierre: subtotalVal,
+        cajeroAsignado: currentUser?.id || (currentUser as any)?._id
+      }
+
       try {
-        const response = await api.post<{ comprobante: Order }>(`/pagos/${pId}/procesar`, {
-          metodoPago: selectedMethod || 'QR' // Fallback a QR si se autoejecutó
-        })
+        const response = await api.post<{ comprobante: Order }>(`/pagos/${pId}/procesar`, payload)
         comprobanteBackend = (response as any).comprobante || (response as any).data?.comprobante
       } catch (err: any) {
         await api.put(`/pedidos/${pId}`, {
+          ...payload,
           estado: 'CERRADO',
-          paymentStatus: 'paid',
-          metodoPago: selectedMethod || 'QR'
+          paymentStatus: 'paid'
         })
       }
 
@@ -370,7 +393,12 @@ export function CashierView() {
 
       setProcessedBill({
         ...selectedBill,
+        subtotalCierre: subtotalVal,
+        montoDescuento: descVal,
+        montoPropina: propVal,
+        total: calculatedTotal,
         ...comprobanteBackend,
+        metodoPago: selectedMethod || 'QR',
         paymentMethod: selectedMethod || 'QR'
       })
 

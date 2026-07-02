@@ -1,3 +1,4 @@
+//src/app/components/client/ClientProfile.tsx
 import React, { useState, useEffect, useRef } from 'react'
 import { User, MapPin, Package, Shield, ArrowLeft, LogOut, Plus, Trash2, Edit2, Loader2, Save, MessageSquare, X, Send } from 'lucide-react'
 import { useNavigate } from 'react-router'

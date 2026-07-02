@@ -1,3 +1,4 @@
+//src/app/components/TableSidePanel.tsx
 import React, { useState, useEffect } from 'react'
 import {
   X,
@@ -11,13 +12,12 @@ import {
   Printer,
   Trash2,
   Edit2,
-  CreditCard
+  AlertTriangle // <-- NUEVO ÍCONO AÑADIDO
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '../services/api'
 import { useAppContext } from '../context/AppContext'
 import { platosService } from '../services/platos.service'
-import { ordersService } from '../services/orders.service'
 import { inventarioService } from '../services/inventario.service'
 import { checkAvailability } from '../utils/checkDishAvailability'
 
@@ -52,6 +52,9 @@ export function TableSidePanel({ isOpen, tableId, onClose, onOpenPayment }: Tabl
   const [backendOrder, setBackendOrder] = useState<any>(null)
   const [recipes, setRecipes] = useState<any[]>([])
   const [inventory, setInventory] = useState<any[]>([])
+  
+  // 🛡️ NUEVO ESTADO: Para atrapar y mostrar los errores de inventario
+  const [inventoryErrors, setInventoryErrors] = useState<string[]>([])
 
   // Resetear estados locales cada vez que se abre una mesa nueva
   useEffect(() => {
@@ -60,6 +63,7 @@ export function TableSidePanel({ isOpen, tableId, onClose, onOpenPayment }: Tabl
       setShowSummary(false)
       setEditingNote(null)
       setSearchQuery('')
+      setInventoryErrors([]) // Limpiamos errores anteriores
 
       // Buscar si la mesa tiene un pedido en estado "Listo/ENTREGADO" en la cocina
       api
@@ -72,7 +76,7 @@ export function TableSidePanel({ isOpen, tableId, onClose, onOpenPayment }: Tabl
     }
   }, [isOpen, tableId])
 
-  // CARGA INICIAL INDEPENDIENTE: Garantiza que el menú cargue al abrir la mesa sin depender de otra vista
+  // CARGA INICIAL INDEPENDIENTE
   useEffect(() => {
     inventarioService.getInventarioEstado()
       .then(setInventory)
@@ -139,7 +143,6 @@ export function TableSidePanel({ isOpen, tableId, onClose, onOpenPayment }: Tabl
   const itemsTotal = activeOrder.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
   const orderTotal = itemsTotal + cargoVip
 
-
   // Filtrar platillos
   const filteredDishes = localProducts.filter(
     (d) =>
@@ -167,6 +170,7 @@ export function TableSidePanel({ isOpen, tableId, onClose, onOpenPayment }: Tabl
   // Handlers
   const handleConfirmOrder = async () => {
     setIsSubmitting(true)
+    setInventoryErrors([]) // Limpiamos errores previos al reintentar
     try {
       await confirmOrder(tableId)
 
@@ -184,7 +188,13 @@ export function TableSidePanel({ isOpen, tableId, onClose, onOpenPayment }: Tabl
         }
       )
     } catch (error: any) {
-      toast.error(error.message || 'Error al enviar el pedido a la cocina.')
+      // 🛡️ ATRAPAR ERROR DE INVENTARIO: Verificamos si el backend envió el arreglo de errores
+      const respData = error.response?.data || error
+      if (respData && respData.errores && Array.isArray(respData.errores)) {
+        setInventoryErrors(respData.errores) // Levantamos el modal rojo
+      } else {
+        toast.error(respData.mensaje || error.message || 'Error al enviar el pedido a la cocina.')
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -216,7 +226,7 @@ export function TableSidePanel({ isOpen, tableId, onClose, onOpenPayment }: Tabl
         onClick={onClose}
       />
 
-      {/* Contenedor del Modal */}
+      {/* Contenedor del Modal Principal */}
       <div className="relative z-10 w-[95vw] sm:w-full max-w-[440px] lg:max-w-[480px] bg-white shadow-2xl rounded-3xl flex flex-col transform transition-all duration-300 ease-out overflow-hidden max-h-[95vh] sm:max-h-[90vh] animate-in zoom-in-95">
         {/* Header del panel */}
         <div
@@ -690,6 +700,41 @@ export function TableSidePanel({ isOpen, tableId, onClose, onOpenPayment }: Tabl
           </div>
         )}
       </div>
+
+      {/* 🛑 MODAL DE ALERTA DE INVENTARIO PARA EL MESERO */}
+      {inventoryErrors.length > 0 && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col">
+            <div className="bg-red-50 px-6 pt-8 pb-6 text-center border-b border-red-100 shrink-0">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm border-2 border-red-200">
+                <AlertTriangle size={32} className="text-red-600" />
+              </div>
+              <h2 className="text-2xl font-black text-red-700 mb-2 leading-tight">Ingredientes<br/>Insuficientes</h2>
+              <p className="text-sm font-bold text-red-500/80 leading-relaxed px-2">
+                Cocina no puede preparar esta orden. Faltan los siguientes insumos en el inventario:
+              </p>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[40vh] bg-gray-50/50">
+              <div className="space-y-3">
+                {inventoryErrors.map((err, idx) => (
+                  <div key={idx} className="bg-white p-4 rounded-xl border border-red-100 shadow-sm flex items-start gap-3 text-sm font-bold text-gray-700">
+                    <span className="text-red-500 shrink-0 mt-0.5">•</span>
+                    <span className="leading-snug">{err}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="p-6 border-t border-gray-100 bg-white shrink-0">
+              <button
+                onClick={() => setInventoryErrors([])}
+                className="w-full py-4 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-black text-lg shadow-lg shadow-red-600/30 transition-all active:scale-95"
+              >
+                Entendido, modificar pedido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
